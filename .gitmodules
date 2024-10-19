@@ -1,0 +1,6 @@
+[submodule "data/binance"]
+	path = data/binance
+	url = https://github.com/binance/binance-public-data.git
+[submodule "docs/project/template"]
+	path = docs/project/template
+	url = https://github.com/patriciobos/Plantilla-planificacion.git
