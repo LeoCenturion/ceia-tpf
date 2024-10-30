@@ -1,0 +1,17 @@
+\babel@toc {spanish}{}
+\contentsline {section}{\numberline {1}1. Descripción técnica-conceptual del proyecto a realizar}{5}{section.1}%
+\contentsline {section}{\numberline {2}2. Identificación y análisis de los interesados}{6}{section.2}%
+\contentsline {section}{\numberline {3}3. Propósito del proyecto}{6}{section.3}%
+\contentsline {section}{\numberline {4}4. Alcance del proyecto}{6}{section.4}%
+\contentsline {section}{\numberline {5}5. Supuestos del proyecto}{6}{section.5}%
+\contentsline {section}{\numberline {6}6. Requerimientos}{7}{section.6}%
+\contentsline {section}{\numberline {7}7. Historias de usuarios (\textit {Product backlog})}{8}{section.7}%
+\contentsline {section}{\numberline {8}8. Entregables principales del proyecto}{8}{section.8}%
+\contentsline {section}{\numberline {9}9. Desglose del trabajo en tareas}{8}{section.9}%
+\contentsline {section}{\numberline {10}10. Diagrama de Activity On Node}{9}{section.10}%
+\contentsline {section}{\numberline {11}11. Diagrama de Gantt}{9}{section.11}%
+\contentsline {section}{\numberline {12}12. Presupuesto detallado del proyecto}{13}{section.12}%
+\contentsline {section}{\numberline {13}13. Gestión de riesgos}{13}{section.13}%
+\contentsline {section}{\numberline {14}14. Gestión de la calidad}{14}{section.14}%
+\contentsline {section}{\numberline {15}15. Procesos de cierre}{15}{section.15}%
+\contentsfinish 
