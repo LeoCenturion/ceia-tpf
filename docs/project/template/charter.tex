@@ -201,45 +201,69 @@
     \section{6. Requerimientos}
     \label{sec:requerimientos}
 
-    \begin{consigna}{red} % ELIMINAR \begin{consigna}{red} y \end{consigna}{red} en las secciones que vayan completando para cada entrega parcial.
-        Los requerimientos deben enumerarse y de ser posible estar agrupados por afinidad, por ejemplo:
+    \begin{enumerate}
+    \item Requerimientos funcionales:
+      \begin{enumerate}
+      \item El sistema debe poder operar de de forma autónoma.
+      \item El usuario debe poder ingresar credenciales de una cuenta en un exchange de criptomonedas con la cual operar.
+      \item El sistema debe poder detenerse de forma segura.
+      \item El sistema debe tener criterios configurables que determinen el nivel tolerable de riesgo, para un criterio de riesgo a definir.
+      \item Al sistema se le puede definir un monto máximo con el cual operar.
+      \end{enumerate}
+    \item Requerimientos de documentación:
+      \begin{enumerate}
+      \item Debe estar documentado como iniciar y detener el sistema de forma segura.
+      \item Debe estar documentado los parámetros de configuración y como afectan al comportamiento del sistema.
 
-        \begin{enumerate}
-            \item Requerimientos funcionales:
-            \begin{enumerate}
-                \item El sistema debe...
-                \item Tal componente debe...
-                \item El usuario debe poder...
-            \end{enumerate}
-            \item Requerimientos de documentación:
-            \begin{enumerate}
-                \item Requerimiento 1.
-                \item Requerimiento 2 (prioridad menor)
-            \end{enumerate}
-            \item Requerimiento de testing...
-            \item Requerimientos de la interfaz...
-            \item Requerimientos interoperabilidad...
-            \item etc...
-        \end{enumerate}
+      \end{enumerate}
+    \item Requerimiento de testing:
+      \begin{enumerate}
+      \item El sistema contara con tests de integración contra la API del exchange elegido.
+      \item El sistema contara con tests de componente validando las reglas de negocio del servicio. Por ejemplo: respetar el monto máximo o el limite de riesgo.
+      \item El modelo sera evaluado según su capacidad predicativa teniendo en cuenta los datos históricos disponibles.
+      \item Se diseñara una forma de monitorizar el rendimiento del sistema.
+      \end{enumerate}
 
-        Leyendo los requerimientos se debe poder interpretar cómo será el proyecto y su funcionalidad.
+    \item Requerimientos de la interfaz:
+      \begin{enumerate}
+      \item El sistema proveerá una interfaz de linea de comandos(CLI) para iniciar y detener el sistema.
+      \item La CLI sera clara en sus errores cuando faltase información necesaria para iniciar el sistema.
+      \end{enumerate}
 
-        Indicar claramente cuál es la prioridad entre los distintos requerimientos y si hay requerimientos opcionales.
-
-        \textbf{¡¡¡No olvidarse de que los requerimientos incluyen a las regulaciones y normas vigentes!!!}
-
-        Y al escribirlos seguir las siguientes reglas:
-        \begin{itemize}
-            \item Ser breve y conciso (nadie lee cosas largas).
-            \item Ser específico: no dejar lugar a confusiones.
-            \item Expresar los requerimientos en términos que sean cuantificables y medibles.
-        \end{itemize}
-
-    \end{consigna} % ELIMINAR \begin{consigna}{red} y \end{consigna}{red} en las secciones que vayan completando para cada entrega parcial.
-
+    \end{enumerate}
 
     \section{7. Historias de usuarios (\textit{Product backlog})}
+    \subsection{Roles}
+    Se identifican los siguientes roles:
+    \begin{itemize}
+    \item Inversor: individuo registrado en el exchange que aporta la cuenta con capital disponible para operar.
+    \item Ingeniero de Operaciones: individuo con conocimientos técnicos responsable de poner el sistema en marcha y velar por su correcto funcionamiento.
+    \item Gerente de inversiones: individuo encargado de decidir los parámetros con los cuales se configurara el sistema en base a los objetivos de negocio.
+    \end{itemize}
+
     \label{sec:backlog}
+    \subsection{Product backlog}
+    \subsubsection{Inversor}
+    \begin{enumerate}
+    \item \textbf{Como} inversor \textbf{quiero} proveer de capital \textbf{para} generar ganancias.
+    \item \textbf{Como} inversor \textbf{quiero} proveer de forma secura las credenciales de mi cuenta \textbf{para} que se pueda operar con el capital disponible.
+    \end{enumerate}
+
+    \subsubsection{Ingeniero de Operaciones}
+    \begin{enumerate}
+    \item \textbf{Como} ingeniero de operaciones \textbf{quiero} poder levantar el sistema \textbf{para} corroborar que no haya errores de configuración.
+    \item \textbf{Como} ingeniero de operaciones \textbf{quiero} poder iniciar el sistema \textbf{para} que empiece a operar.
+    \item \textbf{Como} ingeniero de operaciones \textbf{quiero} poder detener el sistema \textbf{para} que deje de operar.
+    \item \textbf{Como} ingeniero de operaciones \textbf{quiero} poder detener el sistema de forma segura \textbf{para} que no queden transacciones sin finalizar.
+    \item \textbf{Como} ingeniero de operaciones \textbf{quiero} poder matar el sistema \textbf{para} que deje consumir recursos.
+    \item \textbf{Como} ingeniero de operaciones \textbf{quiero} ver logs del sistema  \textbf{para} monitorizar errores.
+    \end{enumerate}
+
+    \subsubsection{Gerente de inversiones}
+    \begin{enumerate}
+    \item \textbf{Como} gerente de inversiones  \textbf{quiero} configurar el nivel de riesgo \textbf{para} evitar la perdida de capital.
+    \item \textbf{Como} gerente de inversiones  \textbf{quiero} configurar un limite de dinero a invertir \textbf{para} evitar la perdida de capital.
+    \end{enumerate}
 
     \begin{consigna}{red}
         Descripción: en esta sección se deben incluir las historias de usuarios y su ponderación (\textit{history points}). Recordar que las historias de usuarios son descripciones cortas y simples de una característica contada desde la perspectiva de la persona que desea la nueva capacidad, generalmente un usuario o cliente del sistema. La ponderación es un número entero que representa el tamaño de la historia comparada con otras historias de similar tipo.
