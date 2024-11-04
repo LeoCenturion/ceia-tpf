@@ -245,95 +245,100 @@
     \subsection{Product backlog}
     \subsubsection{Inversor}
     \begin{enumerate}
-    \item \textbf{Como} inversor \textbf{quiero} proveer de capital \textbf{para} generar ganancias.
     \item \textbf{Como} inversor \textbf{quiero} proveer de forma secura las credenciales de mi cuenta \textbf{para} que se pueda operar con el capital disponible.
+      \textit{Story points}: 3  (complejidad: 1, dificultad: 1, incertidumbre: 1)
     \end{enumerate}
 
     \subsubsection{Ingeniero de Operaciones}
     \begin{enumerate}
     \item \textbf{Como} ingeniero de operaciones \textbf{quiero} poder levantar el sistema \textbf{para} corroborar que no haya errores de configuración.
+      \textit{Story points}: 3  (complejidad: 1, dificultad: 1, incertidumbre: 1)
     \item \textbf{Como} ingeniero de operaciones \textbf{quiero} poder iniciar el sistema \textbf{para} que empiece a operar.
+      \textit{Story points}: 7  (complejidad: 2, dificultad: 2, incertidumbre: 3)
     \item \textbf{Como} ingeniero de operaciones \textbf{quiero} poder detener el sistema \textbf{para} que deje de operar.
+      \textit{Story points}: 3  (complejidad: 1, dificultad: 1, incertidumbre: 1)
     \item \textbf{Como} ingeniero de operaciones \textbf{quiero} poder detener el sistema de forma segura \textbf{para} que no queden transacciones sin finalizar.
+      \textit{Story points}: 5  (complejidad: 3, dificultad: 1, incertidumbre: 1)
     \item \textbf{Como} ingeniero de operaciones \textbf{quiero} poder matar el sistema \textbf{para} que deje consumir recursos.
+      \textit{Story points}: 1  (complejidad: 1, dificultad: 1, incertidumbre: 1)
     \item \textbf{Como} ingeniero de operaciones \textbf{quiero} ver logs del sistema  \textbf{para} monitorizar errores.
+      \textit{Story points}: 1  (complejidad: 1, dificultad: 1, incertidumbre: 1)
     \end{enumerate}
 
     \subsubsection{Gerente de inversiones}
     \begin{enumerate}
     \item \textbf{Como} gerente de inversiones  \textbf{quiero} configurar el nivel de riesgo \textbf{para} evitar la perdida de capital.
-    \item \textbf{Como} gerente de inversiones  \textbf{quiero} configurar un limite de dinero a invertir \textbf{para} evitar la perdida de capital.
+      \textit{Story points}: 6  (complejidad: 1, dificultad: 2, incertidumbre: 3)
+    \item \textbf{Como} gerente de inversiones \textbf{quiero} configurar un limite de dinero a invertir \textbf{para} evitar la perdida de capital.
+      \textit{Story points}: 5  (complejidad: 1, dificultad: 2, incertidumbre: 2)
     \end{enumerate}
-
-    \begin{consigna}{red}
-        Descripción: en esta sección se deben incluir las historias de usuarios y su ponderación (\textit{history points}). Recordar que las historias de usuarios son descripciones cortas y simples de una característica contada desde la perspectiva de la persona que desea la nueva capacidad, generalmente un usuario o cliente del sistema. La ponderación es un número entero que representa el tamaño de la historia comparada con otras historias de similar tipo.
-
-        Se debe indicar explícitamente el criterio para calcular los \textit{story points} de cada historia.
-
-        El formato propuesto es:
-        \begin{enumerate}
-            \item ``Como [rol] quiero [tal cosa] para [tal otra cosa]."
-
-            \textit{Story points}: 8 (complejidad: 3, dificultad: 2, incertidumbre: 3)
-        \end{enumerate}
-    \end{consigna}
-
 
     \section{8. Entregables principales del proyecto}
     \label{sec:entregables}
 
-    \begin{consigna}{red}
-        Los entregables del proyecto son (ejemplo):
+    Los entregables del proyecto son:
 
-        \begin{itemize}
-            \item Manual de usuario.
-            \item Diagrama de circuitos esquemáticos.
-            \item Código fuente del firmware.
-            \item Diagrama de instalación.
-            \item Memoria del trabajo final.
-            \item etc...
-        \end{itemize}
-    \end{consigna}
-
+    \begin{itemize}
+    \item Documentación.
+    \item Código fuente.
+    \item Memoria del trabajo final.
+    \end{itemize}
 
     \section{9. Desglose del trabajo en tareas}
     \label{sec:wbs}
 
-    \begin{consigna}{red}
-        El WBS debe tener relación directa o indirecta con los requerimientos. Son todas las actividades que se harán en el proyecto para dar cumplimiento a los requerimientos. Se recomienda mostrar el WBS mediante una lista indexada:
 
-        \begin{enumerate}
-            \item Grupo de tareas 1 (suma h)
-            \begin{enumerate}
-                \item Tarea 1 (tantas h)
-                \item Tarea 2 (tantas h)
-                \item Tarea 3 (tantas h)
-            \end{enumerate}
-            \item Grupo de tareas 2 (suma h)
-            \begin{enumerate}
-                \item Tarea 1 (tantas h)
-                \item Tarea 2 (tantas h)
-                \item Tarea 3 (tantas h)
-            \end{enumerate}
-            \item Grupo de tareas 3 (suma h)
-            \begin{enumerate}
-                \item Tarea 1 (tantas h)
-                \item Tarea 2 (tantas h)
-                \item Tarea 3 (tantas h)
-                \item Tarea 4 (tantas h)
-                \item Tarea 5 (tantas h)
-            \end{enumerate}
-        \end{enumerate}
+    \begin{enumerate}
+    \item Estudio del dominio del problema (176 h):
+      \begin{enumerate}
+      \item Búsqueda de bibliografía (8 h).
+      \item Estudio sobre trading (40 h).
+      \item Estudio sobre indicadores y análisis técnico (40 h).
+      \item Estudio sobre trading algorítmico (30 h).
+      \item Estudio sobre análisis de series de tiempo (48 h).
+      \item Estudio sobre compra/venta de criptomonedas (10 h).
+      \end{enumerate}
 
-        Cantidad total de horas: tantas.
+    \item Procuración y análisis de datos (38 h):
+      \begin{itemize}
+      \item Obtención de datos (3 h).
+      \item Análisis y tratamiento (10 h).
+      \item Exploración y visualización inicial (15 h).
+      \item Entrenamiento y selección de un modelo simple para hacer de base (10 h).
+      \end{itemize}
 
-        \textbf{¡Importante!:} la unidad de horas es h y va separada por espacio del número. Es incorrecto escribir ``23hs".
+    \item Exploración de métodos tradicionales y estado del arte (150 h):
+      \begin{enumerate}
+      \item Métodos tradicionales: Moving averages, autoregresión, ARIMA, State Space Models, etc. (50 h).
+      \item Estado del arte: RNN, CNN, Hybrids, Prophet, DeepAR, etc. (50 h).
+      \item Entrenamiento y selección de modelos (30 h).
+      \item Visualización y exploración (20 h).
+      \end{enumerate}
 
-        \textbf{Se recomienda que no haya ninguna tarea que lleve más de 40 h.} De ser así se recomienda dividirla en tareas de menor duración.
+    \item Exploración del uso de transformers en series de tiempo (100 h):
+      \begin{enumerate}
+      \item Investigación redes neuronales, transformers, estado del arte, etc. (20 h).
+      \item Entrenamiento y selección de modelos (50 h).
+      \item Visualización y exploración (20 h).
+      \item Comparativa con estado del arte (10 h).
+      \end{enumerate}
 
-    \end{consigna}
+    \item Implementación del sistema de trading (100 h):
+      \begin{enumerate}
+      \item Integración con la API del exchange para compra/venta (20 h).
+      \item Parametrización de las variables riesgo, monto a operar, etc. (15 h).
+      \item Integración con la API del exchange para cotizaciones (15 h).
+      \item Implementación de la lógica de decisión de compra/venta (15 h).
+      \item Integración con el modelo (10 h).
+      \item Productización de la CLI (15 h).
+      \item Desarrollo de la lógica de monitorización del rendimiento (20 h).
+      \item Documentación (5 h).
+      \end{enumerate}
 
+    \item Escritura de las memorias (50 h).
+    \end{enumerate}
 
+    Cantidad total de horas: 614.
     \section{10. Diagrama de Activity On Node}
     \label{sec:AoN}
 
