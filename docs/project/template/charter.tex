@@ -16,10 +16,10 @@
 
 % Tu nombre, se puede usar el cualquier lugar del documento con el comando \authorname
 % IMPORTANTE: no omitir titulaciones ni tildación en los nombres, también se recomienda escribir los nombres completos (tal cual los tienen en su documento)
-\autor{Martín Leonardo Centurión}
+\autor{Ing. Martín Leonardo Centurión}
 
 % El nombre del director y co-director, se puede usar el cualquier lugar del documento con el comando \supname y \cosupname y \pertesupname y \pertecosupname
-\director{Director a definir}
+\director{director a definir}
 \pertenenciaDirector{pertenencia}
 \codirector{} % para que aparezca en la portada se debe descomentar la opción codirector en los parámetros de documentclass
 \pertenenciaCoDirector{FIUBA}
@@ -30,8 +30,7 @@
 
 \fechaINICIO{15 de octubre de 2024}        %Fecha de inicio de la cursada de GdP \fechaInicioName
 \fechaFINALPlan{03 de diciembre de 2024}    %Fecha de final de cursada de GdP
-\fechaFINALTrabajo{diciembre de 2025}    %Fecha de defensa pública del trabajo final
-
+\fechaFINALTrabajo{febrero de 2026}    %Fecha de defensa pública del trabajo final
 
 \begin{document}
 
@@ -59,8 +58,10 @@
             \rowcolor[HTML]{C0C0C0}
             Revisión & \multicolumn{1}{c|}{\cellcolor[HTML]{C0C0C0}Detalles de los cambios realizados} & Fecha      \\ \hline
             0        & Creación del documento                                                          & \fechaInicioName \\ \hline
-            1        & Primera entrega                                                          & 30 de octubre de 2024 \\ \hline
-%1      & Se completa hasta el punto 5 inclusive                & {día} de {mes} de 202X \\ \hline
+            1      & Se completa hasta el punto 5 inclusive                & 30 de octubre de 2024 \\ \hline
+            2      & Se completa hasta el punto 9 inclusive                & 4 de noviembre de 2024 \\ \hline
+            3      & Se completa hasta el punto 12 inclusive                & 11 de noviembre de 2024 \\ \hline
+            4      & Se completa hasta el punto 15 inclusive                & 18 de noviembre de 2024 \\ \hline
 %2      & Se completa hasta el punto 9 inclusive
 %		  Se puede agregar algo más \newline
 %		  En distintas líneas \newline
@@ -86,11 +87,11 @@
 
     \vspace{2cm}
 
-    Por medio de la presente se acuerda con \authorname\hspace{1px}que su Trabajo Final de la \degreename\hspace{1px}
+    Por medio de la presente se acuerda con \authorname\hspace{1px} que su Trabajo Final de la \degreename\hspace{1px}
     se titulará ``\ttitle'' y consistirá en la implementación de un sistema de predicción de series de tiempos
     aplicado al trading de criptomonedas usando la arquitectura de Transformers.
-    El trabajo tendrá un presupuesto preliminar estimado de 600
-    horas y un costo estimado de \$37.500.000, con fecha de inicio el \fechaInicioName\hspace{1px}
+    El trabajo tendrá un presupuesto preliminar estimado de 614
+    horas y un costo estimado de \$44.131.250, con fecha de inicio el \fechaInicioName\hspace{1px}
     y fecha de presentación pública en \fechaFinalName.
 
     Se adjunta a esta acta la planificación inicial.
@@ -120,21 +121,21 @@
     el desempeño de la arquitectura de Transformers. Esta tecnología es una pieza fundacional del estado del arte actual
     en deep learning en general y en predicción de series de tiempos en particular.
 
-    Para dicho estudio se propone la aplicación a un sistema de trading de criptomonedas con el cual se espera obtener
+    Para dicho estudio se propone la aplicación a un sistema de trading de criptomonedas con el que se espera obtener
     rendimiento y, al mismo tiempo, regular el nivel de riesgo incurrido.
 
     Es valioso explorar el uso de Transformers y sus variantes, ya que permitiría obtener una ventaja comparativa con
     respecto a otras soluciones mediante la utilización de nuevos modelos basados que presenten mejor poder de predicción.
 
-    El objetivo del trading consiste en obtener una ganancia comprando instrumentos, en este caso criptomonedas, a un precio menor al que se los vende.
-    Se caracteriza por tener un plazo de tiempo acotado, ya que, en el largo plazo las fluctuaciones del mercado pierden relevancia
-    frente a las condiciones fundamentales del instrumento en cuestion.
+    El objetivo del trading consiste en obtener una ganancia al comprar instrumentos, en este caso criptomonedas, a un precio menor al que se los vende.
+    Se caracteriza por tener un plazo de tiempo acotado, ya que en el largo plazo las fluctuaciones del mercado pierden relevancia
+    frente a las condiciones fundamentales del instrumento en cuestión.
     Esto es: el precio del bitcoin (BTC) de hoy a diez años depende más de tendencias macroeconómicas que de otras fluctuaciones.
     Al otro extremo está el trading de alta frecuencia donde se realizan varias operaciones por segundo y requiere del uso de hardware y redes especializadas.
-    Por lo dicho anteriormente se decide acotar el plazo de predicción entre un minuto y una semana.
+    Por lo expuesto se decide acotar el plazo de predicción entre un minuto y una semana.
 
-    El resultado final, como ilustra la figura \ref{fig:diagBloques}, constara de un sistema capaz de comprar y vender criptomonedas de forma autónoma consultando
-    un modelo preentrenado con datos históricos cotizaciones pertinentes.
+    El resultado final, como ilustra la figura \ref{fig:diagBloques}, constará de un sistema capaz de comprar y vender criptomonedas de forma autónoma, el que realiza consultas a un modelo preentrenado con datos históricos sobre cotizaciones pertinentes.
+
 
     \begin{figure}[htpb]
             \centering
@@ -154,12 +155,14 @@
             Rol         & Nombre y Apellido & Organización  & Puesto                     \\ \hline
             Responsable & \authorname       & FIUBA         & Alumno                     \\ \hline
             Orientador  & \supname          & \pertesupname & Director del Trabajo Final \\ \hline
+            Cliente  & \authorname          & FIUBA & Alumno \\ \hline
         \end{tabularx}
         \label{tab:interesados}
     \end{table}
     \begin{itemize}
-        \item Orientador: \supname  a definir.
-        \item Responsable: El alumno encargado de llevar a cabo la planificación e implementación.
+        \item Orientador: \supname.
+        \item Responsable: el alumno encargado de llevar a cabo la planificación e implementación.
+        \item Potencial cliente: individuo con capital disponible para invertirlo.
     \end{itemize}
 
 
@@ -181,8 +184,8 @@
     \end{itemize}
     El proyecto no incluye:
     \begin{itemize}
-        \item Un servicio ni una API para exponer el modelo.
-        \item Aprovisionamiento infraestructura para correr el modelo.
+        \item Un servicio, ni una API para exponer el modelo.
+        \item Aprovisionamiento de infraestructura para correr el modelo.
         \item Implementación de un modelo.
     \end{itemize}
 
@@ -192,10 +195,11 @@
     Para el desarrollo del presente proyecto se supone que:
 
     \begin{itemize}
-        \item Existen API's con las cuales integrarse para realizar el trading.
+        \item Existen API's con las que integrarse para realizar el trading.
         \item Existen datasets históricos para entrenar los modelos.
         \item La arquitectura de transformers es efectiva para la predicción de series de tiempo.
         \item Existen modelos adecuados para entrenarlos.
+        \item Los modelos se pueden entrenar sin hardware especializado.
     \end{itemize}
 
     \section{6. Requerimientos}
@@ -204,11 +208,11 @@
     \begin{enumerate}
     \item Requerimientos funcionales:
       \begin{enumerate}
-      \item El sistema debe poder operar de de forma autónoma.
-      \item El usuario debe poder ingresar credenciales de una cuenta en un exchange de criptomonedas con la cual operar.
+      \item El sistema debe poder operar de forma autónoma.
+      \item El usuario debe poder ingresar credenciales de una cuenta en un exchange de criptomonedas con la que operar.
       \item El sistema debe poder detenerse de forma segura.
-      \item El sistema debe tener criterios configurables que determinen el nivel tolerable de riesgo, para un criterio de riesgo a definir.
-      \item Al sistema se le puede definir un monto máximo con el cual operar.
+      \item El sistema debe tener parámetros configurables que determinen el nivel tolerable, para un criterio de riesgo a definir.
+      \item Al sistema se le puede definir un monto máximo con el que operar.
       \end{enumerate}
     \item Requerimientos de documentación:
       \begin{enumerate}
@@ -218,16 +222,16 @@
       \end{enumerate}
     \item Requerimiento de testing:
       \begin{enumerate}
-      \item El sistema contara con tests de integración contra la API del exchange elegido.
-      \item El sistema contara con tests de componente validando las reglas de negocio del servicio. Por ejemplo: respetar el monto máximo o el limite de riesgo.
-      \item El modelo sera evaluado según su capacidad predicativa teniendo en cuenta los datos históricos disponibles.
-      \item Se diseñara una forma de monitorizar el rendimiento del sistema.
+      \item El sistema contará con tests de integración contra la API del exchange elegido.
+      \item El sistema contará con tests de componente que validen las reglas de negocio del servicio. Por ejemplo: respetar el monto máximo o el limite de riesgo.
+      \item El modelo será evaluado según su capacidad predicativa y tendrá en cuenta los datos históricos disponibles.
+      \item Se diseñará una forma de monitorizar el rendimiento del sistema.
       \end{enumerate}
 
     \item Requerimientos de la interfaz:
       \begin{enumerate}
-      \item El sistema proveerá una interfaz de linea de comandos(CLI) para iniciar y detener el sistema.
-      \item La CLI sera clara en sus errores cuando faltase información necesaria para iniciar el sistema.
+      \item El sistema proveerá una interfaz de línea de comandos (CLI) para iniciar y detener el sistema.
+      \item La CLI será clara en sus errores cuando faltase información necesaria para iniciar el sistema.
       \end{enumerate}
 
     \end{enumerate}
@@ -238,7 +242,7 @@
     \begin{itemize}
     \item Inversor: individuo registrado en el exchange que aporta la cuenta con capital disponible para operar.
     \item Ingeniero de Operaciones: individuo con conocimientos técnicos responsable de poner el sistema en marcha y velar por su correcto funcionamiento.
-    \item Gerente de inversiones: individuo encargado de decidir los parámetros con los cuales se configurara el sistema en base a los objetivos de negocio.
+    \item Gerente de inversiones: individuo encargado de decidir los parámetros con los que se configurará el sistema con base en los objetivos de negocio.
     \end{itemize}
 
     \label{sec:backlog}
@@ -246,7 +250,7 @@
     \subsubsection{Inversor}
     \begin{enumerate}
     \item \textbf{Como} inversor \textbf{quiero} proveer de forma secura las credenciales de mi cuenta \textbf{para} que se pueda operar con el capital disponible.
-      \textit{Story points}: 3  (complejidad: 1, dificultad: 1, incertidumbre: 1)
+      \textit{Story points}: 3 (complejidad: 1, dificultad: 1, incertidumbre: 1)
     \end{enumerate}
 
     \subsubsection{Ingeniero de Operaciones}
@@ -254,7 +258,7 @@
     \item \textbf{Como} ingeniero de operaciones \textbf{quiero} poder levantar el sistema \textbf{para} corroborar que no haya errores de configuración.
       \textit{Story points}: 3  (complejidad: 1, dificultad: 1, incertidumbre: 1)
     \item \textbf{Como} ingeniero de operaciones \textbf{quiero} poder iniciar el sistema \textbf{para} que empiece a operar.
-      \textit{Story points}: 7  (complejidad: 2, dificultad: 2, incertidumbre: 3)
+      \textit{Story points}: 8  (complejidad: 2, dificultad: 2, incertidumbre: 3)
     \item \textbf{Como} ingeniero de operaciones \textbf{quiero} poder detener el sistema \textbf{para} que deje de operar.
       \textit{Story points}: 3  (complejidad: 1, dificultad: 1, incertidumbre: 1)
     \item \textbf{Como} ingeniero de operaciones \textbf{quiero} poder detener el sistema de forma segura \textbf{para} que no queden transacciones sin finalizar.
@@ -265,11 +269,12 @@
       \textit{Story points}: 1  (complejidad: 1, dificultad: 1, incertidumbre: 1)
     \end{enumerate}
 
+
     \subsubsection{Gerente de inversiones}
     \begin{enumerate}
     \item \textbf{Como} gerente de inversiones  \textbf{quiero} configurar el nivel de riesgo \textbf{para} evitar la perdida de capital.
-      \textit{Story points}: 6  (complejidad: 1, dificultad: 2, incertidumbre: 3)
-    \item \textbf{Como} gerente de inversiones \textbf{quiero} configurar un limite de dinero a invertir \textbf{para} evitar la perdida de capital.
+      \textit{Story points}: 8  (complejidad: 1, dificultad: 2, incertidumbre: 3)
+    \item \textbf{Como} gerente de inversiones \textbf{quiero} configurar un límite de dinero a invertir \textbf{para} evitar la perdida de capital.
       \textit{Story points}: 5  (complejidad: 1, dificultad: 2, incertidumbre: 2)
     \end{enumerate}
 
@@ -282,11 +287,12 @@
     \item Documentación.
     \item Código fuente.
     \item Memoria del trabajo final.
+    \item Prototipo funcional a la memoria del trabajo final.
+    \item Informe de avance.
     \end{itemize}
 
     \section{9. Desglose del trabajo en tareas}
     \label{sec:wbs}
-
 
     \begin{enumerate}
     \item Estudio del dominio del problema (176 h):
@@ -295,7 +301,8 @@
       \item Estudio sobre trading (40 h).
       \item Estudio sobre indicadores y análisis técnico (40 h).
       \item Estudio sobre trading algorítmico (30 h).
-      \item Estudio sobre análisis de series de tiempo (48 h).
+      \item Estudio sobre análisis de series de tiempo I (24 h).
+      \item Estudio sobre análisis de series de tiempo II (24 h).
       \item Estudio sobre compra/venta de criptomonedas (10 h).
       \end{enumerate}
 
@@ -309,8 +316,10 @@
 
     \item Exploración de métodos tradicionales y estado del arte (150 h):
       \begin{enumerate}
-      \item Métodos tradicionales: Moving averages, autoregresión, ARIMA, State Space Models, etc. (50 h).
-      \item Estado del arte: RNN, CNN, Hybrids, Prophet, DeepAR, etc. (50 h).
+      \item Métodos tradicionales I: moving averages, autoregresión, ARIMA, State Space Models, etc. (25 h).
+      \item Métodos tradicionales II: moving averages, autoregresión, ARIMA, State Space Models, etc. (25 h).
+      \item Estado del arte I: RNN, CNN, Hybrids, Prophet, DeepAR, etc. (25 h).
+      \item Estado del arte II: RNN, CNN, Hybrids, Prophet, DeepAR, etc. (25 h).
       \item Entrenamiento y selección de modelos (30 h).
       \item Visualización y exploración (20 h).
       \end{enumerate}
@@ -342,132 +351,41 @@
     \section{10. Diagrama de Activity On Node}
     \label{sec:AoN}
 
-    \begin{consigna}{red}
-        Armar el AoN a partir del WBS definido en la etapa anterior.
 
-        Una herramienta simple para desarrollar los diagramas es el Draw.io (\url{https://app.diagrams.net/}).
-        \href{https://app.diagrams.net}{Draw.io}
-
-
-        \begin{figure}[htpb]
-            \centering
-            \includegraphics[width=.8\textwidth]{./Figuras/AoN.png}
-            \caption{Diagrama de \textit{Activity on Node}.}
-            \label{fig:AoN}
-        \end{figure}
-
-        Indicar claramente en qué unidades están expresados los tiempos.
-        De ser necesario indicar los caminos semi críticos y analizar sus tiempos mediante un cuadro.
-        Es recomendable usar colores y un cuadro indicativo describiendo qué representa cada color.
-
-    \end{consigna}
-
+    \begin{figure}[htpb]
+      \centering
+      \includegraphics[width=.95\textwidth]{./Figuras/aon.drawio.png}
+      \caption{Diagrama de \textit{Activity on Node}. Se ve el camino critico marcado por flechas con volumen. Todas las estimaciones estan en horas. Los hitos están marcados por óvalos.}
+      \label{fig:AoN}
+    \end{figure}
 
     \section{11. Diagrama de Gantt}
     \label{sec:gantt}
+    \begin{landscape}
+      \begin{figure}[htpb]
+        \centering
+        \includegraphics[height=.85\textheight, trim={0 0 40cm 0},clip]{./Figuras/gantt.png}
 
-    \begin{consigna}{red}
-        Existen muchos programas y recursos \textit{online} para hacer diagramas de Gantt, entre los cuales destacamos:
+        \caption{Diagrama de gantt del proyecto (1/2).} %Modificar este título acorde.
 
-        \begin{itemize}
-            \item Planner
-            \item GanttProject
-            \item Trello + \textit{plugins}. En el siguiente link hay un tutorial oficial: \\ \url{https://blog.trello.com/es/diagrama-de-gantt-de-un-proyecto}
-            \item Creately, herramienta online colaborativa. \\\url{https://creately.com/diagram/example/ieb3p3ml/LaTeX}
-            \item Se puede hacer en latex con el paquete \textit{pgfgantt}\\ \url{http://ctan.dcc.uchile.cl/graphics/pgf/contrib/pgfgantt/pgfgantt.pdf}
-        \end{itemize}
+        \label{fig:diagGantt1}
+      \end{figure}
 
-        Pegar acá una captura de pantalla del diagrama de Gantt, cuidando que la letra sea suficientemente grande como para ser legible.
-        Si el diagrama queda demasiado ancho, se puede pegar primero la ``tabla'' del Gantt y luego pegar la parte del diagrama de barras del diagrama de Gantt.
+    \end{landscape}
+    \begin{landscape}
+      \begin{figure}[htpb]
+        \centering
+        \includegraphics[height=.85\textheight, trim={30cm 0 0 0},clip]{./Figuras/gantt.png}
 
-        Configurar el software para que en la parte de la tabla muestre los códigos del EDT (WBS).\\
-        Configurar el software para que al lado de cada barra muestre el nombre de cada tarea.\\
-        Revisar que la fecha de finalización coincida con lo indicado en el Acta Constitutiva.
+        \caption{Diagrama de gantt del proyecto (2/2).} %Modificar este título acorde.
 
-        En la figura \ref{fig:gantt}, se muestra un ejemplo de diagrama de gantt realizado con el paquete de \textit{pgfgantt}.
-        En la plantilla pueden ver el código que lo genera y usarlo de base para construir el propio.
+        \label{fig:diagGantt2}
+      \end{figure}
 
-        Las fechas pueden ser calculadas utilizando alguna de las herramientas antes citadas. Sin embargo, el siguiente ejemplo
-        fue elaborado utilizando
-        \href{https://docs.google.com/spreadsheets/d/1fBz8NhSpc4tkkhz3KjJCbh1nR_ltDkfEcZi4tZXduqs}{esta hoja de cálculo}.
-
-        Es importante destacar que el ancho del diagrama estará dado por la longitud del texto utilizado para las tareas
-        (Ejemplo: tarea 1, tarea 2, etcétera) y el valor \textit{x unit}. Para mejorar la apariencia del diagrama, es necesario
-        ajustar este valor y, quizás, acortar los nombres de las tareas.
-
-        \begin{figure}[htpb]
-            \begin{center}
-                \begin{ganttchart}[
-                    time slot unit=day,
-                    time slot format=isodate,
-                    x unit=0.038cm,
-                    y unit title=0.7cm,
-                    y unit chart=0.6cm,
-                    milestone/.append style={xscale=4}
-                ]{2021-03-05}{2021-12-16}
-                    \gantttitlecalendar*{2021-03-05}{2021-12-16}{year} \\
-                    \gantttitlecalendar*{2021-03-05}{2021-12-16}{month} \\
-                    \ganttgroup{Duración Total}{2021-03-05}{2021-12-16} \\
-                    %%%%%%%%%%%%%%%%%Organización
-                    \ganttgroup{Organización}{2021-03-05}{2021-04-16} \\
-                    \ganttbar{Planificación del proyecto}{2021-03-05}{2021-04-15} \\
-                    %%%%%%%%%%%%%%%%%Ejecución
-                    \ganttgroup{Ejecución}{2021-04-16}{2021-10-21} \\
-                    \ganttbar{Tarea 1}{2021-04-16}{2021-04-29} \\
-                    \ganttbar{Tarea 2}{2021-04-30}{2021-05-13} \\
-                    \ganttbar{Tarea 3}{2021-05-14}{2021-05-27} \\
-                    \ganttbar{Tarea 4}{2021-05-28}{2021-07-12} \\
-                    \ganttbar{Tarea 5}{2021-07-13}{2021-08-09} \\
-                    \ganttbar{Tarea 6}{2021-08-10}{2021-09-23} \\
-                    \ganttbar{Tarea 7}{2021-09-24}{2021-09-30} \\
-                    \ganttbar{Tarea 8}{2021-10-01}{2021-10-14} \\
-                    \ganttbar{Tarea 9}{2021-10-15}{2021-10-21} \\
-                    % %%%%%%%%%%%%%%%%%Finalización
-                    \ganttgroup{Finalización}{2021-10-22}{2021-12-16} \\
-                    \ganttbar{Memoria v1}{2021-10-22}{2021-11-04} \\
-                    \ganttbar{Memoria v2}{2021-11-05}{2021-11-18} \\
-                    \ganttbar{Memoria final}{2021-11-19}{2021-12-02} \\
-                    % La fecha del siguiente milestone es la fecha en que terminamos la memoria
-                    \ganttmilestone{Enviar memoria al director}{2021-12-02} \\
-                    \ganttbar{Elaborar la presentación}{2021-12-03}{2021-12-16} \\
-                    \ganttmilestone{Ensayo de la presentación}{2021-12-16} \\
-                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                \end{ganttchart}
-            \end{center}
-            \caption{Diagrama de gantt de ejemplo}
-            \label{fig:gantt}
-        \end{figure}
-
-
-        \begin{landscape}
-            \begin{figure}[htpb]
-                \centering
-                \includegraphics[height=.85\textheight]{./Figuras/Gantt-2.png}
-                \caption{Ejemplo de diagrama de Gantt (apaisado).} %Modificar este título acorde.
-                \label{fig:diagGantt}
-            \end{figure}
-
-        \end{landscape}
-
-    \end{consigna}
-
+    \end{landscape}
 
     \section{12. Presupuesto detallado del proyecto}
     \label{sec:presupuesto}
-
-    \begin{consigna}{red}
-        Si el proyecto es complejo entonces separarlo en partes:
-        \begin{itemize}
-            \item Un total global, indicando el subtotal acumulado por cada una de las áreas.
-            \item El desglose detallado del subtotal de cada una de las áreas.
-        \end{itemize}
-
-        IMPORTANTE: No olvidarse de considerar los COSTOS INDIRECTOS.
-
-        Incluir la aclaración de si se emplea como moneda el peso argentino (ARS) o si se usa moneda extranjera (USD, EUR, etc). Si es en moneda extranjera se debe indicar la tasa de conversión respecto a la moneda local en una fecha dada.
-
-    \end{consigna}
-
     \begin{table}[htpb]
         \centering
         \begin{tabularx}{\linewidth}{@{}|X|c|r|r|@{}}
@@ -479,24 +397,13 @@
             \multicolumn{1}{c|}{\cellcolor[HTML]{C0C0C0}Cantidad} &
             \multicolumn{1}{c|}{\cellcolor[HTML]{C0C0C0}Valor unitario} &
             \multicolumn{1}{c|}{\cellcolor[HTML]{C0C0C0}Valor total} \\ \hline
-            &
-            \multicolumn{1}{c|}{} &
-            \multicolumn{1}{c|}{} &
-            \multicolumn{1}{c|}{} \\ \hline
-            &
-            \multicolumn{1}{c|}{} &
-            \multicolumn{1}{c|}{} &
-            \multicolumn{1}{c|}{} \\ \hline
-            \multicolumn{1}{|l|}{} &
-            &
-            &
-            \\ \hline
-            \multicolumn{1}{|l|}{} &
-            &
-            &
-            \\ \hline
+            Horas de trabajo &
+            \multicolumn{1}{c|}{614} &
+            \multicolumn{1}{c|}{62500 ARS} &
+            \multicolumn{1}{c|}{38375000 ARS} \\ \hline
+
             \multicolumn{3}{|c|}{SUBTOTAL} &
-            \multicolumn{1}{c|}{} \\ \hline
+            \multicolumn{1}{c|}{38375000 ARS} \\ \hline
             \rowcolor[HTML]{C0C0C0}
             \multicolumn{4}{|c|}{\cellcolor[HTML]{C0C0C0}COSTOS INDIRECTOS} \\ \hline
             \rowcolor[HTML]{C0C0C0}
@@ -504,22 +411,14 @@
             \multicolumn{1}{c|}{\cellcolor[HTML]{C0C0C0}Cantidad} &
             \multicolumn{1}{c|}{\cellcolor[HTML]{C0C0C0}Valor unitario} &
             \multicolumn{1}{c|}{\cellcolor[HTML]{C0C0C0}Valor total} \\ \hline
-            \multicolumn{1}{|l|}{} &
+            Costos indirectos (15\% de costos fijos) &
             &
-            &
-            \\ \hline
-            \multicolumn{1}{|l|}{} &
-            &
-            &
-            \\ \hline
-            \multicolumn{1}{|l|}{} &
-            &
-            &
+            & 5756250 ARS
             \\ \hline
             \multicolumn{3}{|c|}{SUBTOTAL} &
-            \multicolumn{1}{c|}{} \\ \hline
+            \multicolumn{1}{c|}{5756250 ARS} \\ \hline
             \rowcolor[HTML]{C0C0C0}
-            \multicolumn{3}{|c|}{TOTAL} &
+            \multicolumn{3}{|c|}{TOTAL} & 44131250 ARS
             \\ \hline
         \end{tabularx}%
     \end{table}
@@ -527,115 +426,167 @@
 
     \section{13. Gestión de riesgos}
     \label{sec:riesgos}
-
-    \begin{consigna}{red}
-        a) Identificación de los riesgos (al menos cinco) y estimación de sus consecuencias:
-
-        Riesgo 1: detallar el riesgo (riesgo es algo que si ocurre altera los planes previstos de forma negativa)
+Riesgo 1: La arquitectura de Transformers no es adecuada para la predicción de series de tiempo en el contexto de las criptomonedas.
         \begin{itemize}
-            \item Severidad (S): mientras más severo, más alto es el número (usar números del 1 al 10).\\
-            Justificar el motivo por el cual se asigna determinado número de severidad (S).
-            \item Probabilidad de ocurrencia (O): mientras más probable, más alto es el número (usar del 1 al 10).\\
-            Justificar el motivo por el cual se asigna determinado número de (O).
+            \item Severidad (S): 10.\\
+            La arquitectura de transformers es una pieza central del trabajo.
+            \item Ocurrencia (O): 3.\\
+            Hay bibliografía disponible que asevere que dicha arquitectura es efectiva para la predicción de series de tiempo.
         \end{itemize}
 
-        Riesgo 2:
+        Riesgo 2: Se requiere de hardware especializado o de gran poder de cómputo para entrenar los modelos de redes neuronales.
         \begin{itemize}
-            \item Severidad (S): X.\\
-            Justificación...
-            \item Ocurrencia (O): Y.\\
-            Justificación...
+            \item Severidad (S): 5.\\
+            Alquilar o adquirir hardware impactaría en los costos del proyecto.
+            \item Ocurrencia (O): 5.\\
+            Se desconocen los requerimientos exactos para entrenar los modelos de redes neuronales capaces de predecir series de tiempo de forma efectiva.
         \end{itemize}
 
-        Riesgo 3:
+        Riesgo 3: La integración, para la lectura de cotizaciones, con la API del exchange es paga.
         \begin{itemize}
-            \item Severidad (S): X.\\
-            Justificación...
-            \item Ocurrencia (O): Y.\\
-            Justificación...
+        \item Severidad (S): 10.\\
+          Limitaría en gran medida el periodo de tiempo con el que se pueden hacer predicciones y la precisión mínima aceptable para estas.
+        \item Ocurrencia (O): 1.\\
+          Hasta el día de la fecha ha sido gratuita.
         \end{itemize}
 
+        Riesgo 4: La comisión para las transacciones incrementa.
+        \begin{itemize}
+        \item Severidad (S): 8.\\
+          Limitaría la precisión mínima aceptable para las predicciones.
+        \item Ocurrencia (O): 3.\\
+          Actualmente, para la plataforma Binance, se encuentra en $0.1000\%$. Es una decisión de negocio que depende exclusivamente de la plataforma en cuestión, con lo cual puede cambiar.
+        \end{itemize}
 
-        b) Tabla de gestión de riesgos:      (El RPN se calcula como RPN=SxO)
-
-        \begin{table}[htpb]
+        Riesgo 5: Deja de funcionar la computadora con la que se lleva a cabo el desarrollo.
+        \begin{itemize}
+        \item Severidad (S): 7.\\
+          Podría generar perdida de trabajo. Elevaría el costo final del proyecto.
+        \item Ocurrencia (O): 2.\\
+          No se detectan indicios de falla actualmente.
+        \end{itemize}
+     \begin{table}[htpb]
             \centering
             \begin{tabularx}{\linewidth}{@{}|X|c|c|c|c|c|c|@{}}
                 \hline
                 \rowcolor[HTML]{C0C0C0}
                 Riesgo & S & O & RPN & S* & O* & RPN* \\ \hline
-                &   &   &     &    &    &      \\ \hline
-                &   &   &     &    &    &      \\ \hline
-                &   &   &     &    &    &      \\ \hline
-                &   &   &     &    &    &      \\ \hline
-                &   &   &     &    &    &      \\ \hline
+                Riesgo 1: La arquitectura de Transformers no es adecuada para la predicción de series de tiempo en el contexto de las criptomonedas. & 10  & 3  & 30     &  6  & 3   &    18  \\ \hline
+                Riesgo 2: Se requiere de hardware especializado o de gran poder de computo para entrenar los modelos de redes neuronales. & 5  & 5  &  25   &  5  & 5   & 25     \\ \hline
+                Riesgo 3: La integración, para la lectura de cotizaciones, con la API del exchange es arancelada.  & 10  & 1  &  10   &    &    &      \\ \hline
+                Riesgo 4: La comisión para las transacciones incrementa. & 8  & 3  &  24   &    &    &      \\ \hline
+                Riesgo 5: Deja de funcionar la computadora con la que se lleva a cabo el desarrollo. & 7  & 2  &  14   &    &    &      \\ \hline
             \end{tabularx}%
         \end{table}
 
-        Criterio adoptado:
+     Se tomarán medidas de mitigación en los riesgos cuyos números de RPN sean mayores o iguales a 25.
 
-        Se tomarán medidas de mitigación en los riesgos cuyos números de RPN sean mayores a...
 
-        Nota: los valores marcados con (*) en la tabla corresponden luego de haber aplicado la mitigación.
-
-        c) Plan de mitigación de los riesgos que originalmente excedían el RPN máximo establecido:
-
-        Riesgo 1: plan de mitigación (si por el RPN fuera necesario elaborar un plan de mitigación).
-        Nueva asignación de S y O, con su respectiva justificación:
+        Riesgo 1: La arquitectura de Transformers no es adecuada para la predicción de series de tiempo en el contexto de las criptomonedas.
         \begin{itemize}
-            \item Severidad (S*): mientras más severo, más alto es el número (usar números del 1 al 10).
-            Justificar el motivo por el cual se asigna determinado número de severidad (S).
-            \item Probabilidad de ocurrencia (O*): mientras más probable, más alto es el número (usar del 1 al 10).
-            Justificar el motivo por el cual se asigna determinado número de (O).
+        \item Severidad (S*): 6.
+          Existen otros modelos ya sea de deep learning o estadísticos que pueden servir para cumplir el objetivo de predecir el valor del BTC. Estos se exploran en una etapa previa del proyecto.
+        \item Probabilidad de ocurrencia (O*): 3.
+          La probabilidad no cambia.
         \end{itemize}
 
-        Riesgo 2: plan de mitigación (si por el RPN fuera necesario elaborar un plan de mitigación).
+        Riesgo 2: Se requiere de hardware especializado o de gran poder de cómputo para entrenar los modelos de redes neuronales.
+        \begin{itemize}
+        \item Severidad (S*): 5.
+          No se mitiga. En caso de ser necesario se contratara un servicio cloud.
+        \item Probabilidad de ocurrencia (O*): 5.
+          La probabilidad no cambia.
+        \end{itemize}
 
-        Riesgo 3: plan de mitigación (si por el RPN fuera necesario elaborar un plan de mitigación).
-
-    \end{consigna}
-
-
+    \newpage
     \section{14. Gestión de la calidad}
     \label{sec:calidad}
+    \begin{enumerate}
+    \item \textbf{Precisión en las Predicciones:} El modelo debe ser capaz de predecir con alta precisión las fluctuaciones de precios de las criptomonedas (específicamente para un plazo entre un minuto y una semana).
+      \begin{itemize}
+      \item \textbf{Acción de Verificación:} Realizar pruebas de precisión del modelo que utilice métricas como MAE (Error Absoluto Medio), RMSE (Raíz del Error Cuadrático Medio) y MAPE (Error Porcentual Absoluto Medio) en un conjunto de datos de validación.
+      \item \textbf{Acción de Validación:} Comparar las predicciones con un conjunto de datos de test independiente para asegurar que la precisión general es robusta y consistente en diferentes intervalos de tiempo.
+      \end{itemize}
 
-    \begin{consigna}{red}
-        Elija al menos diez requerimientos que a su criterio sean los más importantes/críticos/que aportan más valor y para cada uno de ellos indique las acciones de verificación y validación que permitan asegurar su cumplimiento.
+    \item \textbf{Eficiencia Computacional:} El modelo debe ser eficiente en términos de tiempo de entrenamiento y capacidad de hacer predicciones en tiempo real.
+      \begin{itemize}
+      \item \textbf{Acción de Verificación:} Medir los tiempos de entrenamiento y tiempos de inferencia para asegurar que se cumplan los requisitos de tiempo de ejecución. Esto puede incluir la medición del tiempo necesario para entrenar el modelo y hacer una predicción de una nueva entrada de datos.
+      \item \textbf{Acción de Validación:} Validar que el sistema puede hacer predicciones en tiempo real dentro de un plazo de menos de un segundo, según las especificaciones del sistema de trading.
+      \end{itemize}
 
-        \begin{itemize}
-            \item Req \#1: copiar acá el requerimiento con su correspondiente número.
+    \item \textbf{Robustez ante Ruido de Datos:} El modelo debe ser capaz de manejar el ruido de datos y las fluctuaciones inesperadas del mercado sin perder rendimiento significativo.
+      \begin{itemize}
+      \item \textbf{Acción de Verificación:} Introducir ruido artificial en los datos de entrada y evaluar la capacidad del modelo para mantener una precisión razonable en la predicción.
+      \item \textbf{Acción de Validación:} Evaluar el rendimiento del modelo con datos históricos que incluyan fluctuaciones y eventos inesperados en el mercado, como crisis o “flash crashes”.
+      \end{itemize}
 
-            \begin{itemize}
-                \item Verificación para confirmar si se cumplió con lo requerido antes de mostrar el sistema al cliente. Detallar.
-                \item Validación con el cliente para confirmar que está de acuerdo en que se cumplió con lo requerido. Detallar.
-            \end{itemize}
+    \item \textbf{Modelado de Tendencias a Largo Plazo:} El modelo debe ser capaz de captar tendencias a largo plazo, más allá de las fluctuaciones de corto plazo, como en un plazo de predicción de una semana.
+      \begin{itemize}
+      \item \textbf{Acción de Verificación:} Utilizar métricas de predicción de largo plazo, como la capacidad del modelo para capturar correctamente las tendencias (por ejemplo, con el coeficiente de determinación R² o una métrica de tendencia direccional).
+      \item \textbf{Acción de Validación:} Validar que el modelo puede predecir correctamente las tendencias de criptomonedas de hasta una semana.
+      \end{itemize}
 
-        \end{itemize}
+    \item \textbf{Minimización del Riesgo:} El sistema debe ser capaz de gestionar y regular el nivel de riesgo asociado a las inversiones.
+      \begin{itemize}
+      \item \textbf{Acción de Verificación:} Implementar un algoritmo de gestión de riesgo que incluya criterios como stop-loss, take-profit y asignación de capital basada en el riesgo calculado.
+      \item \textbf{Acción de Validación:} Validar el modelo con backtesting para evaluar cómo se comporta en diferentes condiciones del mercado, y asegurar que el riesgo no excede los límites establecidos.
+      \end{itemize}
 
-        Tener en cuenta que en este contexto se pueden mencionar simulaciones, cálculos, revisión de hojas de datos, consulta con expertos, mediciones, etc.
+    \item \textbf{Redacción de una memoria final:} Se debe redactar una memoria técnica sobre lo que se realizó a lo largo del proyecto.
+      \begin{itemize}
+      \item \textbf{Acción de Verificación:} tener el documento escrito.
+      \item \textbf{Acción de Validación:} publicar el documento.
+      \end{itemize}
 
-        Las acciones de verificación suelen considerar al entregable como ``caja blanca'', es decir se conoce en profundidad su funcionamiento interno.
+    \item \textbf{Generación de Señales de Trading Efectivas:} El modelo debe generar señales de compra y venta con un umbral de efectividad aceptable según un indicador de rendimiento como el Sharpe Ratio o el Ratio de Ganancia/Perdida.
+      \begin{itemize}
+      \item \textbf{Acción de Verificación:} Evaluar la efectividad de las señales generadas al comparar las señales de trading con los movimientos de mercado reales.
+      \item \textbf{Acción de Validación:} Validar que las señales generadas por el sistema en condiciones de mercado normales y extremas tengan un impacto positivo en las ganancias netas durante el backtesting.
+      \end{itemize}
 
-        En cambio, las acciones de validación suelen considerar al entregable como ``caja negra'', es decir, que no se conocen los detalles de su funcionamiento interno.
+    \item \textbf{Sistema autonomo:} El sistema debe ser totalmente autónomo en la compra y venta de criptomonedas.
+      \begin{itemize}
+      \item \textbf{Acción de Verificación:} realizar pruebas con el sistema en funcionamiento por más de un día.
+      \item \textbf{Acción de Validación:} realizar pruebas con el sistema en funcionamiento por más de un día.
+      \end{itemize}
 
-    \end{consigna}
+    \item \textbf{Reportes de transacciones:} El modelo deberá tener alguna forma de exportar las transacciones que se realizaron.
+      \begin{itemize}
+      \item \textbf{Acción de Verificación:} emitir registro de las transacciones a medida que se realizan.
+      \item \textbf{Acción de Validación:} mostrar el registro de las transacciones al cliente.
+      \end{itemize}
 
+    \item \textbf{Detención segura del sistema:} el sistema debe poder detenerse de forma segura.
+      \begin{itemize}
+      \item \textbf{Acción de Verificación:} Probar el mecanismo de detención para asegurarse que no queden transacciones pendientes.
+      \item \textbf{Acción de Validación:} Mostrar que, al detener el sistema, no quedan transacciones pendientes.
+      \end{itemize}
+
+    \end{enumerate}
 
     \section{15. Procesos de cierre}
     \label{sec:cierre}
+    \begin{itemize}
+    \item Pautas de trabajo que se seguirán para analizar si se respetó el Plan de Proyecto original:\\
 
-    \begin{consigna}{red}
-        Establecer las pautas de trabajo para realizar una reunión final de evaluación del proyecto, tal que contemple las siguientes actividades:
+      \begin{itemize}
+      \item Responsable: \supname
+      \item Procedimiento: se evaluará el cumplimiento de los requerimientos en tiempo y forma. De no ser el caso se desarrollaran las causas y mitigaciones para futuros proyectos.
+      \end{itemize}
 
-        \begin{itemize}
-            \item Pautas de trabajo que se seguirán para analizar si se respetó el Plan de Proyecto original:\\
-            - Indicar quién se ocupará de hacer esto y cuál será el procedimiento a aplicar.
-            \item Identificación de las técnicas y procedimientos útiles e inútiles que se emplearon, los problemas que surgieron y cómo se solucionaron:\\
-            - Indicar quién se ocupará de hacer esto y cuál será el procedimiento para dejar registro.
-            \item Indicar quién organizará el acto de agradecimiento a todos los interesados, y en especial al equipo de trabajo y colaboradores:\\
-            - Indicar esto y quién financiará los gastos correspondientes.
-        \end{itemize}
+    \item Identificación de las técnicas y procedimientos útiles e inútiles que se emplearon, los problemas que surgieron y cómo se solucionaron:\\
+      \begin{itemize}
+      \item Responsable: \supname
+      \item Procedimiento: se evaluarán si las técnicas y procedimientos propuestos fueron efectivos para cumplir con los objetivos. Si se utilizaron otras técnicas y procedimientos que no fueron propuestos también se detallaran.
+      \end{itemize}
 
-    \end{consigna}
+    \item Indicar quién organizará el acto de agradecimiento a todos los interesados, y en especial al equipo de trabajo y colaboradores:\\
+      \begin{itemize}
+      \item Responsable: \supname
+      \item Procedimiento: presentación final ante las autoridades del CEIA.
+      \end{itemize}
 
+    \end{itemize}
 \end{document}
+
+% LocalWords:  State Space

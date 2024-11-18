@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021/CVE-2023-32700 patched) (preloaded format=pdflatex 2024.9.3)  3 NOV 2024 23:20
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021/CVE-2023-32700 patched) (preloaded format=pdflatex 2024.9.3)  18 NOV 2024 16:38
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -867,24 +867,24 @@ LaTeX Info: Redefining \% on input line 25.
 )
 \openout1 = `charter.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 36.
-LaTeX Font Info:    ... okay on input line 36.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 36.
-LaTeX Font Info:    ... okay on input line 36.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 36.
-LaTeX Font Info:    ... okay on input line 36.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 36.
-LaTeX Font Info:    ... okay on input line 36.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 36.
-LaTeX Font Info:    ... okay on input line 36.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 36.
-LaTeX Font Info:    ... okay on input line 36.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 36.
-LaTeX Font Info:    ... okay on input line 36.
-LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 36.
-LaTeX Font Info:    ... okay on input line 36.
-LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 36.
-LaTeX Font Info:    ... okay on input line 36.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 35.
+LaTeX Font Info:    ... okay on input line 35.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 35.
+LaTeX Font Info:    ... okay on input line 35.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 35.
+LaTeX Font Info:    ... okay on input line 35.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 35.
+LaTeX Font Info:    ... okay on input line 35.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 35.
+LaTeX Font Info:    ... okay on input line 35.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 35.
+LaTeX Font Info:    ... okay on input line 35.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 35.
+LaTeX Font Info:    ... okay on input line 35.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 35.
+LaTeX Font Info:    ... okay on input line 35.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 35.
+LaTeX Font Info:    ... okay on input line 35.
  (/usr/share/texlive/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
 [Loading MPS to PDF converter (version 2006.09.02).]
 \scratchcounter=\count342
@@ -942,11 +942,11 @@ e
 * \@reversemarginfalse
 * (1in=72.27pt=25.4mm, 1cm=28.453pt)
 
-LaTeX Info: Redefining \. on input line 36.
-LaTeX Info: Redefining \% on input line 36.
+LaTeX Info: Redefining \. on input line 35.
+LaTeX Info: Redefining \% on input line 35.
 Package lastpage Info: Please have a look at the pageslts package at
 (lastpage)             https://www.ctan.org/pkg/pageslts
-(lastpage)             ! on input line 36.
+(lastpage)             ! on input line 35.
 Package caption Info: Begin \AtBeginDocument code.
 Package caption Info: hyperref package is loaded.
 Package caption Info: longtable package is loaded.
@@ -954,7 +954,7 @@ Package caption Info: longtable package is loaded.
 Package: ltcaption 2020/05/30 v1.4b longtable captions (AR)
 )
 Package caption Info: End \AtBeginDocument code.
-Package hyperref Info: Link coloring ON on input line 36.
+Package hyperref Info: Link coloring ON on input line 35.
 
 (/usr/share/texlive/texmf-dist/tex/latex/hyperref/nameref.sty
 Package: nameref 2021-04-02 v2.47 Cross-referencing by name of section
@@ -967,9 +967,9 @@ Package: gettitlestring 2019/12/15 v1.6 Cleanup title references (HO)
 )
 \c@section@level=\count348
 )
-LaTeX Info: Redefining \ref on input line 36.
-LaTeX Info: Redefining \pageref on input line 36.
-LaTeX Info: Redefining \nameref on input line 36.
+LaTeX Info: Redefining \ref on input line 35.
+LaTeX Info: Redefining \pageref on input line 35.
+LaTeX Info: Redefining \nameref on input line 35.
 
 (./charter.out) (./charter.out)
 \@outlinefile=\write4
@@ -978,7 +978,7 @@ LaTeX Info: Redefining \nameref on input line 36.
 <./Figuras/logoFIUBA.pdf, id=87, 460.9062pt x 153.61644pt>
 File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
 <use ./Figuras/logoFIUBA.pdf>
-Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 39.
+Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 38.
 (pdftex.def)             Requested size: 317.07614pt x 105.68369pt.
  [1
 
@@ -1002,96 +1002,124 @@ File: umsb.fd 2013/01/14 v3.01 AMS symbols B
  [2]
 File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
 <use ./Figuras/logoFIUBA.pdf>
-Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 77.
+Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 78.
 (pdftex.def)             Requested size: 99.58464pt x 33.19096pt.
  [3]
 File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
 <use ./Figuras/logoFIUBA.pdf>
-Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 135.
+Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 136.
 (pdftex.def)             Requested size: 99.58464pt x 33.19096pt.
  [4]
-<./Figuras/bloques-tp-final.drawio.png, id=156, 512.91624pt x 392.46625pt>
+<./Figuras/bloques-tp-final.drawio.png, id=156, 507.8975pt x 392.46625pt>
 File: ./Figuras/bloques-tp-final.drawio.png Graphic file (type png)
 <use ./Figuras/bloques-tp-final.drawio.png>
 Package pdftex.def Info: ./Figuras/bloques-tp-final.drawio.png  used on input l
-ine 141.
-(pdftex.def)             Requested size: 294.42636pt x 225.28307pt.
+ine 142.
+(pdftex.def)             Requested size: 294.42636pt x 227.51678pt.
 File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
 <use ./Figuras/logoFIUBA.pdf>
-Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 146.
+Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 147.
 (pdftex.def)             Requested size: 99.58464pt x 33.19096pt.
 
 [5 <./Figuras/bloques-tp-final.drawio.png>]
 File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
 <use ./Figuras/logoFIUBA.pdf>
-Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 198.
+Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 199.
 (pdftex.def)             Requested size: 99.58464pt x 33.19096pt.
  [6]
 File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
 <use ./Figuras/logoFIUBA.pdf>
-Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 241.
+Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 243.
 (pdftex.def)             Requested size: 99.58464pt x 33.19096pt.
  [7]
 File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
 <use ./Figuras/logoFIUBA.pdf>
-Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 282.
+Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 279.
 (pdftex.def)             Requested size: 99.58464pt x 33.19096pt.
  [8]
 File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
 <use ./Figuras/logoFIUBA.pdf>
-Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 335.
+Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 332.
 (pdftex.def)             Requested size: 99.58464pt x 33.19096pt.
  [9]
-<./Figuras/AoN.png, id=238, 1239.63126pt x 592.2125pt>
-File: ./Figuras/AoN.png Graphic file (type png)
-<use ./Figuras/AoN.png>
-Package pdftex.def Info: ./Figuras/AoN.png  used on input line 354.
-(pdftex.def)             Requested size: 362.37569pt x 173.11075pt.
+<./Figuras/aon.drawio.png, id=230, 763.85374pt x 392.46625pt>
+File: ./Figuras/aon.drawio.png Graphic file (type png)
+<use ./Figuras/aon.drawio.png>
+Package pdftex.def Info: ./Figuras/aon.drawio.png  used on input line 357.
+(pdftex.def)             Requested size: 430.31812pt x 221.09706pt.
 File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
 <use ./Figuras/logoFIUBA.pdf>
-Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 377.
+Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 364.
 (pdftex.def)             Requested size: 99.58464pt x 33.19096pt.
- [10 <./Figuras/AoN.png>]
+ [10 <./Figuras/aon.drawio.png>]
+<./Figuras/gantt.png, id=253, 2037.6125pt x 672.5125pt>
+File: ./Figuras/gantt.png Graphic file (type png)
+<use ./Figuras/gantt.png>
+Package pdftex.def Info: ./Figuras/gantt.png  used on input line 367.
+(pdftex.def)             Requested size: 514.9863pt x 385.02547pt.
 File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
 <use ./Figuras/logoFIUBA.pdf>
-Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 442.
+Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 374.
 (pdftex.def)             Requested size: 99.58464pt x 33.19096pt.
- [11]
+ [11 <./Figuras/gantt.png (PNG copy)>]
+File: ./Figuras/gantt.png Graphic file (type png)
+<use ./Figuras/gantt.png>
+Package pdftex.def Info: ./Figuras/gantt.png  used on input line 378.
+(pdftex.def)             Requested size: 677.88506pt x 385.02547pt.
 File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
 <use ./Figuras/logoFIUBA.pdf>
-Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 442.
+Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 385.
 (pdftex.def)             Requested size: 99.58464pt x 33.19096pt.
  [12]
-<./Figuras/Gantt-2.png, id=270, 1216.545pt x 701.62125pt>
-File: ./Figuras/Gantt-2.png Graphic file (type png)
-<use ./Figuras/Gantt-2.png>
-Package pdftex.def Info: ./Figuras/Gantt-2.png  used on input line 445.
-(pdftex.def)             Requested size: 667.61679pt x 385.02547pt.
 File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
 <use ./Figuras/logoFIUBA.pdf>
-Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 450.
+Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 459.
 (pdftex.def)             Requested size: 99.58464pt x 33.19096pt.
- [13 <./Figuras/Gantt-2.png>]
-File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
-<use ./Figuras/logoFIUBA.pdf>
-Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 552.
-(pdftex.def)             Requested size: 99.58464pt x 33.19096pt.
- [14
+ [13
+
+
 
 
 ]
+Underfull \hbox (badness 2393) in paragraph at lines 479--479
+[]|\OT1/cmr/m/n/10.95 Riesgo 1: La ar-qui-tec-tura de Trans-form-ers no es
+ []
+
 File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
 <use ./Figuras/logoFIUBA.pdf>
-Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 610.
+Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 501.
+(pdftex.def)             Requested size: 99.58464pt x 33.19096pt.
+[14]
+File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
+<use ./Figuras/logoFIUBA.pdf>
+Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 537.
 (pdftex.def)             Requested size: 99.58464pt x 33.19096pt.
  [15]
+Underfull \hbox (badness 10000) in paragraph at lines 570--571
+
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 577--578
+
+ []
+
+File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
+<use ./Figuras/logoFIUBA.pdf>
+Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 581.
+(pdftex.def)             Requested size: 99.58464pt x 33.19096pt.
+[16]
+Underfull \hbox (badness 10000) in paragraph at lines 583--584
+
+ []
+
 
 AED: lastpage setting LastPage
 File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
 <use ./Figuras/logoFIUBA.pdf>
-Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 641.
+Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 590.
 (pdftex.def)             Requested size: 99.58464pt x 33.19096pt.
-[16] (./charter.aux
+[17] (./charter.aux
 LaTeX Info: Redefining \. on input line 25.
 LaTeX Info: Redefining \% on input line 25.
 )
@@ -1102,26 +1130,26 @@ Package rerunfilecheck Info: File `charter.out' has not changed.
 (rerunfilecheck)             Checksum: F5FB6AF81BC0CA3D9DDA778FF5362F89;4273.
  ) 
 Here is how much of TeX's memory you used:
- 26411 strings out of 480806
- 486654 string characters out of 5905129
- 805782 words of memory out of 6000000
- 43206 multiletter control sequences out of 15000+600000
- 411468 words of font info for 56 fonts, out of 8000000 for 9000
+ 25827 strings out of 480806
+ 473599 string characters out of 5905129
+ 794806 words of memory out of 6000000
+ 42609 multiletter control sequences out of 15000+600000
+ 411300 words of font info for 55 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
- 114i,16n,111p,447b,1017s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 114i,16n,111p,447b,526s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/share/texlive/texmf-dist/fonts/enc/dvips/cm-super/cm-super-ts1.enc}</us
 r/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/shar
 e/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/share/texl
 ive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbxti10.pfb></usr/share/texlive/
-texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-d
-ist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/share/texlive/texmf-dist/fon
-ts/type1/public/amsfonts/cm/cmti10.pfb></usr/share/texlive/texmf-dist/fonts/typ
-e1/public/amsfonts/cm/cmtt10.pfb></usr/share/texlive/texmf-dist/fonts/type1/pub
+texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/texlive/texmf-
+dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fo
+nts/type1/public/amsfonts/cm/cmr12.pfb></usr/share/texlive/texmf-dist/fonts/typ
+e1/public/amsfonts/cm/cmti10.pfb></usr/share/texlive/texmf-dist/fonts/type1/pub
 lic/cm-super/sfrm1095.pfb>
-Output written on charter.pdf (16 pages, 695181 bytes).
+Output written on charter.pdf (17 pages, 711081 bytes).
 PDF statistics:
- 347 PDF objects out of 1000 (max. 8388607)
- 295 compressed objects within 3 object streams
- 100 named destinations out of 1000 (max. 500000)
- 193 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 364 PDF objects out of 1000 (max. 8388607)
+ 309 compressed objects within 4 object streams
+ 114 named destinations out of 1000 (max. 500000)
+ 205 words of extra memory for PDF output out of 10000 (max. 10000000)
 

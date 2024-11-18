@@ -3,10 +3,10 @@
 \contentsline {section}{\numberline {2}2. Identificación y análisis de los interesados}{6}{section.2}%
 \contentsline {section}{\numberline {3}3. Propósito del proyecto}{6}{section.3}%
 \contentsline {section}{\numberline {4}4. Alcance del proyecto}{6}{section.4}%
-\contentsline {section}{\numberline {5}5. Supuestos del proyecto}{6}{section.5}%
+\contentsline {section}{\numberline {5}5. Supuestos del proyecto}{7}{section.5}%
 \contentsline {section}{\numberline {6}6. Requerimientos}{7}{section.6}%
-\contentsline {section}{\numberline {7}7. Historias de usuarios (\textit {Product backlog})}{7}{section.7}%
-\contentsline {subsection}{\numberline {7.1}Roles}{7}{subsection.7.1}%
+\contentsline {section}{\numberline {7}7. Historias de usuarios (\textit {Product backlog})}{8}{section.7}%
+\contentsline {subsection}{\numberline {7.1}Roles}{8}{subsection.7.1}%
 \contentsline {subsection}{\numberline {7.2}Product backlog}{8}{subsection.7.2}%
 \contentsline {subsubsection}{\numberline {7.2.1}Inversor}{8}{subsubsection.7.2.1}%
 \contentsline {subsubsection}{\numberline {7.2.2}Ingeniero de Operaciones}{8}{subsubsection.7.2.2}%
@@ -15,8 +15,8 @@
 \contentsline {section}{\numberline {9}9. Desglose del trabajo en tareas}{9}{section.9}%
 \contentsline {section}{\numberline {10}10. Diagrama de Activity On Node}{10}{section.10}%
 \contentsline {section}{\numberline {11}11. Diagrama de Gantt}{10}{section.11}%
-\contentsline {section}{\numberline {12}12. Presupuesto detallado del proyecto}{14}{section.12}%
-\contentsline {section}{\numberline {13}13. Gestión de riesgos}{14}{section.13}%
+\contentsline {section}{\numberline {12}12. Presupuesto detallado del proyecto}{13}{section.12}%
+\contentsline {section}{\numberline {13}13. Gestión de riesgos}{13}{section.13}%
 \contentsline {section}{\numberline {14}14. Gestión de la calidad}{15}{section.14}%
 \contentsline {section}{\numberline {15}15. Procesos de cierre}{16}{section.15}%
 \contentsfinish 
