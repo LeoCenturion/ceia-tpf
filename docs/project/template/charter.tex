@@ -264,17 +264,17 @@
     \item \textbf{Como} ingeniero de operaciones \textbf{quiero} poder detener el sistema de forma segura \textbf{para} que no queden transacciones sin finalizar.
       \textit{Story points}: 5  (complejidad: 3, dificultad: 1, incertidumbre: 1)
     \item \textbf{Como} ingeniero de operaciones \textbf{quiero} poder matar el sistema \textbf{para} que deje consumir recursos.
-      \textit{Story points}: 1  (complejidad: 1, dificultad: 1, incertidumbre: 1)
+      \textit{Story points}: 3  (complejidad: 1, dificultad: 1, incertidumbre: 1)
     \item \textbf{Como} ingeniero de operaciones \textbf{quiero} ver logs del sistema  \textbf{para} monitorizar errores.
-      \textit{Story points}: 1  (complejidad: 1, dificultad: 1, incertidumbre: 1)
+      \textit{Story points}: 3  (complejidad: 1, dificultad: 1, incertidumbre: 1)
     \end{enumerate}
 
 
     \subsubsection{Gerente de inversiones}
     \begin{enumerate}
-    \item \textbf{Como} gerente de inversiones  \textbf{quiero} configurar el nivel de riesgo \textbf{para} evitar la perdida de capital.
+    \item \textbf{Como} gerente de inversiones  \textbf{quiero} configurar el nivel de riesgo \textbf{para} evitar la pérdida de capital.
       \textit{Story points}: 8  (complejidad: 1, dificultad: 2, incertidumbre: 3)
-    \item \textbf{Como} gerente de inversiones \textbf{quiero} configurar un límite de dinero a invertir \textbf{para} evitar la perdida de capital.
+    \item \textbf{Como} gerente de inversiones \textbf{quiero} configurar un límite de dinero a invertir \textbf{para} evitar la pérdida de capital.
       \textit{Story points}: 5  (complejidad: 1, dificultad: 2, incertidumbre: 2)
     \end{enumerate}
 
@@ -355,7 +355,7 @@
     \begin{figure}[htpb]
       \centering
       \includegraphics[width=.95\textwidth]{./Figuras/aon.drawio.png}
-      \caption{Diagrama de \textit{Activity on Node}. Se ve el camino critico marcado por flechas con volumen. Todas las estimaciones estan en horas. Los hitos están marcados por óvalos.}
+      \caption{Diagrama de \textit{Activity on Node}. Se ve el camino crítico marcado por flechas con volumen. Todas las estimaciones estan en horas. Los hitos están marcados por óvalos.}
       \label{fig:AoN}
     \end{figure}
 
@@ -426,7 +426,9 @@
 
     \section{13. Gestión de riesgos}
     \label{sec:riesgos}
-Riesgo 1: La arquitectura de Transformers no es adecuada para la predicción de series de tiempo en el contexto de las criptomonedas.
+            a) Identificación de los riesgos (al menos cinco) y estimación de sus consecuencias:
+
+    Riesgo 1: la arquitectura de Transformers no es adecuada para la predicción de series de tiempo en el contexto de las criptomonedas.
         \begin{itemize}
             \item Severidad (S): 10.\\
             La arquitectura de transformers es una pieza central del trabajo.
@@ -434,7 +436,7 @@ Riesgo 1: La arquitectura de Transformers no es adecuada para la predicción de 
             Hay bibliografía disponible que asevere que dicha arquitectura es efectiva para la predicción de series de tiempo.
         \end{itemize}
 
-        Riesgo 2: Se requiere de hardware especializado o de gran poder de cómputo para entrenar los modelos de redes neuronales.
+        Riesgo 2: se requiere de hardware especializado o de gran poder de cómputo para entrenar los modelos de redes neuronales.
         \begin{itemize}
             \item Severidad (S): 5.\\
             Alquilar o adquirir hardware impactaría en los costos del proyecto.
@@ -442,7 +444,7 @@ Riesgo 1: La arquitectura de Transformers no es adecuada para la predicción de 
             Se desconocen los requerimientos exactos para entrenar los modelos de redes neuronales capaces de predecir series de tiempo de forma efectiva.
         \end{itemize}
 
-        Riesgo 3: La integración, para la lectura de cotizaciones, con la API del exchange es paga.
+        Riesgo 3: la integración, para la lectura de cotizaciones, con la API del exchange es paga.
         \begin{itemize}
         \item Severidad (S): 10.\\
           Limitaría en gran medida el periodo de tiempo con el que se pueden hacer predicciones y la precisión mínima aceptable para estas.
@@ -450,7 +452,7 @@ Riesgo 1: La arquitectura de Transformers no es adecuada para la predicción de 
           Hasta el día de la fecha ha sido gratuita.
         \end{itemize}
 
-        Riesgo 4: La comisión para las transacciones incrementa.
+        Riesgo 4: la comisión para las transacciones incrementa.
         \begin{itemize}
         \item Severidad (S): 8.\\
           Limitaría la precisión mínima aceptable para las predicciones.
@@ -458,42 +460,47 @@ Riesgo 1: La arquitectura de Transformers no es adecuada para la predicción de 
           Actualmente, para la plataforma Binance, se encuentra en $0.1000\%$. Es una decisión de negocio que depende exclusivamente de la plataforma en cuestión, con lo cual puede cambiar.
         \end{itemize}
 
-        Riesgo 5: Deja de funcionar la computadora con la que se lleva a cabo el desarrollo.
+        Riesgo 5: deja de funcionar la computadora con la que se lleva a cabo el desarrollo.
         \begin{itemize}
         \item Severidad (S): 7.\\
           Podría generar perdida de trabajo. Elevaría el costo final del proyecto.
         \item Ocurrencia (O): 2.\\
           No se detectan indicios de falla actualmente.
         \end{itemize}
-     \begin{table}[htpb]
+        b) Tabla de gestión de riesgos:      (El RPN se calcula como RPN=SxO)
+
+
+        \begin{table}[htpb]
             \centering
             \begin{tabularx}{\linewidth}{@{}|X|c|c|c|c|c|c|@{}}
                 \hline
                 \rowcolor[HTML]{C0C0C0}
                 Riesgo & S & O & RPN & S* & O* & RPN* \\ \hline
-                Riesgo 1: La arquitectura de Transformers no es adecuada para la predicción de series de tiempo en el contexto de las criptomonedas. & 10  & 3  & 30     &  6  & 3   &    18  \\ \hline
-                Riesgo 2: Se requiere de hardware especializado o de gran poder de computo para entrenar los modelos de redes neuronales. & 5  & 5  &  25   &  5  & 5   & 25     \\ \hline
-                Riesgo 3: La integración, para la lectura de cotizaciones, con la API del exchange es arancelada.  & 10  & 1  &  10   &    &    &      \\ \hline
-                Riesgo 4: La comisión para las transacciones incrementa. & 8  & 3  &  24   &    &    &      \\ \hline
-                Riesgo 5: Deja de funcionar la computadora con la que se lleva a cabo el desarrollo. & 7  & 2  &  14   &    &    &      \\ \hline
+                Riesgo 1: la arquitectura de Transformers no es adecuada para la predicción de series de tiempo en el contexto de las criptomonedas. & 10  & 3  & 30     &  6  & 3   &    18  \\ \hline
+                Riesgo 2: se requiere de hardware especializado o de gran poder de computo para entrenar los modelos de redes neuronales. & 5  & 5  &  25   &  3  & 5   & 15     \\ \hline
+                Riesgo 3: la integración, para la lectura de cotizaciones, con la API del exchange es arancelada.  & 10  & 1  &  10   &    &    &      \\ \hline
+                Riesgo 4: la comisión para las transacciones incrementa. & 8  & 3  &  24   &    &    &      \\ \hline
+                Riesgo 5: deja de funcionar la computadora con la que se lleva a cabo el desarrollo. & 7  & 2  &  14   &    &    &      \\ \hline
             \end{tabularx}%
         \end{table}
+        c) Plan de mitigación de los riesgos que originalmente excedían el RPN máximo establecido:
+
 
      Se tomarán medidas de mitigación en los riesgos cuyos números de RPN sean mayores o iguales a 25.
 
 
-        Riesgo 1: La arquitectura de Transformers no es adecuada para la predicción de series de tiempo en el contexto de las criptomonedas.
+        Riesgo 1: la arquitectura de Transformers no es adecuada para la predicción de series de tiempo en el contexto de las criptomonedas.
         \begin{itemize}
         \item Severidad (S*): 6.
-          Existen otros modelos ya sea de deep learning o estadísticos que pueden servir para cumplir el objetivo de predecir el valor del BTC. Estos se exploran en una etapa previa del proyecto.
+          Existen otros modelos ya sea de \textit{deep learning} o estadísticos que pueden servir para cumplir el objetivo de predecir el valor del BTC. Estos se exploran en una etapa previa del proyecto.
         \item Probabilidad de ocurrencia (O*): 3.
           La probabilidad no cambia.
         \end{itemize}
 
-        Riesgo 2: Se requiere de hardware especializado o de gran poder de cómputo para entrenar los modelos de redes neuronales.
+        Riesgo 2: se requiere de hardware especializado o de gran poder de cómputo para entrenar los modelos de redes neuronales.
         \begin{itemize}
-        \item Severidad (S*): 5.
-          No se mitiga. En caso de ser necesario se contratara un servicio cloud.
+        \item Severidad (S*): 3.
+          En caso de ser necesario se contratará un servicio cloud.
         \item Probabilidad de ocurrencia (O*): 5.
           La probabilidad no cambia.
         \end{itemize}
@@ -502,64 +509,64 @@ Riesgo 1: La arquitectura de Transformers no es adecuada para la predicción de 
     \section{14. Gestión de la calidad}
     \label{sec:calidad}
     \begin{enumerate}
-    \item \textbf{Precisión en las Predicciones:} El modelo debe ser capaz de predecir con alta precisión las fluctuaciones de precios de las criptomonedas (específicamente para un plazo entre un minuto y una semana).
+    \item \textbf{Precisión en las predicciones:} el modelo debe ser capaz de predecir con alta precisión las fluctuaciones de precios de las criptomonedas (específicamente en un plazo entre un minuto y una semana).
       \begin{itemize}
-      \item \textbf{Acción de Verificación:} Realizar pruebas de precisión del modelo que utilice métricas como MAE (Error Absoluto Medio), RMSE (Raíz del Error Cuadrático Medio) y MAPE (Error Porcentual Absoluto Medio) en un conjunto de datos de validación.
-      \item \textbf{Acción de Validación:} Comparar las predicciones con un conjunto de datos de test independiente para asegurar que la precisión general es robusta y consistente en diferentes intervalos de tiempo.
+      \item \textbf{Acción de verificación:} realizar pruebas de precisión del modelo que utilice métricas como MAE (Error Absoluto Medio), RMSE (Raíz del Error Cuadrático Medio) y MAPE (Error Porcentual Absoluto Medio) en un conjunto de datos de validación.
+      \item \textbf{Acción de validación:} comparar, con el cliente presente, las predicciones con un conjunto de datos de test independiente para asegurar que la precisión general es robusta y consistente en diferentes intervalos de tiempo.
       \end{itemize}
 
-    \item \textbf{Eficiencia Computacional:} El modelo debe ser eficiente en términos de tiempo de entrenamiento y capacidad de hacer predicciones en tiempo real.
+    \item \textbf{Eficiencia computacional:} el modelo debe ser eficiente en términos de tiempo de entrenamiento y capacidad de hacer predicciones en tiempo real.
       \begin{itemize}
-      \item \textbf{Acción de Verificación:} Medir los tiempos de entrenamiento y tiempos de inferencia para asegurar que se cumplan los requisitos de tiempo de ejecución. Esto puede incluir la medición del tiempo necesario para entrenar el modelo y hacer una predicción de una nueva entrada de datos.
-      \item \textbf{Acción de Validación:} Validar que el sistema puede hacer predicciones en tiempo real dentro de un plazo de menos de un segundo, según las especificaciones del sistema de trading.
+      \item \textbf{Acción de verificación:} medir los tiempos de entrenamiento y tiempos de inferencia para asegurar que se cumplan los requisitos de tiempo de ejecución. Esto puede incluir la medición del tiempo necesario para entrenar el modelo y hacer una predicción de una nueva entrada de datos.
+      \item \textbf{Acción de validación:} validar, con el cliente presente, que el sistema puede hacer predicciones en tiempo real dentro de un plazo de menos de un segundo, según las especificaciones del sistema de \textit{trading}.
       \end{itemize}
 
-    \item \textbf{Robustez ante Ruido de Datos:} El modelo debe ser capaz de manejar el ruido de datos y las fluctuaciones inesperadas del mercado sin perder rendimiento significativo.
+    \item \textbf{Robustez ante ruido de datos:} el modelo debe ser capaz de manejar el ruido de datos y las fluctuaciones inesperadas del mercado sin perder rendimiento significativo.
       \begin{itemize}
-      \item \textbf{Acción de Verificación:} Introducir ruido artificial en los datos de entrada y evaluar la capacidad del modelo para mantener una precisión razonable en la predicción.
-      \item \textbf{Acción de Validación:} Evaluar el rendimiento del modelo con datos históricos que incluyan fluctuaciones y eventos inesperados en el mercado, como crisis o “flash crashes”.
+      \item \textbf{Acción de verificación:} introducir ruido artificial en los datos de entrada y evaluar la capacidad del modelo para mantener una precisión razonable en la predicción.
+      \item \textbf{Acción de validación:} evaluar, con el cliente presente, el rendimiento del modelo con datos históricos que incluyan fluctuaciones y eventos inesperados en el mercado, como crisis o \textit{“flash crashes”}.
       \end{itemize}
 
-    \item \textbf{Modelado de Tendencias a Largo Plazo:} El modelo debe ser capaz de captar tendencias a largo plazo, más allá de las fluctuaciones de corto plazo, como en un plazo de predicción de una semana.
+    \item \textbf{Modelado de tendencias a largo plazo:} el modelo debe ser capaz de captar tendencias a largo plazo, más allá de las fluctuaciones de corto plazo, como en un plazo de predicción de una semana.
       \begin{itemize}
-      \item \textbf{Acción de Verificación:} Utilizar métricas de predicción de largo plazo, como la capacidad del modelo para capturar correctamente las tendencias (por ejemplo, con el coeficiente de determinación R² o una métrica de tendencia direccional).
-      \item \textbf{Acción de Validación:} Validar que el modelo puede predecir correctamente las tendencias de criptomonedas de hasta una semana.
+      \item \textbf{Acción de verificación:} utilizar métricas de predicción de largo plazo, como la capacidad del modelo para capturar correctamente las tendencias (por ejemplo, con el coeficiente de determinación R² o una métrica de tendencia direccional).
+      \item \textbf{Acción de validación:} validar, con el cliente presente, que el modelo puede predecir correctamente las tendencias de criptomonedas de hasta una semana.
       \end{itemize}
 
-    \item \textbf{Minimización del Riesgo:} El sistema debe ser capaz de gestionar y regular el nivel de riesgo asociado a las inversiones.
+    \item \textbf{Minimización del riesgo:} el sistema debe ser capaz de gestionar y regular el nivel de riesgo asociado a las inversiones.
       \begin{itemize}
-      \item \textbf{Acción de Verificación:} Implementar un algoritmo de gestión de riesgo que incluya criterios como stop-loss, take-profit y asignación de capital basada en el riesgo calculado.
-      \item \textbf{Acción de Validación:} Validar el modelo con backtesting para evaluar cómo se comporta en diferentes condiciones del mercado, y asegurar que el riesgo no excede los límites establecidos.
+      \item \textbf{Acción de verificación:} implementar un algoritmo de gestión de riesgo que incluya criterios como \textit{stop-loss}, \textit{take-profit} y asignación de capital basada en el riesgo calculado.
+      \item \textbf{Acción de validación:} validar, junto con el cliente, el comportamiento del modelo en diferentes condiciones del mercado, y asegurar que el riesgo no excede los límites establecidos.
       \end{itemize}
 
-    \item \textbf{Redacción de una memoria final:} Se debe redactar una memoria técnica sobre lo que se realizó a lo largo del proyecto.
+    \item \textbf{Redacción de una memoria final:} se debe redactar una memoria técnica  el desarrollo del proyecto.
       \begin{itemize}
-      \item \textbf{Acción de Verificación:} tener el documento escrito.
-      \item \textbf{Acción de Validación:} publicar el documento.
+      \item \textbf{Acción de verificación:} tener el documento escrito.
+      \item \textbf{Acción de validación:} publicar el documento.
       \end{itemize}
 
-    \item \textbf{Generación de Señales de Trading Efectivas:} El modelo debe generar señales de compra y venta con un umbral de efectividad aceptable según un indicador de rendimiento como el Sharpe Ratio o el Ratio de Ganancia/Perdida.
+    \item \textbf{Generación de señales de trading efectivas:} el modelo debe generar señales de compra y venta con un umbral de efectividad aceptable según un indicador de rendimiento como el \textit{Sharpe Ratio} o el Ratio de Ganancia/Pérdida.
       \begin{itemize}
-      \item \textbf{Acción de Verificación:} Evaluar la efectividad de las señales generadas al comparar las señales de trading con los movimientos de mercado reales.
-      \item \textbf{Acción de Validación:} Validar que las señales generadas por el sistema en condiciones de mercado normales y extremas tengan un impacto positivo en las ganancias netas durante el backtesting.
+      \item \textbf{Acción de verificación:} evaluar la efectividad de las señales generadas al comparar las señales de trading con los movimientos de mercado reales.
+      \item \textbf{Acción de validación:} dar al cliente que valide que las señales generadas por el sistema en condiciones de mercado normales y extremas tengan un impacto positivo en las ganancias netas durante el \textit{backtesting}.
       \end{itemize}
 
-    \item \textbf{Sistema autonomo:} El sistema debe ser totalmente autónomo en la compra y venta de criptomonedas.
+    \item \textbf{Sistema autónomo:} el sistema debe ser totalmente autónomo en la compra y venta de criptomonedas.
       \begin{itemize}
-      \item \textbf{Acción de Verificación:} realizar pruebas con el sistema en funcionamiento por más de un día.
-      \item \textbf{Acción de Validación:} realizar pruebas con el sistema en funcionamiento por más de un día.
+      \item \textbf{Acción de verificación:} realizar pruebas con el sistema en funcionamiento por más de un día.
+      \item \textbf{Acción de validación:} realizar pruebas con el sistema en funcionamiento por más de un día y dar acceso al cliente para que pueda validarlo.
       \end{itemize}
 
-    \item \textbf{Reportes de transacciones:} El modelo deberá tener alguna forma de exportar las transacciones que se realizaron.
+    \item \textbf{Reportes de transacciones:} el modelo deberá tener alguna forma de exportar las transacciones que se realizaron.
       \begin{itemize}
-      \item \textbf{Acción de Verificación:} emitir registro de las transacciones a medida que se realizan.
-      \item \textbf{Acción de Validación:} mostrar el registro de las transacciones al cliente.
+      \item \textbf{Acción de verificación:} emitir registro de las transacciones a medida que se realizan.
+      \item \textbf{Acción de validación:} mostrar el registro de las transacciones al cliente.
       \end{itemize}
 
     \item \textbf{Detención segura del sistema:} el sistema debe poder detenerse de forma segura.
       \begin{itemize}
-      \item \textbf{Acción de Verificación:} Probar el mecanismo de detención para asegurarse que no queden transacciones pendientes.
-      \item \textbf{Acción de Validación:} Mostrar que, al detener el sistema, no quedan transacciones pendientes.
+      \item \textbf{Acción de verificación:} probar el mecanismo de detención para asegurarse que no queden transacciones pendientes.
+      \item \textbf{Acción de validación:} mostrar al cliente que, al detener el sistema, no quedan transacciones pendientes.
       \end{itemize}
 
     \end{enumerate}
@@ -571,13 +578,13 @@ Riesgo 1: La arquitectura de Transformers no es adecuada para la predicción de 
 
       \begin{itemize}
       \item Responsable: \supname
-      \item Procedimiento: se evaluará el cumplimiento de los requerimientos en tiempo y forma. De no ser el caso se desarrollaran las causas y mitigaciones para futuros proyectos.
+      \item Procedimiento: se evaluará el cumplimiento de los requerimientos en tiempo y forma. De no ser el caso se desarrollarán las causas y mitigaciones para futuros proyectos.
       \end{itemize}
-
+\newpage
     \item Identificación de las técnicas y procedimientos útiles e inútiles que se emplearon, los problemas que surgieron y cómo se solucionaron:\\
       \begin{itemize}
       \item Responsable: \supname
-      \item Procedimiento: se evaluarán si las técnicas y procedimientos propuestos fueron efectivos para cumplir con los objetivos. Si se utilizaron otras técnicas y procedimientos que no fueron propuestos también se detallaran.
+      \item Procedimiento: se evaluarán si las técnicas y procedimientos propuestos fueron efectivos para cumplir con los objetivos. Si se utilizaron otras técnicas y procedimientos que no fueron propuestos también se detallarán.
       \end{itemize}
 
     \item Indicar quién organizará el acto de agradecimiento a todos los interesados, y en especial al equipo de trabajo y colaboradores:\\

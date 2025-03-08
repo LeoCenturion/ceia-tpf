@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021/CVE-2023-32700 patched) (preloaded format=pdflatex 2024.9.3)  18 NOV 2024 16:38
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2021/CVE-2023-32700 patched) (preloaded format=pdflatex 2024.9.3)  1 DEC 2024 15:58
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1073,7 +1073,7 @@ Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 385.
  [12]
 File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
 <use ./Figuras/logoFIUBA.pdf>
-Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 459.
+Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 461.
 (pdftex.def)             Requested size: 99.58464pt x 33.19096pt.
  [13
 
@@ -1081,35 +1081,31 @@ Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 459.
 
 
 ]
-Underfull \hbox (badness 2393) in paragraph at lines 479--479
-[]|\OT1/cmr/m/n/10.95 Riesgo 1: La ar-qui-tec-tura de Trans-form-ers no es
- []
-
 File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
 <use ./Figuras/logoFIUBA.pdf>
-Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 501.
+Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 508.
 (pdftex.def)             Requested size: 99.58464pt x 33.19096pt.
-[14]
+ [14]
 File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
 <use ./Figuras/logoFIUBA.pdf>
-Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 537.
+Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 544.
 (pdftex.def)             Requested size: 99.58464pt x 33.19096pt.
  [15]
-Underfull \hbox (badness 10000) in paragraph at lines 570--571
-
- []
-
-
 Underfull \hbox (badness 10000) in paragraph at lines 577--578
 
  []
 
 File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
 <use ./Figuras/logoFIUBA.pdf>
-Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 581.
+Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 583.
 (pdftex.def)             Requested size: 99.58464pt x 33.19096pt.
 [16]
-Underfull \hbox (badness 10000) in paragraph at lines 583--584
+Underfull \hbox (badness 10000) in paragraph at lines 584--585
+
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 590--591
 
  []
 
@@ -1117,22 +1113,19 @@ Underfull \hbox (badness 10000) in paragraph at lines 583--584
 AED: lastpage setting LastPage
 File: ./Figuras/logoFIUBA.pdf Graphic file (type pdf)
 <use ./Figuras/logoFIUBA.pdf>
-Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 590.
+Package pdftex.def Info: ./Figuras/logoFIUBA.pdf  used on input line 597.
 (pdftex.def)             Requested size: 99.58464pt x 33.19096pt.
 [17] (./charter.aux
 LaTeX Info: Redefining \. on input line 25.
 LaTeX Info: Redefining \% on input line 25.
 )
-
-LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
-
 Package rerunfilecheck Info: File `charter.out' has not changed.
 (rerunfilecheck)             Checksum: F5FB6AF81BC0CA3D9DDA778FF5362F89;4273.
  ) 
 Here is how much of TeX's memory you used:
  25827 strings out of 480806
  473599 string characters out of 5905129
- 794806 words of memory out of 6000000
+ 795940 words of memory out of 6000000
  42609 multiletter control sequences out of 15000+600000
  411300 words of font info for 55 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
@@ -1146,7 +1139,7 @@ dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fo
 nts/type1/public/amsfonts/cm/cmr12.pfb></usr/share/texlive/texmf-dist/fonts/typ
 e1/public/amsfonts/cm/cmti10.pfb></usr/share/texlive/texmf-dist/fonts/type1/pub
 lic/cm-super/sfrm1095.pfb>
-Output written on charter.pdf (17 pages, 711081 bytes).
+Output written on charter.pdf (17 pages, 713002 bytes).
 PDF statistics:
  364 PDF objects out of 1000 (max. 8388607)
  309 compressed objects within 4 object streams
