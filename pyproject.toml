@@ -17,6 +17,7 @@ binance = "^0.3"
 notebook = "^7.3.2"
 ccxt = "^4.4.64"
 ta = "^0.11.0"
+backtesting = "^0.6.2"
 
 
 [build-system]

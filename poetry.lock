@@ -332,6 +332,28 @@ files = [
 dev = ["backports.zoneinfo ; python_version < \"3.9\"", "freezegun (>=1.0,<2.0)", "jinja2 (>=3.0)", "pytest (>=6.0)", "pytest-cov", "pytz", "setuptools", "tzdata ; sys_platform == \"win32\""]
 
 [[package]]
+name = "backtesting"
+version = "0.6.2"
+description = "Backtest trading strategies in Python"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "backtesting-0.6.2-py3-none-any.whl", hash = "sha256:5d48f0a10f139e02a4219d0b79e439c7f250d8faafe0746eabffd9bed157a0b2"},
+    {file = "backtesting-0.6.2.tar.gz", hash = "sha256:18885239b7eccfc672c1c8f861cac179bee5edcd26d8f409649472adbd0831b5"},
+]
+
+[package.dependencies]
+bokeh = ">=1.4.0,<3.0.dev0 || ==3.1.* || >=3.3.dev0"
+numpy = ">=1.17.0"
+pandas = ">0.25.0"
+
+[package.extras]
+dev = ["coverage", "flake8", "mypy"]
+doc = ["ipykernel", "jupyter-client", "jupytext (>=1.3)", "nbconvert", "pdoc3"]
+test = ["matplotlib", "sambo", "scikit-learn"]
+
+[[package]]
 name = "beautifulsoup4"
 version = "4.13.3"
 description = "Screen-scraping library"
@@ -383,6 +405,29 @@ webencodings = "*"
 
 [package.extras]
 css = ["tinycss2 (>=1.1.0,<1.5)"]
+
+[[package]]
+name = "bokeh"
+version = "3.6.3"
+description = "Interactive plots and applications in the browser from Python"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "bokeh-3.6.3-py3-none-any.whl", hash = "sha256:1c219e2afe1405e6ada212071ac3bee91c95acfd1aa6d620eb6f61a751407747"},
+    {file = "bokeh-3.6.3.tar.gz", hash = "sha256:9b81d6a9ea62e75a04a1a9d9f931942016890beec9ab5d129a2a4432cf595c0a"},
+]
+
+[package.dependencies]
+contourpy = ">=1.2"
+Jinja2 = ">=2.9"
+numpy = ">=1.16"
+packaging = ">=16.8"
+pandas = ">=1.2"
+pillow = ">=7.1.0"
+PyYAML = ">=3.10"
+tornado = ">=6.2"
+xyzservices = ">=2021.09.1"
 
 [[package]]
 name = "ccxt"
@@ -3641,6 +3686,18 @@ optional = ["python-socks", "wsaccel"]
 test = ["websockets"]
 
 [[package]]
+name = "xyzservices"
+version = "2025.1.0"
+description = "Source of XYZ tiles providers"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "xyzservices-2025.1.0-py3-none-any.whl", hash = "sha256:fa599956c5ab32dad1689960b3bb08fdcdbe0252cc82d84fc60ae415dc648907"},
+    {file = "xyzservices-2025.1.0.tar.gz", hash = "sha256:5cdbb0907c20be1be066c6e2dc69c645842d1113a4e83e642065604a21f254ba"},
+]
+
+[[package]]
 name = "yarl"
 version = "1.18.3"
 description = "Yet another URL library"
@@ -3740,4 +3797,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "d9f047c713e527818fe2a0afec5e30374c349e41bc4edc1fbebe57e26cec11b9"
+content-hash = "cb9c9da48ebf9049189bef56731a073f06b0b468e5a547d430baa155266360ac"

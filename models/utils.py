@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import seaborn as sns   
+import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.stats import kurtosis, skew
 from collections import namedtuple
@@ -12,16 +12,17 @@ def prepare_df(df):
     df['open_date'] = pd.to_datetime(df['open_time'], unit='ms')
     df['diff'] =  df['close'] - df['open']
     df['dow'] = df['open_date'].dt.weekday
-def read_values():
+
+def read_values() -> dict[int, dict[int, pd.DataFrame]]:
     data_path = '../data/binance/python/data/spot/monthly/klines/BTCUSDT/1h/'
     data_dict = {}
-    
+
     for filename in os.listdir(data_path):
         if filename.endswith('.csv'):
             parts = filename.split('-')
             year = int(parts[2])
             month = int(parts[3].split('.')[0])
-    
+
             file_path = os.path.join(data_path, filename)
             df = pd.read_csv(file_path)
             df.columns = ["open_time", "open", "high", "low", "close", "volume", "close_time","quote_assets_volume", "number_of_trades", "taker_buy_base_asset_vol", "taker_buy_quote_asset_vol", "ignore"]
@@ -29,18 +30,17 @@ def read_values():
             if year not in data_dict:
                 data_dict[year] = {}
             data_dict[year][month] = df
-    
+
     return data_dict
 
 def compute_runs(df):
-    # Initialize lists to store the results
     start_prices = []
     end_prices = []
     run_vectors = []
     run_lengths = []
     start_times = []
     end_times = []
-    # Initialize variables to keep track of the current run
+
     start_price = None
     start_time = None
     current_run_length = 0
