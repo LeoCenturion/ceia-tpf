@@ -109,8 +109,10 @@ class TradingBacktester:
         signals = pd.Series(index=data.index, dtype=float)
         signals[:] = 0
 
-        data["MA_short"] = data["close"].rolling(window=short_window).mean()
-        data["MA_long"] = data["close"].rolling(window=long_window).mean()
+        price_change = data["close"].pct_change()
+
+        data["MA_short"] = price_change.rolling(window=short_window).mean()
+        data["MA_long"] = price_change.rolling(window=long_window).mean()
 
         # Generate signals
         signals.loc[data["MA_short"] > data["MA_long"]] = 1  # Long
@@ -165,8 +167,10 @@ class TradingBacktester:
         signals = pd.Series(index=data.index, dtype=float)
         signals[:] = 0
 
-        data["EWMA_short"] = data["close"].ewm(span=short_span, adjust=False).mean()
-        data["EWMA_long"] = data["close"].ewm(span=long_span, adjust=False).mean()
+        price_change = data["close"].pct_change()
+
+        data["EWMA_short"] = price_change.ewm(span=short_span, adjust=False).mean()
+        data["EWMA_long"] = price_change.ewm(span=long_span, adjust=False).mean()
 
         # Generate signals
         signals.loc[data["EWMA_short"] > data["EWMA_long"]] = 1  # Long
@@ -209,22 +213,32 @@ class TradingBacktester:
         signals = pd.Series(index=data.index, dtype=float)
         signals[:] = 0
 
-        # Prepare data for Prophet
-        prophet_data = data.reset_index()[["timestamp", "close"]].rename(
+        # Prepare data for Prophet using price changes
+        prophet_df = data.reset_index()[["timestamp", "close"]].rename(
             columns={"timestamp": "ds", "close": "y"}
         )
+        prophet_df["y"] = prophet_df["y"].pct_change()
+        prophet_df_train = prophet_df.dropna()
 
         model = Prophet()
-        model.fit(prophet_data)
-        forecast = model.predict(prophet_data)
+        model.fit(prophet_df_train)
+
+        # Predict on all dates
+        future = prophet_df[["ds"]]
+        forecast = model.predict(future)
 
         # Merge forecast back to original dataframe
         forecast.set_index("ds", inplace=True)
         data_with_forecast = data.join(forecast[["trend"]])
+        data_with_forecast["price_change"] = data["close"].pct_change()
 
-        # Generate signals based on whether the price is above or below the trend
-        signals.loc[data_with_forecast["close"] > data_with_forecast["trend"]] = 1
-        signals.loc[data_with_forecast["close"] < data_with_forecast["trend"]] = -1
+        # Generate signals based on whether the price change is above or below the trend
+        signals.loc[
+            data_with_forecast["price_change"] > data_with_forecast["trend"]
+        ] = 1
+        signals.loc[
+            data_with_forecast["price_change"] < data_with_forecast["trend"]
+        ] = -1
 
         return signals
 
