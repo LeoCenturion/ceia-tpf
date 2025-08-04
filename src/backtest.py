@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import ccxt
 import matplotlib.pyplot as plt
+from prophet import Prophet
 from typing import List, Dict, Callable
 
 
@@ -147,6 +148,83 @@ class TradingBacktester:
         # Generate signals
         signals.loc[rsi > overbought] = -1  # Sell signal
         signals.loc[rsi < oversold] = 1  # Buy signal
+
+        return signals
+
+    def ewma_crossover_strategy(
+        self, data: pd.DataFrame, short_span: int = 50, long_span: int = 200
+    ) -> pd.Series:
+        """
+        Exponential Moving Average (EWMA) Crossover strategy
+
+        :param data: Historical price data
+        :param short_span: Short-term EWMA span
+        :param long_span: Long-term EWMA span
+        :return: Trading signals
+        """
+        signals = pd.Series(index=data.index, dtype=float)
+        signals[:] = 0
+
+        data["EWMA_short"] = data["close"].ewm(span=short_span, adjust=False).mean()
+        data["EWMA_long"] = data["close"].ewm(span=long_span, adjust=False).mean()
+
+        # Generate signals
+        signals.loc[data["EWMA_short"] > data["EWMA_long"]] = 1  # Long
+        signals.loc[data["EWMA_short"] < data["EWMA_long"]] = -1  # Short
+
+        return signals
+
+    def momentum_strategy(self, data: pd.DataFrame, window: int = 10) -> pd.Series:
+        """
+        Simple momentum strategy.
+
+        :param data: Historical price data
+        :param window: Momentum calculation window
+        :return: Trading signals
+        """
+        signals = pd.Series(index=data.index, dtype=float)
+        signals[:] = 0
+
+        momentum = data["close"].diff(window)
+
+        # Generate signals
+        signals.loc[momentum > 0] = 1  # Buy signal
+        signals.loc[momentum < 0] = -1  # Sell signal
+
+        return signals
+
+    def prophet_strategy(self, data: pd.DataFrame) -> pd.Series:
+        """
+        Prophet-based trading strategy.
+
+        .. warning::
+            This is a simplistic implementation and has a strong
+            lookahead bias as it fits the Prophet model on the entire dataset.
+            A proper implementation would use a rolling forecast to avoid
+            using future data. This is for demonstration purposes only.
+
+        :param data: Historical price data.
+        :return: Trading signals.
+        """
+        signals = pd.Series(index=data.index, dtype=float)
+        signals[:] = 0
+
+        # Prepare data for Prophet
+        prophet_data = data.reset_index()[["timestamp", "close"]].rename(
+            columns={"timestamp": "ds", "close": "y"}
+        )
+
+        model = Prophet()
+        model.fit(prophet_data)
+        forecast = model.predict(prophet_data)
+
+        # Merge forecast back to original dataframe
+        forecast.set_index("ds", inplace=True)
+        data_with_forecast = data.join(forecast[["trend"]])
+
+        # Generate signals based on whether the price is above or below the trend
+        signals.loc[data_with_forecast["close"] > data_with_forecast["trend"]] = 1
+        signals.loc[data_with_forecast["close"] < data_with_forecast["trend"]] = -1
 
         return signals
 
@@ -309,6 +387,14 @@ def main():
         historical_data, rsi_window=14, overbought=70, oversold=30
     )
 
+    ewma_signals = backtester.ewma_crossover_strategy(
+        historical_data, short_span=50, long_span=200
+    )
+
+    momentum_signals = backtester.momentum_strategy(historical_data, window=10)
+
+    prophet_signals = backtester.prophet_strategy(historical_data)
+
     # Backtest strategies
     ma_results = backtester.backtest(
         historical_data, ma_signals, stop_loss=0.05, take_profit=0.10
@@ -316,6 +402,18 @@ def main():
 
     rsi_results = backtester.backtest(
         historical_data, rsi_signals, stop_loss=0.05, take_profit=0.10
+    )
+
+    ewma_results = backtester.backtest(
+        historical_data, ewma_signals, stop_loss=0.05, take_profit=0.10
+    )
+
+    momentum_results = backtester.backtest(
+        historical_data, momentum_signals, stop_loss=0.05, take_profit=0.10
+    )
+
+    prophet_results = backtester.backtest(
+        historical_data, prophet_signals, stop_loss=0.05, take_profit=0.10
     )
 
     # Print results
@@ -326,6 +424,18 @@ def main():
     print("\nRSI Strategy:")
     print(f"Final Balance: ${rsi_results['final_balance']:.2f}")
     print(f"Total Return: {rsi_results['total_return_percent']:.2f}%")
+
+    print("\nEWMA Crossover Strategy:")
+    print(f"Final Balance: ${ewma_results['final_balance']:.2f}")
+    print(f"Total Return: {ewma_results['total_return_percent']:.2f}%")
+
+    print("\nMomentum Strategy:")
+    print(f"Final Balance: ${momentum_results['final_balance']:.2f}")
+    print(f"Total Return: {momentum_results['total_return_percent']:.2f}%")
+
+    print("\nProphet Strategy:")
+    print(f"Final Balance: ${prophet_results['final_balance']:.2f}")
+    print(f"Total Return: {prophet_results['total_return_percent']:.2f}%")
 
     # Plot performance
     # backtester.plot_performance(ma_results['balance_history'])
