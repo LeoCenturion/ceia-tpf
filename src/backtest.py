@@ -49,7 +49,9 @@ class TradingBacktester:
         """
         if data_path:
             df = pd.read_csv(data_path)
-            # Assuming CSV columns are compatible, e.g., ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+            df.rename(
+                columns={"date": "timestamp", "Volume BTC": "volume"}, inplace=True
+            )
             df["timestamp"] = pd.to_datetime(df["timestamp"])
             df.set_index("timestamp", inplace=True)
 
