@@ -3,3 +3,4 @@
 /models/__pycache__/
 /out/
 /.idea/workspace.xml
+.aider*
