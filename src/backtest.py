@@ -30,7 +30,8 @@ class TradingBacktester:
                               symbol: str = 'BTC/USDT', 
                               timeframe: str = '1h', 
                               start_date: str = None, 
-                              end_date: str = None) -> pd.DataFrame:
+                              end_date: str = None,
+                              data_path: str = None) -> pd.DataFrame:
         """
         Fetch historical price data for backtesting
         
@@ -38,8 +39,22 @@ class TradingBacktester:
         :param timeframe: Candle timeframe
         :param start_date: Start date for data fetch
         :param end_date: End date for data fetch
+        :param data_path: Path to local CSV file. If provided, data is loaded from here.
         :return: DataFrame with OHLCV data
         """
+        if data_path:
+            df = pd.read_csv(data_path)
+            # Assuming CSV columns are compatible, e.g., ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df.set_index('timestamp', inplace=True)
+            
+            if start_date:
+                df = df[df.index >= start_date]
+            if end_date:
+                df = df[df.index <= end_date]
+            
+            return df
+
         exchange = ccxt.binance({
             'enableRateLimit': True,
             'options': {
