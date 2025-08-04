@@ -112,12 +112,8 @@ class TradingBacktester:
         data["MA_long"] = data["close"].rolling(window=long_window).mean()
 
         # Generate signals
-        signals[short_window:][
-            data["MA_short"][short_window:] > data["MA_long"][short_window:]
-        ] = 1  # Long
-        signals[short_window:][
-            data["MA_short"][short_window:] < data["MA_long"][short_window:]
-        ] = -1  # Short
+        signals.loc[data["MA_short"] > data["MA_long"]] = 1  # Long
+        signals.loc[data["MA_short"] < data["MA_long"]] = -1  # Short
 
         return signals
 
@@ -149,8 +145,8 @@ class TradingBacktester:
         rsi = 100 - (100 / (1 + rs))
 
         # Generate signals
-        signals[rsi_window:][rsi[rsi_window:] > overbought] = -1  # Sell signal
-        signals[rsi_window:][rsi[rsi_window:] < oversold] = 1  # Buy signal
+        signals.loc[rsi > overbought] = -1  # Sell signal
+        signals.loc[rsi < oversold] = 1  # Buy signal
 
         return signals
 
