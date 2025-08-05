@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from prophet import Prophet
 
-from src.backtest import TradingBacktester
+from backtest import TradingBacktester
 
 
 def prophet_expanding_window_validation(
