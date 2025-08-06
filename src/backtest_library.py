@@ -235,10 +235,11 @@ class ProphetStrategy(Strategy):
 
     def next(self):
         price = self.data.Close[-1]
-        if self.i >= len(self.signals):
+        current_index = len(self.data) - 1
+        if current_index >= len(self.signals):
             return
 
-        signal = self.signals[self.i]
+        signal = self.signals[current_index]
         if signal == 1 and not self.position.is_long:
             self.buy(
                 sl=price * (1 - self.stop_loss), tp=price * (1 + self.take_profit)
