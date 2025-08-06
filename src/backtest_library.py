@@ -273,7 +273,7 @@ def main():
             strat_class,
             cash=10000,
             commission=0.0005,
-            leverage=5.0,
+            margin=1 / 5.0,
         )
         stats = bt.run()
         print(f"------ {name} ------")
