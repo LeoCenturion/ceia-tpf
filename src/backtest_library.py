@@ -106,6 +106,19 @@ def momentum_indicator(series, window=10):
     return pd.Series(series).diff(window)
 
 
+def adjust_data_to_ubtc(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Adjusts the price data from BTC to micro-BTC (uBTC).
+    1 BTC = 1,000,000 uBTC.
+    This function divides the OHLC prices by 1,000,000.
+    """
+    df_copy = df.copy()
+    for col in ["Open", "High", "Low", "Close"]:
+        if col in df_copy.columns:
+            df_copy[col] = df_copy[col] / 1_000_000
+    return df_copy
+
+
 class MaCrossover(Strategy):
     short_window = 50
     long_window = 200
@@ -247,6 +260,7 @@ def main():
         end_date="2024-01-01",
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
     )
+    historical_data = adjust_data_to_ubtc(historical_data)
 
     strategies = {
         "MA Crossover": MaCrossover,
