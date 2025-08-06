@@ -269,7 +269,7 @@ def optimize_ma_crossover(data):
             # stop_loss=stop_loss,
             # take_profit=take_profit,
         )
-        return stats["Sharpe Ratio"]
+        return stats["Return [%]"]
 
     study = optuna.create_study(
         study_name="ma_crossover_optimization",

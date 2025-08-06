@@ -16,6 +16,18 @@ try:
 
     # Merge trial data with parameters
     df = pd.merge(trials_df, params_df, on="trial_id")
+
+    # Drop trials where the objective value is NaN, which can happen with Sharpe Ratio
+    # when no trades are made.
+    df.dropna(subset=["value"], inplace=True)
+
+    if df.empty:
+        print("Could not find any completed trials with valid objective values.")
+        print(
+            "This might happen if all trials resulted in an undefined metric (e.g., NaN Sharpe Ratio)."
+        )
+        exit()
+
     # Pivot parameters into columns
     df = df.pivot_table(
         index=["trial_id", "value", "state"], columns="param_name", values="param_value"
@@ -26,8 +38,8 @@ try:
     print("--- Optimization Trials Analysis ---")
     print(f"Loaded {len(df)} trials from '{DB_FILE}'")
 
-    # Display the top 5 best trials based on the 'value' (Sharpe Ratio)
-    print("\n--- Top 5 Best Trials (by Sharpe Ratio) ---")
+    # Display the top 5 best trials based on the 'value'
+    print("\n--- Top 5 Best Trials (by Objective Value) ---")
     best_trials = df.sort_values("value", ascending=False).head(5)
     print(best_trials[["value", "short_window", "long_window"]])
 
