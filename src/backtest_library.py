@@ -269,7 +269,12 @@ def optimize_ma_crossover(data):
         stats = bt.run(short_window=short_window, long_window=long_window)
         return stats["Return [%]"]
 
-    study = optuna.create_study(direction="maximize")
+    study = optuna.create_study(
+        study_name="ma_crossover_optimization",
+        storage="sqlite:///ma_crossover_study.db",
+        direction="maximize",
+        load_if_exists=True,
+    )
     study.optimize(objective, n_trials=100)
 
     print("Best trial for MaCrossover:")
