@@ -1,5 +1,6 @@
 import ccxt
 import pandas as pd
+import optuna
 from backtesting import Backtest, Strategy
 from backtesting.lib import crossover
 from prophet import Prophet
@@ -251,6 +252,36 @@ class ProphetStrategy(Strategy):
             )
 
 
+def optimize_ma_crossover(data):
+    """
+    Optimizes MaCrossover strategy hyperparameters using Optuna.
+    """
+
+    def objective(trial):
+        short_window = trial.suggest_int("short_window", 10, 150, step=5)
+        long_window = trial.suggest_int(
+            "long_window", short_window + 5, 300, step=5
+        )
+
+        bt = Backtest(
+            data, MaCrossover, cash=10000, commission=0.0005, margin=1 / 5.0
+        )
+        stats = bt.run(short_window=short_window, long_window=long_window)
+        return stats["Return [%]"]
+
+    study = optuna.create_study(direction="maximize")
+    study.optimize(objective, n_trials=100)
+
+    print("Best trial for MaCrossover:")
+    trial = study.best_trial
+    print(f"  Value: {trial.value}")
+    print("  Params: ")
+    for key, value in trial.params.items():
+        print(f"    {key}: {value}")
+
+    return trial.params
+
+
 def main():
     # Fetch historical data
     historical_data = fetch_historical_data(
@@ -262,27 +293,19 @@ def main():
     )
     historical_data = adjust_data_to_ubtc(historical_data)
 
-    strategies = {
-        "MA Crossover": MaCrossover,
-        # "RSI": RsiStrategy,
-        # "EWMA Crossover": EwmaCrossover,
-        # "Momentum": MomentumStrategy,
-        # "Prophet": ProphetStrategy,
-    }
+    best_params = optimize_ma_crossover(historical_data)
 
-    for name, strat_class in strategies.items():
-        bt = Backtest(
-            historical_data,
-            strat_class,
-            cash=10000,
-            commission=0.0005,
-            margin=1 / 5.0,
-        )
-        stats = bt.run()
-        print(f"------ {name} ------")
-        print(stats)
-        # For a single plot, uncomment the following line and run one strategy
-        bt.plot(filename=f"{name.replace(' ', '_')}_plot.html")
+    print("\n--- Running final backtest with best params ---")
+    bt = Backtest(
+        historical_data,
+        MaCrossover,
+        cash=10000,
+        commission=0.0005,
+        margin=1 / 5.0,
+    )
+    stats = bt.run(**best_params)
+    print(stats)
+    bt.plot(filename="ma_crossover_optimized_plot.html")
 
 
 if __name__ == "__main__":
