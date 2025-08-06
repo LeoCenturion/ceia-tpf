@@ -26,9 +26,7 @@ def fetch_historical_data(
     """
     if data_path:
         df = pd.read_csv(data_path)
-        df.rename(
-            columns={"date": "timestamp", "Volume BTC": "volume"}, inplace=True
-        )
+        df.rename(columns={"date": "timestamp", "Volume BTC": "volume"}, inplace=True)
         df["timestamp"] = pd.to_datetime(df["timestamp"])
         df.set_index("timestamp", inplace=True)
 
@@ -122,9 +120,7 @@ class MaCrossover(Strategy):
     def next(self):
         price = self.data.Close[-1]
         if crossover(self.ma_short, self.ma_long):
-            self.buy(
-                sl=price * (1 - self.stop_loss), tp=price * (1 + self.take_profit)
-            )
+            self.buy(sl=price * (1 - self.stop_loss), tp=price * (1 + self.take_profit))
         elif crossover(self.ma_long, self.ma_short):
             self.sell(
                 sl=price * (1 + self.stop_loss), tp=price * (1 - self.take_profit)
@@ -150,9 +146,7 @@ class RsiStrategy(Strategy):
             )
         elif self.rsi < self.oversold and not self.position.is_long:
             self.position.close()
-            self.buy(
-                sl=price * (1 - self.stop_loss), tp=price * (1 + self.take_profit)
-            )
+            self.buy(sl=price * (1 - self.stop_loss), tp=price * (1 + self.take_profit))
 
 
 class EwmaCrossover(Strategy):
@@ -169,9 +163,7 @@ class EwmaCrossover(Strategy):
     def next(self):
         price = self.data.Close[-1]
         if crossover(self.ewma_short, self.ewma_long):
-            self.buy(
-                sl=price * (1 - self.stop_loss), tp=price * (1 + self.take_profit)
-            )
+            self.buy(sl=price * (1 - self.stop_loss), tp=price * (1 + self.take_profit))
         elif crossover(self.ewma_long, self.ewma_short):
             self.sell(
                 sl=price * (1 + self.stop_loss), tp=price * (1 - self.take_profit)
@@ -190,9 +182,7 @@ class MomentumStrategy(Strategy):
         price = self.data.Close[-1]
         if self.momentum > 0 and not self.position.is_long:
             self.position.close()
-            self.buy(
-                sl=price * (1 - self.stop_loss), tp=price * (1 + self.take_profit)
-            )
+            self.buy(sl=price * (1 - self.stop_loss), tp=price * (1 + self.take_profit))
         elif self.momentum < 0 and not self.position.is_short:
             self.position.close()
             self.sell(
@@ -241,9 +231,7 @@ class ProphetStrategy(Strategy):
 
         signal = self.signals[current_index]
         if signal == 1 and not self.position.is_long:
-            self.buy(
-                sl=price * (1 - self.stop_loss), tp=price * (1 + self.take_profit)
-            )
+            self.buy(sl=price * (1 - self.stop_loss), tp=price * (1 + self.take_profit))
         elif signal == -1 and not self.position.is_short:
             self.sell(
                 sl=price * (1 + self.stop_loss), tp=price * (1 - self.take_profit)
@@ -262,10 +250,10 @@ def main():
 
     strategies = {
         "MA Crossover": MaCrossover,
-        "RSI": RsiStrategy,
-        "EWMA Crossover": EwmaCrossover,
-        "Momentum": MomentumStrategy,
-        "Prophet": ProphetStrategy,
+        # "RSI": RsiStrategy,
+        # "EWMA Crossover": EwmaCrossover,
+        # "Momentum": MomentumStrategy,
+        # "Prophet": ProphetStrategy,
     }
 
     for name, strat_class in strategies.items():
