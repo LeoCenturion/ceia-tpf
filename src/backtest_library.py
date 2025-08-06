@@ -126,7 +126,11 @@ class MaCrossover(Strategy):
     stop_loss = 0.05
     take_profit = 0.10
 
-    def init(self):
+    def init(self, short_window=50, long_window=200, stop_loss=0.05, take_profit=0.10):
+        short_window = short_window
+        long_window = long_window
+        stop_loss = stop_loss
+        take_profit = take_profit
         price_change = self.I(pct_change, self.data.Close)
         self.ma_short = self.I(sma, price_change, self.short_window)
         self.ma_long = self.I(sma, price_change, self.long_window)
@@ -259,15 +263,17 @@ def optimize_ma_crossover(data):
 
     def objective(trial):
         short_window = trial.suggest_int("short_window", 10, 150, step=5)
-        long_window = trial.suggest_int(
-            "long_window", short_window + 5, 300, step=5
+        long_window = trial.suggest_int("long_window", short_window + 5, 300, step=5)
+        # stop_loss = trial.suggest_float("stop_loss", 0.05, 1)
+        # take_profit = trial.suggest_float("take_profit", 0.0, 0.5)
+        bt = Backtest(data, MaCrossover, cash=10000, commission=0.0005, margin=1 / 5.0)
+        stats = bt.run(
+            short_window=short_window,
+            long_window=long_window,
+            # stop_loss=stop_loss,
+            # take_profit=take_profit,
         )
-
-        bt = Backtest(
-            data, MaCrossover, cash=10000, commission=0.0005, margin=1 / 5.0
-        )
-        stats = bt.run(short_window=short_window, long_window=long_window)
-        return stats["Return [%]"]
+        return stats["Sharpe Ratio"]
 
     study = optuna.create_study(
         study_name="ma_crossover_optimization",
