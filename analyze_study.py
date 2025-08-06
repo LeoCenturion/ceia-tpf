@@ -7,7 +7,7 @@ DB_FILE = "ma_crossover_study.db"
 # --- Load Data ---
 try:
     # Connect to the SQLite database
-    conn = sqlite3.connect(f"sqlite:///{DB_FILE}?mode=ro", uri=True)
+    conn = sqlite3.connect(DB_FILE)
 
     # Load the trials table into a pandas DataFrame
     trials_df = pd.read_sql_query("SELECT * FROM trials", conn)

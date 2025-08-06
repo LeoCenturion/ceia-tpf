@@ -126,11 +126,7 @@ class MaCrossover(Strategy):
     stop_loss = 0.05
     take_profit = 0.10
 
-    def init(self, short_window=50, long_window=200, stop_loss=0.05, take_profit=0.10):
-        short_window = short_window
-        long_window = long_window
-        stop_loss = stop_loss
-        take_profit = take_profit
+    def init(self):
         price_change = self.I(pct_change, self.data.Close)
         self.ma_short = self.I(sma, price_change, self.short_window)
         self.ma_long = self.I(sma, price_change, self.long_window)
