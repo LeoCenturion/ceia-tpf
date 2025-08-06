@@ -282,7 +282,7 @@ def main():
         print(f"------ {name} ------")
         print(stats)
         # For a single plot, uncomment the following line and run one strategy
-        # bt.plot()
+        bt.plot()
 
 
 if __name__ == "__main__":
