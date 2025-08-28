@@ -1,1 +1,2 @@
 - Use type hints whenever possible
+- For installing do: poetry add <package>
