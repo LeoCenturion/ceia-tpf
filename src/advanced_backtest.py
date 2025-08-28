@@ -243,17 +243,17 @@ def optimize_strategy(data, strategy, study_name, n_trials=100):
             params['fast_span'] = trial.suggest_int('fast_span', 5, 50)
             params['slow_span'] = trial.suggest_int('slow_span', 20, 100)
             params['signal_span'] = trial.suggest_int('signal_span', 5, 50)
-
+        #AI I want to save in mlflow the artifact corresponding to the trades and backtest plot for the last step AI!
         # Run expanding window backtest for the given params
         stats_list = []
-        window_size = 1000
-        step_size = 100
-        for i in range(window_size, len(data), step_size):
-            window_data = data.iloc[i-window_size:i]
+        # window_size = 1000
+        step_size = 1000
+        for i in range(0, len(data), step_size):
+            window_data = data.iloc[:i]
             bt = Backtest(window_data, strategy, cash=10000, commission=.002)
             stats = bt.run(**params)
             stats_list.append(stats)
-
+        
         if not stats_list:
             return 0 # Return a neutral value if no backtests were run
 
