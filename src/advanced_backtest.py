@@ -3,6 +3,7 @@ import pandas as pd
 import optuna
 import mlflow
 import numpy as np
+import os # Added for file operations
 import re
 from backtesting import Backtest, Strategy
 from backtesting.lib import crossover
@@ -243,25 +244,40 @@ def optimize_strategy(data, strategy, study_name, n_trials=100):
             params['fast_span'] = trial.suggest_int('fast_span', 5, 50)
             params['slow_span'] = trial.suggest_int('slow_span', 20, 100)
             params['signal_span'] = trial.suggest_int('signal_span', 5, 50)
-        #AI I want to save in mlflow the artifact corresponding to the trades and backtest plot for the last step AI!
+        
         # Run expanding window backtest for the given params
         stats_list = []
-        # window_size = 1000
-        step_size = 1000
-        for i in range(0, len(data), step_size):
+        last_bt_instance = None # To store the Backtest object for the last successful step
+        step_size = 1000 # Increment for expanding window
+        min_window_size = step_size # Assuming minimum window size is the step_size
+
+        for i in range(min_window_size, len(data) + 1, step_size):
             window_data = data.iloc[:i]
+            
+            # Skip if window_data is empty or too small for strategy to initialize (e.g., for indicators)
+            # A more robust check might involve actual strategy requirements.
+            if len(window_data) < min_window_size: 
+                continue 
+
             bt = Backtest(window_data, strategy, cash=10000, commission=.002)
             stats = bt.run(**params)
-            stats_list.append(stats)
+            
+            if stats is not None: # Only append if backtest ran successfully
+                stats_list.append(stats)
+                last_bt_instance = bt # Keep track of the last successful Backtest instance
         
         if not stats_list:
             return 0 # Return a neutral value if no backtests were run
 
         # Average the stats
         stats_df = pd.DataFrame(stats_list)
-        stats_df.drop(columns=['Duration', 'Max. Drawdown Duration', 'Avg. Drawdown Duration', 'Max. Trade Duration', 'Avg. Trade Duration'],inplace=True)
+        # Drop non-numeric or non-averageable columns before calculating mean
+        columns_to_drop = ['Duration', 'Max. Drawdown Duration', 'Avg. Drawdown Duration', 'Max. Trade Duration', 'Avg. Trade Duration']
+        stats_df = stats_df.drop(columns=columns_to_drop, errors='ignore') # Use errors='ignore' for robustness
+
         # Explicitly select numeric columns for averaging
         averaged_stats = stats_df.select_dtypes(include=np.number).mean().to_dict()
+        
         # Log to MLflow
         run_name = f"{study_name}-" + "-".join([f"{k}={v}" for k, v in params.items()])
         with mlflow.start_run(run_name=run_name, nested=True):
@@ -269,6 +285,27 @@ def optimize_strategy(data, strategy, study_name, n_trials=100):
             for key, value in averaged_stats.items():
                 sanitized_key = sanitize_metric_name(key)
                 mlflow.log_metric(sanitized_key, value)
+
+            # Log artifacts for the last step if available
+            if last_bt_instance:
+                plot_filename = "backtest_plot.html"
+                trades_filename = "trades.csv"
+                
+                # Save plot
+                # open_browser=False prevents the plot from opening automatically
+                last_bt_instance.plot(filename=plot_filename, open_browser=False) 
+                mlflow.log_artifact(plot_filename)
+                
+                # Save trades
+                if not last_bt_instance._trades.empty:
+                    last_bt_instance._trades.to_csv(trades_filename, index=False)
+                    mlflow.log_artifact(trades_filename)
+                
+                # Clean up created files
+                if os.path.exists(plot_filename):
+                    os.remove(plot_filename)
+                if os.path.exists(trades_filename):
+                    os.remove(trades_filename)
 
         return averaged_stats.get('Sortino Ratio', 0)
 
