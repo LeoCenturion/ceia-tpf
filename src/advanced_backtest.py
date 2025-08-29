@@ -253,31 +253,22 @@ def optimize_strategy(data, strategy, study_name, n_trials=100):
 
         for i in range(min_window_size, len(data) + 1, step_size):
             window_data = data.iloc[:i]
-            
-            # Skip if window_data is empty or too small for strategy to initialize (e.g., for indicators)
-            # A more robust check might involve actual strategy requirements.
-            if len(window_data) < min_window_size: 
-                continue 
-
             bt = Backtest(window_data, strategy, cash=10000, commission=.002)
             stats = bt.run(**params)
-            
-            if stats is not None: # Only append if backtest ran successfully
-                stats_list.append(stats)
-                last_bt_instance = bt # Keep track of the last successful Backtest instance
-        
+            stats_list.append(stats)
+            last_bt_instance = bt # Keep track of the last successful Backtest instance
+
         if not stats_list:
             return 0 # Return a neutral value if no backtests were run
 
-        # Average the stats
+
         stats_df = pd.DataFrame(stats_list)
-        # Drop non-numeric or non-averageable columns before calculating mean
         columns_to_drop = ['Duration', 'Max. Drawdown Duration', 'Avg. Drawdown Duration', 'Max. Trade Duration', 'Avg. Trade Duration']
         stats_df = stats_df.drop(columns=columns_to_drop, errors='ignore') # Use errors='ignore' for robustness
 
-        # Explicitly select numeric columns for averaging
+
         averaged_stats = stats_df.select_dtypes(include=np.number).mean().to_dict()
-        
+
         # Log to MLflow
         run_name = f"{study_name}-" + "-".join([f"{k}={v}" for k, v in params.items()])
         with mlflow.start_run(run_name=run_name, nested=True):
@@ -290,17 +281,16 @@ def optimize_strategy(data, strategy, study_name, n_trials=100):
             if last_bt_instance:
                 plot_filename = "backtest_plot.html"
                 trades_filename = "trades.csv"
-                
+
                 # Save plot
                 # open_browser=False prevents the plot from opening automatically
-                last_bt_instance.plot(filename=plot_filename, open_browser=False) 
+                last_bt_instance.plot(filename=plot_filename, open_browser=False)
                 mlflow.log_artifact(plot_filename)
-                
                 # Save trades
-                if not last_bt_instance._trades.empty:
-                    last_bt_instance._trades.to_csv(trades_filename, index=False)
+                if not last_bt_instance._strategy.trades:
+                    last_bt_instance._strategy.trades.to_csv(trades_filename, index=False)
                     mlflow.log_artifact(trades_filename)
-                
+
                 # Clean up created files
                 if os.path.exists(plot_filename):
                     os.remove(plot_filename)
