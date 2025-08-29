@@ -328,6 +328,7 @@ def optimize_strategy(data, strategy, study_name, n_trials=100):
     study.optimize(objective, n_trials=n_trials)
     return study.best_params
 
+# AI Refator this to take strategies, tracking ui, experiment name. Other scripts should be able to import this function AI!
 def main():
     mlflow.set_tracking_uri("sqlite:///mlflow.db")
     mlflow.set_experiment("Trading Strategies")
