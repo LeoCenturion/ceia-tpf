@@ -147,6 +147,15 @@ class MaCrossover(Strategy):
                 sl=price * (1 + self.stop_loss), tp=price * (1 - self.take_profit)
             )
 
+    @classmethod
+    def get_optuna_params(cls, trial):
+        """Suggest hyperparameters for Optuna optimization."""
+        return {
+            'short_window': trial.suggest_int('short_window', 10, 100),
+            'long_window': trial.suggest_int('long_window', 50, 250),
+        }
+
+
 class BollingerBands(Strategy):
     bb_window = 20
     bb_std = 2
@@ -168,6 +177,15 @@ class BollingerBands(Strategy):
                 sl=price * (1 + self.stop_loss), tp=price * (1 - self.take_profit)
             )
 
+    @classmethod
+    def get_optuna_params(cls, trial):
+        """Suggest hyperparameters for Optuna optimization."""
+        return {
+            'bb_window': trial.suggest_int('bb_window', 10, 100),
+            'bb_std': trial.suggest_float('bb_std', 1.5, 3.5),
+        }
+
+
 class MACD(Strategy):
     fast_span = 12
     slow_span = 26
@@ -187,6 +205,15 @@ class MACD(Strategy):
             self.sell(
                 sl=price * (1 + self.stop_loss), tp=price * (1 - self.take_profit)
             )
+
+    @classmethod
+    def get_optuna_params(cls, trial):
+        """Suggest hyperparameters for Optuna optimization."""
+        return {
+            'fast_span': trial.suggest_int('fast_span', 5, 50),
+            'slow_span': trial.suggest_int('slow_span', 20, 100),
+            'signal_span': trial.suggest_int('signal_span', 5, 50),
+        }
 
 def sanitize_metric_name(name):
     """Sanitize metric name to be MLflow compliant."""
@@ -233,18 +260,7 @@ def optimize_strategy(data, strategy, study_name, n_trials=100):
     For each trial, run an expanding window backtest and log the averaged stats to MLflow.
     """
     def objective(trial):
-        params = {}
-        # AI make the strategy return it's parameters AI!
-        if strategy == MaCrossover:
-            params['short_window'] = trial.suggest_int('short_window', 10, 100)
-            params['long_window'] = trial.suggest_int('long_window', 50, 250)
-        elif strategy == BollingerBands:
-            params['bb_window'] = trial.suggest_int('bb_window', 10, 100)
-            params['bb_std'] = trial.suggest_float('bb_std', 1.5, 3.5)
-        elif strategy == MACD:
-            params['fast_span'] = trial.suggest_int('fast_span', 5, 50)
-            params['slow_span'] = trial.suggest_int('slow_span', 20, 100)
-            params['signal_span'] = trial.suggest_int('signal_span', 5, 50)
+        params = strategy.get_optuna_params(trial)
         
         # Run expanding window backtest for the given params
         stats_list = []
@@ -254,10 +270,18 @@ def optimize_strategy(data, strategy, study_name, n_trials=100):
 
         for i in range(min_window_size, len(data) + 1, step_size):
             window_data = data.iloc[:i]
+            
+            # Skip if window_data is empty or too small for strategy to initialize (e.g., for indicators)
+            # A more robust check might involve actual strategy requirements.
+            if len(window_data) < min_window_size: 
+                continue 
+            
             bt = Backtest(window_data, strategy, cash=10000, commission=.002)
             stats = bt.run(**params)
-            stats_list.append(stats)
-            last_bt_instance = bt # Keep track of the last successful Backtest instance
+            
+            if stats is not None: # Only append if backtest ran successfully
+                stats_list.append(stats)
+                last_bt_instance = bt # Keep track of the last successful Backtest instance
 
         if not stats_list:
             return 0 # Return a neutral value if no backtests were run
