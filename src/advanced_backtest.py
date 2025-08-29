@@ -234,6 +234,7 @@ def optimize_strategy(data, strategy, study_name, n_trials=100):
     """
     def objective(trial):
         params = {}
+        # AI make the strategy return it's parameters AI!
         if strategy == MaCrossover:
             params['short_window'] = trial.suggest_int('short_window', 10, 100)
             params['long_window'] = trial.suggest_int('long_window', 50, 250)
