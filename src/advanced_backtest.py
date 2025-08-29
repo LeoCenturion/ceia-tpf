@@ -328,29 +328,48 @@ def optimize_strategy(data, strategy, study_name, n_trials=100):
     study.optimize(objective, n_trials=n_trials)
     return study.best_params
 
-# AI Refator this to take strategies, tracking ui, experiment name. Other scripts should be able to import this function AI!
-def main():
-    mlflow.set_tracking_uri("sqlite:///mlflow.db")
-    mlflow.set_experiment("Trading Strategies")
+def run_optimizations(strategies, data_path, start_date, tracking_uri, experiment_name, n_trials_per_strategy=10):
+    """
+    Run optimization for a set of strategies.
+
+    :param strategies: Dictionary of strategy names to strategy classes.
+    :param data_path: Path to the historical data CSV file.
+    :param start_date: Start date for the data.
+    :param tracking_uri: MLflow tracking URI.
+    :param experiment_name: MLflow experiment name.
+    :param n_trials_per_strategy: Number of Optuna trials for each strategy.
+    """
+    mlflow.set_tracking_uri(tracking_uri)
+    mlflow.set_experiment(experiment_name)
 
     data = fetch_historical_data(
-        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
-        start_date="2022-01-01T00:00:00Z"
+        data_path=data_path,
+        start_date=start_date
     )
     data = adjust_data_to_ubtc(data)
-
-    strategies = {
-        "MaCrossover": MaCrossover,
-        "BollingerBands": BollingerBands,
-        "MACD": MACD
-    }
 
     for name, strategy in strategies.items():
         # This outer run is for grouping the optimization trials
         with mlflow.start_run(run_name=f"Optimize_{name}"):
             print(f"Optimizing {name}...")
-            optimize_strategy(data, strategy, n_trials=10, study_name=name)
+            optimize_strategy(data, strategy, n_trials=n_trials_per_strategy, study_name=name)
             print(f"Optimization for {name} complete.")
+
+def main():
+    """Main function to run the optimization with default parameters."""
+    strategies = {
+        "MaCrossover": MaCrossover,
+        "BollingerBands": BollingerBands,
+        "MACD": MACD
+    }
+    run_optimizations(
+        strategies=strategies,
+        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
+        start_date="2022-01-01T00:00:00Z",
+        tracking_uri="sqlite:///mlflow.db",
+        experiment_name="Trading Strategies",
+        n_trials_per_strategy=10
+    )
 
 
 if __name__ == "__main__":
