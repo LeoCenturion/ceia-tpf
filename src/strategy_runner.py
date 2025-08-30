@@ -142,6 +142,15 @@ class RSIDivergence(Strategy):
             'divergence_period': trial.suggest_int('divergence_period', 10, 60),
         }
 
+#AI given the following description...
+#  Multi-Indicator Algorithmic Strategy
+# Advanced research has explored combining multiple indicators into a single algorithmic system to improve signal quality and filter out noise.
+#     Strategy: One notable strategy from an ETH Zurich Master's Thesis developed a long-short model using a combination of indicators.
+#         Long Entry: Price closes above the upper Bollinger Band AND the 50-period SMA is above the 100-period SMA (confirming an uptrend).
+#         Short Entry: Price closes below the lower Bollinger Band AND the 50-period SMA is below the 100-period SMA (confirming a downtrend).
+#         Exit: A trailing stop-loss was used for exits.
+#     Reported Performance: This specific strategy, when backtested on hourly BTC data from 2017 to 2019, produced a Sharpe Ratio of 3.2 with a maximum drawdown of 25%. In comparison, a buy-and-hold strategy over the same period had a Sharpe Ratio of 1.13 and a maximum drawdown of 85%.
+# Add a new strategy AI!
 
 def main():
     """Main function to run the optimization with default parameters."""
