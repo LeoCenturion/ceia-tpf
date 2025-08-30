@@ -261,7 +261,7 @@ def optimize_strategy(data, strategy, study_name, n_trials=100):
     """
     def objective(trial):
         params = strategy.get_optuna_params(trial)
-        
+
         # Run expanding window backtest for the given params
         stats_list = []
         last_bt_instance = None # To store the Backtest object for the last successful step
@@ -270,15 +270,15 @@ def optimize_strategy(data, strategy, study_name, n_trials=100):
 
         for i in range(min_window_size, len(data) + 1, step_size):
             window_data = data.iloc[:i]
-            
+
             # Skip if window_data is empty or too small for strategy to initialize (e.g., for indicators)
             # A more robust check might involve actual strategy requirements.
             if len(window_data) < min_window_size: 
                 continue 
-            
+
             bt = Backtest(window_data, strategy, cash=10000, commission=.002)
             stats = bt.run(**params)
-            
+
             if stats is not None: # Only append if backtest ran successfully
                 stats_list.append(stats)
                 last_bt_instance = bt # Keep track of the last successful Backtest instance
