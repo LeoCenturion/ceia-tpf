@@ -1,0 +1,238 @@
+import ccxt
+import pandas as pd
+import optuna
+import mlflow
+import numpy as np
+import os
+import re
+from backtesting import Backtest
+
+
+def fetch_historical_data(
+    symbol: str = "BTC/USDT",
+    timeframe: str = "1h",
+    start_date: str = None,
+    end_date: str = None,
+    data_path: str = None,
+) -> pd.DataFrame:
+    """
+    Fetch historical price data for backtesting.
+
+    The `backtesting` library requires column names: 'Open', 'High', 'Low', 'Close'.
+
+    :param symbol: Trading pair
+    :param timeframe: Candle timeframe
+    :param start_date: Start date for data fetch
+    :param end_date: End date for data fetch
+    :param data_path: Path to local CSV file. If provided, data is loaded from here.
+    :return: DataFrame with OHLCV data
+    """
+    if data_path:
+        df = pd.read_csv(data_path)
+        df.rename(columns={"date": "timestamp", "Volume BTC": "volume"}, inplace=True)
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        df.set_index("timestamp", inplace=True)
+
+        if start_date:
+            start_date = pd.to_datetime(start_date).tz_localize(None)
+            df = df[df.index >= start_date]
+        if end_date:
+            df = df[df.index <= end_date]
+
+    else:
+        exchange = ccxt.binance(
+            {"enableRateLimit": True, "options": {"defaultType": "future"}}
+        )
+        start_timestamp = None
+        if start_date:
+            start_timestamp = exchange.parse8601(start_date)
+        else:
+            start_timestamp = None
+        end_timestamp = None
+        if end_date:
+            end_timestamp = exchange.parse8601(end_date)
+        else:
+            end_timestamp = None
+
+        ohlcv = exchange.fetch_ohlcv(
+            symbol,
+            timeframe,
+            since=start_timestamp,
+            limit=end_timestamp,
+        )
+
+        df = pd.DataFrame(
+            ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"]
+        )
+        df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+        df.set_index("timestamp", inplace=True)
+
+    # The backtesting library requires uppercase column names
+    df.rename(
+        columns={
+            "open": "Open",
+            "high": "High",
+            "low": "Low",
+            "close": "Close",
+            "volume": "Volume",
+        },
+        inplace=True,
+    )
+    return df
+
+
+# Indicator functions to be used with `self.I`
+def pct_change(series):
+    return pd.Series(series).pct_change()
+
+
+def sma(series, n):
+    return pd.Series(series).rolling(n).mean()
+
+
+def ewm(series, span):
+    return pd.Series(series).ewm(span=span, adjust=False).mean()
+
+def std(series, n):
+    return pd.Series(series).rolling(n).std()
+
+
+def rsi_indicator(series, n=14):
+    delta = pd.Series(series).diff()
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+
+    avg_gain = sma(gain, n)
+    avg_loss = sma(loss, n)
+
+    rs = avg_gain / avg_loss
+    return 100 - (100 / (1 + rs))
+
+
+def momentum_indicator(series, window=10):
+    return pd.Series(series).diff(window)
+
+
+def adjust_data_to_ubtc(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Adjusts the price data from BTC to micro-BTC (uBTC).
+    1 BTC = 1,000,000 uBTC.
+    This function divides the OHLC prices by 1,000,000.
+    """
+    df_copy = df.copy()
+    for col in ["Open", "High", "Low", "Close"]:
+        if col in df_copy.columns:
+            df_copy[col] = df_copy[col] / 1_000_000
+    return df_copy
+
+
+def sanitize_metric_name(name):
+    """Sanitize metric name to be MLflow compliant."""
+    return re.sub(r'[^a-zA-Z0-9_\-.\s:/]', '', name)
+
+def run_expanding_window_backtest(data, strategy, params, window_size, step_size, name):
+    """
+    Run backtest with expanding window.
+    """
+    from collections import defaultdict
+
+    stats_list = []
+
+    for i in range(window_size, len(data), step_size):
+        window_data = data.iloc[i-window_size:i]
+        bt = Backtest(window_data, strategy, cash=10000, commission=.002)
+        stats = bt.run(**params)
+        stats_list.append(stats)
+
+    if not stats_list:
+        return []
+
+    # Average the stats
+    stats_df = pd.DataFrame(stats_list)
+    numeric_stats_df = stats_df.select_dtypes(include='number')
+    averaged_stats = numeric_stats_df.mean().to_dict()
+
+    run_name = f"{name}-" + "-".join([f"{k}={v}" for k, v in params.items()])
+    with mlflow.start_run(run_name=run_name, nested=True):
+        mlflow.log_params(params)
+
+        # Sanitize and log metrics
+        for key, value in averaged_stats.items():
+            sanitized_key = sanitize_metric_name(key)
+            mlflow.log_metric(sanitized_key, value)
+
+    return averaged_stats.get('Return [%]', [])
+
+def optimize_strategy(data, strategy, study_name, n_trials=100):
+    """
+    Optimize strategy hyperparameters using Optuna.
+    For each trial, run an expanding window backtest and log the averaged stats to MLflow.
+    """
+    def objective(trial):
+        params = strategy.get_optuna_params(trial)
+
+        # Run expanding window backtest for the given params
+        stats_list = []
+        last_bt_instance = None # To store the Backtest object for the last successful step
+        step_size = 1000 # Increment for expanding window
+        min_window_size = step_size # Assuming minimum window size is the step_size
+
+        for i in range(min_window_size, len(data) + 1, step_size):
+            window_data = data.iloc[:i]
+
+            # Skip if window_data is empty or too small for strategy to initialize (e.g., for indicators)
+            # A more robust check might involve actual strategy requirements.
+            if len(window_data) < min_window_size: 
+                continue 
+
+            bt = Backtest(window_data, strategy, cash=10000, commission=.002)
+            stats = bt.run(**params)
+
+            if stats is not None: # Only append if backtest ran successfully
+                stats_list.append(stats)
+                last_bt_instance = bt # Keep track of the last successful Backtest instance
+
+        if not stats_list:
+            return 0 # Return a neutral value if no backtests were run
+
+
+        stats_df = pd.DataFrame(stats_list)
+        columns_to_drop = ['Duration', 'Max. Drawdown Duration', 'Avg. Drawdown Duration', 'Max. Trade Duration', 'Avg. Trade Duration']
+        stats_df = stats_df.drop(columns=columns_to_drop, errors='ignore') # Use errors='ignore' for robustness
+
+
+        averaged_stats = stats_df.select_dtypes(include=np.number).mean().to_dict()
+
+        # Log to MLflow
+        run_name = f"{study_name}-" + "-".join([f"{k}={v}" for k, v in params.items()])
+        with mlflow.start_run(run_name=run_name, nested=True):
+            mlflow.log_params(params)
+            for key, value in averaged_stats.items():
+                sanitized_key = sanitize_metric_name(key)
+                mlflow.log_metric(sanitized_key, value)
+
+            # Log artifacts for the last step if available
+            if last_bt_instance:
+                plot_filename = "backtest_plot.html"
+                trades_filename = "trades.csv"
+
+                # Save plot
+                # open_browser=False prevents the plot from opening automatically
+                last_bt_instance.plot(filename=plot_filename, open_browser=False)
+                mlflow.log_artifact(plot_filename)
+                # Save trades
+                if not last_bt_instance._strategy.trades:
+                    last_bt_instance._strategy.trades.to_csv(trades_filename, index=False)
+                    mlflow.log_artifact(trades_filename)
+
+                # Clean up created files
+                if os.path.exists(plot_filename):
+                    os.remove(plot_filename)
+                if os.path.exists(trades_filename):
+                    os.remove(trades_filename)
+
+        return averaged_stats.get('Sortino Ratio', 0)
+
+    study = optuna.create_study(study_name=study_name, direction='maximize', storage="sqlite:///optuna-study.db", load_if_exists=True)
+    study.optimize(objective, n_trials=n_trials)
+    return study.best_params
