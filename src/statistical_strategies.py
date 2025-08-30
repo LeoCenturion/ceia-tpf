@@ -131,10 +131,6 @@ class SARIMAStrategy(Strategy):
     take_profit = 0.10
 
     def init(self):
-        if sm is None:
-            raise ImportError(
-                "statsmodels is not installed. Please run 'poetry add statsmodels'."
-            )
         self.model_fit = None
         self.processed_data = self.I(
             normalized_price_change, self.data.Close, self.std_window
@@ -144,31 +140,26 @@ class SARIMAStrategy(Strategy):
         price = self.data.Close[-1]
 
         if len(self.data) % self.refit_period == 0 and len(self.data) > self.std_window:
-            try:
-                model = sm.tsa.SARIMAX(
-                    self.processed_data,
-                    order=(self.p, self.d, self.q),
-                    seasonal_order=(self.P, self.D, self.Q, self.s),
-                )
-                self.model_fit = model.fit(disp=False)
-            except Exception:
-                self.model_fit = None
-
-        if self.model_fit:
-            try:
-                forecast_processed = self.model_fit.forecast(steps=1)[0]
-                if forecast_processed > 0 and not self.position.is_long:
-                    self.buy(
-                        sl=price * (1 - self.stop_loss),
+            model = sm.tsa.SARIMAX(
+                self.processed_data,
+                order=(self.p, self.d, self.q),
+                seasonal_order=(self.P, self.D, self.Q, self.s),
+            )
+            self.model_fit = model.fit(disp=False)
+        try:
+            forecast_processed = self.model_fit.forecast(steps=1)[0]
+            if forecast_processed > 0 and not self.position.is_long:
+                self.buy(
+                    sl=price * (1 - self.stop_loss),
                         tp=price * (1 + self.take_profit),
                     )
-                elif forecast_processed < 0 and not self.position.is_short:
-                    self.sell(
-                        sl=price * (1 + self.stop_loss),
-                        tp=price * (1 - self.take_profit),
-                    )
-            except Exception:
-                pass
+            elif forecast_processed < 0 and not self.position.is_short:
+                self.sell(
+                    sl=price * (1 + self.stop_loss),
+                    tp=price * (1 - self.take_profit),
+                )
+        except Exception:
+            pass
 
     @classmethod
     def get_optuna_params(cls, trial):
@@ -187,7 +178,10 @@ class SARIMAStrategy(Strategy):
 
 def main():
     """Main function to run the optimization with default parameters."""
-    strategies = {"SARIMAStrategy": SARIMAStrategy, "ProphetStrategy": ProphetStrategy}
+    strategies = {
+        "SARIMAStrategy": SARIMAStrategy
+        # "ProphetStrategy": ProphetStrategy
+    }
     run_optimizations(
         strategies=strategies,
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
@@ -199,4 +193,5 @@ def main():
 
 
 if __name__ == "__main__":
+    #AI do one round of backtesting with SARIMAStrategy here AI!
     main()
