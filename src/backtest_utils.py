@@ -236,3 +236,31 @@ def optimize_strategy(data, strategy, study_name, n_trials=100):
     study = optuna.create_study(study_name=study_name, direction='maximize', storage="sqlite:///optuna-study.db", load_if_exists=True)
     study.optimize(objective, n_trials=n_trials)
     return study.best_params
+
+
+def run_optimizations(strategies, data_path, start_date, tracking_uri, experiment_name, n_trials_per_strategy=10):
+    """
+    Run optimization for a set of strategies.
+
+    :param strategies: Dictionary of strategy names to strategy classes.
+    :param data_path: Path to the historical data CSV file.
+    :param start_date: Start date for the data.
+    :param tracking_uri: MLflow tracking URI.
+    :param experiment_name: MLflow experiment name.
+    :param n_trials_per_strategy: Number of Optuna trials for each strategy.
+    """
+    mlflow.set_tracking_uri(tracking_uri)
+    mlflow.set_experiment(experiment_name)
+
+    data = fetch_historical_data(
+        data_path=data_path,
+        start_date=start_date
+    )
+    data = adjust_data_to_ubtc(data)
+
+    for name, strategy in strategies.items():
+        # This outer run is for grouping the optimization trials
+        with mlflow.start_run(run_name=f"Optimize_{name}"):
+            print(f"Optimizing {name}...")
+            optimize_strategy(data, strategy, n_trials=n_trials_per_strategy, study_name=name)
+            print(f"Optimization for {name} complete.")
