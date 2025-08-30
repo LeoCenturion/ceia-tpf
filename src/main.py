@@ -18,6 +18,15 @@ if not API_KEY or not API_SECRET:
 # Initialize Binance client for testnet
 client = Client(API_KEY, API_SECRET, testnet=True)
 
+# Proactively sync time with Binance server to prevent signature errors
+try:
+    server_time = client.get_server_time()
+    client.timestamp_offset = server_time['serverTime'] - int(time.time() * 1000)
+    print(f"Time offset with Binance server: {client.timestamp_offset}ms")
+except Exception as e:
+    print(f"Could not sync time with Binance: {e}")
+
+
 TRANSACTION_LOG_FILE = 'transactions.csv'
 
 # Trading parameters
