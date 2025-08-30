@@ -80,14 +80,13 @@ def plot_trades(transactions_file, symbol):
         if pd.notna(closest_index):
             sell_markers[closest_index] = trade['price']
             
-    # Remove NaNs to avoid plotting issues if no signals found
-    buy_markers = buy_markers.dropna()
-    sell_markers = sell_markers.dropna()
-    
     add_plots = []
-    if not buy_markers.empty:
+    # Check if there are any valid buy markers to plot before adding them
+    if buy_markers.notna().any():
         add_plots.append(mpf.make_addplot(buy_markers, type='scatter', marker='^', color='g', markersize=100))
-    if not sell_markers.empty:
+    
+    # Check if there are any valid sell markers to plot
+    if sell_markers.notna().any():
         add_plots.append(mpf.make_addplot(sell_markers, type='scatter', marker='v', color='r', markersize=100))
 
     print("Generating plot...")
