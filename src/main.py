@@ -3,6 +3,8 @@ import time
 import pandas as pd
 from binance.client import Client
 from binance.enums import *
+import csv
+from datetime import datetime
 
 # API credentials from environment variables
 # Make sure to set BINANCE_API_KEY and BINANCE_API_SECRET in your environment
@@ -15,9 +17,24 @@ if not API_KEY or not API_SECRET:
 # Initialize Binance client for testnet
 client = Client(API_KEY, API_SECRET, testnet=True)
 
+TRANSACTION_LOG_FILE = 'transactions.csv'
+
 # Trading parameters
 symbol = 'BTCUSDT'
 timeframe = '1m'  # Using 1 minute timeframe for historical data
+
+
+def log_transaction(timestamp, side, price, quantity, value):
+    """Logs a transaction to the CSV file."""
+    file_exists = os.path.isfile(TRANSACTION_LOG_FILE)
+    with open(TRANSACTION_LOG_FILE, 'a', newline='') as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(['timestamp', 'side', 'price', 'quantity', 'value'])
+        
+        # Convert ms timestamp to readable format
+        ts = datetime.fromtimestamp(timestamp / 1000).strftime('%Y-%m-%d %H:%M:%S')
+        writer.writerow([ts, side, price, quantity, value])
 
 
 def get_historical_data(symbol, interval, lookback):
@@ -69,7 +86,14 @@ def execute_trade(signal, symbol, trade_amount, open_position_quantity, current_
                 order = client.create_order(
                     symbol=symbol, side=SIDE_BUY, type=ORDER_TYPE_MARKET, quoteOrderQty=trade_amount)
                 print(order)
-                return open_position_quantity + float(order['executedQty'])  # Return the new total quantity
+
+                # Log the transaction
+                executed_qty = float(order['executedQty'])
+                cummulative_quote_qty = float(order['cummulativeQuoteQty'])
+                avg_price = cummulative_quote_qty / executed_qty
+                log_transaction(order['transactTime'], 'BUY', avg_price, executed_qty, cummulative_quote_qty)
+
+                return open_position_quantity + executed_qty  # Return the new total quantity
             except Exception as e:
                 print(f"An error occurred during BUY: {e}")
                 return open_position_quantity  # No change in position
@@ -83,6 +107,13 @@ def execute_trade(signal, symbol, trade_amount, open_position_quantity, current_
             order = client.create_order(
                 symbol=symbol, side=SIDE_SELL, type=ORDER_TYPE_MARKET, quantity=open_position_quantity)
             print(order)
+
+            # Log the transaction
+            executed_qty = float(order['executedQty'])
+            cummulative_quote_qty = float(order['cummulativeQuoteQty'])
+            avg_price = cummulative_quote_qty / executed_qty if executed_qty > 0 else 0
+            log_transaction(order['transactTime'], 'SELL', avg_price, executed_qty, cummulative_quote_qty)
+
             return 0.0  # Position is now closed
         except Exception as e:
             print(f"An error occurred during SELL: {e}")
@@ -134,6 +165,12 @@ def main(strategy_func, trade_amount, max_capital):
                     symbol=symbol, side=SIDE_SELL, type=ORDER_TYPE_MARKET, quantity=open_position_quantity)
                 print("Position closed successfully.")
                 print(order)
+
+                # Log the final transaction
+                executed_qty = float(order['executedQty'])
+                cummulative_quote_qty = float(order['cummulativeQuoteQty'])
+                avg_price = cummulative_quote_qty / executed_qty if executed_qty > 0 else 0
+                log_transaction(order['transactTime'], 'SELL', avg_price, executed_qty, cummulative_quote_qty)
             except Exception as e:
                 print(f"An error occurred while closing position on exit: {e}")
 
