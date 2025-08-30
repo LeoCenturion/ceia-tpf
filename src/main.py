@@ -54,22 +54,28 @@ def macd_strategy(df: pd.DataFrame, short_window=12, long_window=26, signal_wind
         return 'HOLD'
 
 
-def execute_trade(signal, symbol, trade_amount, open_position_quantity):
+def execute_trade(signal, symbol, trade_amount, open_position_quantity, current_price, max_capital):
     """
     Executes a trade based on the signal.
     Returns the quantity of the open position.
     """
-    if signal == 'BUY' and open_position_quantity == 0:
-        print(f"Executing BUY order for {trade_amount} USDT worth of {symbol}")
-        try:
-            # For SPOT market orders, we can specify quoteOrderQty for the amount in quote currency (USDT)
-            order = client.create_order(
-                symbol=symbol, side=SIDE_BUY, type=ORDER_TYPE_MARKET, quoteOrderQty=trade_amount)
-            print(order)
-            return float(order['executedQty'])  # Return the executed quantity
-        except Exception as e:
-            print(f"An error occurred during BUY: {e}")
-            return 0.0  # No position was opened
+    current_position_value = open_position_quantity * current_price
+
+    if signal == 'BUY':
+        if current_position_value + trade_amount <= max_capital:
+            print(f"Executing BUY order for {trade_amount} USDT worth of {symbol}")
+            try:
+                # For SPOT market orders, we can specify quoteOrderQty for the amount in quote currency (USDT)
+                order = client.create_order(
+                    symbol=symbol, side=SIDE_BUY, type=ORDER_TYPE_MARKET, quoteOrderQty=trade_amount)
+                print(order)
+                return open_position_quantity + float(order['executedQty'])  # Return the new total quantity
+            except Exception as e:
+                print(f"An error occurred during BUY: {e}")
+                return open_position_quantity  # No change in position
+        else:
+            print(f"BUY signal ignored. Order would exceed max capital. Current value: {current_position_value:.2f} USDT, Max capital: {max_capital} USDT.")
+            return open_position_quantity
     elif signal == 'SELL' and open_position_quantity > 0:
         print(f"Executing SELL order for {open_position_quantity} {symbol}")
         try:
@@ -84,7 +90,7 @@ def execute_trade(signal, symbol, trade_amount, open_position_quantity):
     return open_position_quantity  # No trade executed, return current position status
 
 
-def main(strategy_func, trade_amount):
+def main(strategy_func, trade_amount, max_capital):
     """
     Main trading loop.
     """
@@ -92,6 +98,7 @@ def main(strategy_func, trade_amount):
     print("Starting trading bot...")
     print(f"Using strategy: {strategy_func.__name__}")
     print(f"Trade amount: {trade_amount} USDT")
+    print(f"Max capital: {max_capital} USDT")
 
     try:
         while True:
@@ -104,10 +111,12 @@ def main(strategy_func, trade_amount):
                     continue
 
                 signal = strategy_func(df)
-                position_open_str = f"Yes, size: {open_position_quantity}" if open_position_quantity > 0 else "No"
-                print(f"Timestamp: {pd.Timestamp.now()}, Signal: {signal}, Position Open: {position_open_str}")
+                current_price = df['close'].iloc[-1]
+                current_position_value = open_position_quantity * current_price
+                position_open_str = f"Yes, size: {open_position_quantity:.6f} BTC ({current_position_value:.2f} USDT)" if open_position_quantity > 0 else "No"
+                print(f"Timestamp: {pd.Timestamp.now()}, Price: {current_price:.2f}, Signal: {signal}, Position: {position_open_str}")
 
-                open_position_quantity = execute_trade(signal, symbol, trade_amount, open_position_quantity)
+                open_position_quantity = execute_trade(signal, symbol, trade_amount, open_position_quantity, current_price, max_capital)
 
                 # Wait for the next candle
                 time.sleep(60)
@@ -136,12 +145,17 @@ if __name__ == '__main__':
     parser.add_argument('--trade-amount', type=float, default=15.0,
                         help='The amount in USDT to use for each trade. Default is 15 USDT. '
                              'Note: Binance has minimum order sizes.')
+    parser.add_argument('--max-capital', type=float, default=1000.0,
+                        help='The maximum available capital in USDT to use for positions. Default is 1000 USDT.')
     args = parser.parse_args()
 
     if args.trade_amount < 11:
         # Binance minimum order size is often around 10 USDT. Setting a bit higher.
         print("Warning: trade-amount is very low. Binance might reject the order. Recommended: > 11 USDT.")
 
+    if args.trade_amount > args.max_capital:
+        raise ValueError("trade-amount cannot be greater than max-capital.")
+
     # You can define other strategies and switch them here
     selected_strategy = macd_strategy
-    main(selected_strategy, args.trade_amount)
+    main(selected_strategy, args.trade_amount, args.max_capital)
