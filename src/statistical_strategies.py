@@ -1,10 +1,12 @@
 import pandas as pd
 import numpy as np
-from backtesting import Strategy
+from backtesting import Strategy, Backtest
 from prophet import Prophet
 import statsmodels.api as sm
 from backtest_utils import (
     run_optimizations,
+    fetch_historical_data,
+    adjust_data_to_ubtc,
 )
 
 
@@ -140,26 +142,31 @@ class SARIMAStrategy(Strategy):
         price = self.data.Close[-1]
 
         if len(self.data) % self.refit_period == 0 and len(self.data) > self.std_window:
-            model = sm.tsa.SARIMAX(
-                self.processed_data,
-                order=(self.p, self.d, self.q),
-                seasonal_order=(self.P, self.D, self.Q, self.s),
-            )
-            self.model_fit = model.fit(disp=False)
-        try:
-            forecast_processed = self.model_fit.forecast(steps=1)[0]
-            if forecast_processed > 0 and not self.position.is_long:
-                self.buy(
-                    sl=price * (1 - self.stop_loss),
+            try:
+                model = sm.tsa.SARIMAX(
+                    self.processed_data,
+                    order=(self.p, self.d, self.q),
+                    seasonal_order=(self.P, self.D, self.Q, self.s),
+                )
+                self.model_fit = model.fit(disp=False)
+            except Exception:
+                self.model_fit = None
+
+        if self.model_fit:
+            try:
+                forecast_processed = self.model_fit.forecast(steps=1)[0]
+                if forecast_processed > 0 and not self.position.is_long:
+                    self.buy(
+                        sl=price * (1 - self.stop_loss),
                         tp=price * (1 + self.take_profit),
                     )
-            elif forecast_processed < 0 and not self.position.is_short:
-                self.sell(
-                    sl=price * (1 + self.stop_loss),
-                    tp=price * (1 - self.take_profit),
-                )
-        except Exception:
-            pass
+                elif forecast_processed < 0 and not self.position.is_short:
+                    self.sell(
+                        sl=price * (1 + self.stop_loss),
+                        tp=price * (1 - self.take_profit),
+                    )
+            except Exception:
+                pass
 
     @classmethod
     def get_optuna_params(cls, trial):
@@ -193,5 +200,17 @@ def main():
 
 
 if __name__ == "__main__":
-    #AI do one round of backtesting with SARIMAStrategy here AI!
+    # Run a single backtest for SARIMAStrategy
+    print("Running single backtest for SARIMAStrategy...")
+    data = fetch_historical_data(
+        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
+        start_date="2022-01-01T00:00:00Z",
+    )
+    data = adjust_data_to_ubtc(data)
+    bt = Backtest(data, SARIMAStrategy, cash=10_000, commission=0.002)
+    stats = bt.run()
+    print(stats)
+    bt.plot()
+
+    print("\nStarting optimizations defined in main()...")
     main()
