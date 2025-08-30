@@ -198,9 +198,9 @@ class MultiIndicatorStrategy(Strategy):
 def main():
     """Main function to run the optimization with default parameters."""
     strategies = {
-        "MaCrossover": MaCrossover,
-        "BollingerBands": BollingerBands,
-        "MACD": MACD,
+        # "MaCrossover": MaCrossover,
+        # "BollingerBands": BollingerBands,
+        # "MACD": MACD,
         "RSIDivergence": RSIDivergence,
         "MultiIndicatorStrategy": MultiIndicatorStrategy
     }

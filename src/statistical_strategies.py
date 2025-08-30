@@ -68,8 +68,8 @@ class ARIMAStrategy(Strategy):
     p = 5
     d = 1
     q = 0
-    refit_period = 100
-    std_window = 1000
+    refit_period = 24 * 30
+    std_window = 24 * 30
     stop_loss = 0.05
     take_profit = 0.10
 
@@ -84,6 +84,7 @@ class ARIMAStrategy(Strategy):
 
         # Refit model periodically and if we have enough data
         if len(self.data) % self.refit_period == 0 and len(self.data) > self.std_window:
+            print(f"retraining. IDX ${len(self.data)}")
             try:
                 model = sm.tsa.ARIMA(
                     self.processed_data, order=(self.p, self.d, self.q)
@@ -186,7 +187,7 @@ class SARIMAStrategy(Strategy):
 def main():
     """Main function to run the optimization with default parameters."""
     strategies = {
-        "SARIMAStrategy": SARIMAStrategy
+        "ARIMAStrategy": ARIMAStrategy
         # "ProphetStrategy": ProphetStrategy
     }
     run_optimizations(
@@ -201,16 +202,17 @@ def main():
 
 if __name__ == "__main__":
     # Run a single backtest for SARIMAStrategy
-    print("Running single backtest for SARIMAStrategy...")
+    print("Running single backtest for ARIMAStrategy...")
     data = fetch_historical_data(
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
         start_date="2022-01-01T00:00:00Z",
     )
     data = adjust_data_to_ubtc(data)
-    bt = Backtest(data, SARIMAStrategy, cash=10_000, commission=0.002)
+    print(f"data len {len(data)}")
+    bt = Backtest(data, ARIMAStrategy, cash=10_000, commission=0.002)
     stats = bt.run()
     print(stats)
     bt.plot()
 
-    print("\nStarting optimizations defined in main()...")
-    main()
+    # print("\nStarting optimizations defined in main()...")
+    # main()

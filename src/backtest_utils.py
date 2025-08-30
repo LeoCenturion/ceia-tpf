@@ -221,7 +221,7 @@ def optimize_strategy(data, strategy, study_name, n_trials=100):
                 last_bt_instance.plot(filename=plot_filename, open_browser=False)
                 mlflow.log_artifact(plot_filename)
                 # Save trades
-                if not last_bt_instance._strategy.trades:
+                if last_bt_instance._strategy.trades:
                     last_bt_instance._strategy.trades.to_csv(trades_filename, index=False)
                     mlflow.log_artifact(trades_filename)
 
