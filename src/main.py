@@ -47,6 +47,18 @@ def log_transaction(timestamp, side, price, quantity, value, strategy_name):
         writer.writerow([ts, side, price, quantity, value, strategy_name])
 
 
+def get_symbol_precision(symbol):
+    """
+    Fetches the quantity precision (stepSize) for a given symbol from exchange info.
+    """
+    info = client.get_exchange_info()
+    for s in info['symbols']:
+        if s['symbol'] == symbol:
+            for f in s['filters']:
+                if f['filterType'] == 'LOT_SIZE':
+                    return float(f['stepSize'])
+    raise ValueError(f"Could not find LOT_SIZE stepSize for symbol {symbol}")
+
 def get_historical_data(symbol, interval, lookback):
     """
     Fetches historical klines from Binance.
@@ -122,11 +134,16 @@ def execute_trade(signal, symbol, trade_amount, open_position_quantity, current_
             print(f"BUY signal ignored. Order would exceed max capital. Current value: {current_position_value:.2f} USDT, Max capital: {max_capital} USDT.")
             return open_position_quantity
     elif signal == 'SELL' and open_position_quantity > 0:
-        print(f"Executing SELL order for {open_position_quantity} {symbol}")
+        # Determine lot size precision dynamically
+        step_size = get_symbol_precision(symbol)
+        # Round quantity to the correct precision
+        rounded_quantity = float(f'{open_position_quantity:.{str(step_size).count("0")}f}')
+
+        print(f"Executing SELL order for {rounded_quantity} {symbol}")
         try:
             # When selling, we specify the quantity of the base asset (BTC)
             order = client.create_order(
-                symbol=symbol, side=SIDE_SELL, type=ORDER_TYPE_MARKET, quantity=open_position_quantity)
+                symbol=symbol, side=SIDE_SELL, type=ORDER_TYPE_MARKET, quantity=rounded_quantity)
             print(order)
 
             # Log the transaction
@@ -180,10 +197,18 @@ def main(strategy_func, trade_amount, max_capital):
         print("\nStopping bot...")
     finally:
         if open_position_quantity > 0:
-            print(f"Closing open position of {open_position_quantity} {symbol}...")
+            # Get symbol precision for graceful shutdown
+            try:
+                step_size = get_symbol_precision(symbol)
+                rounded_quantity = float(f'{open_position_quantity:.{str(step_size).count("0")}f}')
+            except Exception as e:
+                print(f"Could not get symbol precision for {symbol}: {e}. Attempting to sell with original quantity.")
+                rounded_quantity = open_position_quantity
+
+            print(f"Closing open position of {rounded_quantity} {symbol}...")
             try:
                 order = client.create_order(
-                    symbol=symbol, side=SIDE_SELL, type=ORDER_TYPE_MARKET, quantity=open_position_quantity)
+                    symbol=symbol, side=SIDE_SELL, type=ORDER_TYPE_MARKET, quantity=rounded_quantity)
                 print("Position closed successfully.")
                 print(order)
 
