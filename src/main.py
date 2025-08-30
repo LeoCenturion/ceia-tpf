@@ -5,6 +5,7 @@ from binance.client import Client
 from binance.enums import *
 import csv
 from datetime import datetime
+import random
 
 # API credentials from environment variables
 # Make sure to set BINANCE_API_KEY and BINANCE_API_SECRET in your environment
@@ -69,6 +70,17 @@ def macd_strategy(df: pd.DataFrame, short_window=12, long_window=26, signal_wind
         return 'SELL'
     else:
         return 'HOLD'
+
+
+def random_strategy(df: pd.DataFrame):
+    """
+    A random trading strategy.
+    Returns 'BUY' or 'SELL' with 50/50 probability.
+    """
+    if random.random() < 0.5:
+        return 'BUY'
+    else:
+        return 'SELL'
 
 
 def execute_trade(signal, symbol, trade_amount, open_position_quantity, current_price, max_capital):
@@ -179,6 +191,8 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description='A simple Binance trading bot.')
+    parser.add_argument('--strategy', type=str, default='macd', choices=['macd', 'random'],
+                        help='The trading strategy to use. Default is macd.')
     parser.add_argument('--trade-amount', type=float, default=15.0,
                         help='The amount in USDT to use for each trade. Default is 15 USDT. '
                              'Note: Binance has minimum order sizes.')
@@ -193,6 +207,10 @@ if __name__ == '__main__':
     if args.trade_amount > args.max_capital:
         raise ValueError("trade-amount cannot be greater than max-capital.")
 
-    # You can define other strategies and switch them here
-    selected_strategy = macd_strategy
+    strategies = {
+        'macd': macd_strategy,
+        'random': random_strategy,
+    }
+    selected_strategy = strategies[args.strategy]
+
     main(selected_strategy, args.trade_amount, args.max_capital)
