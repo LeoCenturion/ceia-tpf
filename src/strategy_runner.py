@@ -142,15 +142,58 @@ class RSIDivergence(Strategy):
             'divergence_period': trial.suggest_int('divergence_period', 10, 60),
         }
 
-#AI given the following description...
-#  Multi-Indicator Algorithmic Strategy
-# Advanced research has explored combining multiple indicators into a single algorithmic system to improve signal quality and filter out noise.
-#     Strategy: One notable strategy from an ETH Zurich Master's Thesis developed a long-short model using a combination of indicators.
-#         Long Entry: Price closes above the upper Bollinger Band AND the 50-period SMA is above the 100-period SMA (confirming an uptrend).
-#         Short Entry: Price closes below the lower Bollinger Band AND the 50-period SMA is below the 100-period SMA (confirming a downtrend).
-#         Exit: A trailing stop-loss was used for exits.
-#     Reported Performance: This specific strategy, when backtested on hourly BTC data from 2017 to 2019, produced a Sharpe Ratio of 3.2 with a maximum drawdown of 25%. In comparison, a buy-and-hold strategy over the same period had a Sharpe Ratio of 1.13 and a maximum drawdown of 85%.
-# Add a new strategy AI!
+
+class MultiIndicatorStrategy(Strategy):
+    bb_window = 20
+    bb_std = 2
+    fast_sma_window = 50
+    slow_sma_window = 100
+    trailing_sl_pct = 0.05  # 5% trailing stop loss
+
+    def init(self):
+        # Bollinger Bands
+        self.bb_ma = self.I(sma, self.data.Close, self.bb_window)
+        self.bb_std_dev = self.I(std, self.data.Close, self.bb_window)
+        self.upper_band = self.bb_ma + self.bb_std * self.bb_std_dev
+        self.lower_band = self.bb_ma - self.bb_std * self.bb_std_dev
+
+        # SMAs for trend confirmation
+        self.sma_fast = self.I(sma, self.data.Close, self.fast_sma_window)
+        self.sma_slow = self.I(sma, self.data.Close, self.slow_sma_window)
+
+    def next(self):
+        price = self.data.Close[-1]
+
+        # Trailing stop-loss logic
+        for trade in self.trades:
+            if trade.is_long:
+                trade.sl = max(trade.sl or 0, price * (1 - self.trailing_sl_pct))
+            else:
+                trade.sl = min(trade.sl or float('inf'), price * (1 + self.trailing_sl_pct))
+
+        # Entry logic
+        if not self.position:
+            # Long Entry: Price above upper BB & uptrend confirmed by SMAs
+            if price > self.upper_band and self.sma_fast > self.sma_slow:
+                sl = price * (1 - self.trailing_sl_pct)
+                self.buy(sl=sl)
+
+            # Short Entry: Price below lower BB & downtrend confirmed by SMAs
+            elif price < self.lower_band and self.sma_fast < self.sma_slow:
+                sl = price * (1 + self.trailing_sl_pct)
+                self.sell(sl=sl)
+
+    @classmethod
+    def get_optuna_params(cls, trial):
+        """Suggest hyperparameters for Optuna optimization."""
+        return {
+            'bb_window': trial.suggest_int('bb_window', 10, 50),
+            'bb_std': trial.suggest_float('bb_std', 1.5, 3.5),
+            'fast_sma_window': trial.suggest_int('fast_sma_window', 30, 70),
+            'slow_sma_window': trial.suggest_int('slow_sma_window', 80, 120),
+            'trailing_sl_pct': trial.suggest_float('trailing_sl_pct', 0.01, 0.1),
+        }
+
 
 def main():
     """Main function to run the optimization with default parameters."""
@@ -158,7 +201,8 @@ def main():
         "MaCrossover": MaCrossover,
         "BollingerBands": BollingerBands,
         "MACD": MACD,
-        "RSIDivergence": RSIDivergence
+        "RSIDivergence": RSIDivergence,
+        "MultiIndicatorStrategy": MultiIndicatorStrategy
     }
     run_optimizations(
         strategies=strategies,
