@@ -60,34 +60,47 @@ def plot_trades(transactions_file, symbol):
         print("Could not fetch historical data for the specified range. Cannot plot.")
         return
 
-    # Create signals for plotting
-    buy_signals = trades_df[trades_df['side'] == 'BUY']
-    sell_signals = trades_df[trades_df['side'] == 'SELL']
-
-    # Create additional plots for buy/sell markers
-    # We need to align these with the ohlc_df index
-    buy_markers = pd.Series(float('nan'), index=ohlc_df.index)
-    sell_markers = pd.Series(float('nan'), index=ohlc_df.index)
-
-    # Use asof to find the nearest kline timestamp for each trade
-    for index, trade in buy_signals.iterrows():
-        closest_index = ohlc_df.index.asof(trade['timestamp'])
-        if pd.notna(closest_index):
-            buy_markers[closest_index] = trade['price']
-    
-    for index, trade in sell_signals.iterrows():
-        closest_index = ohlc_df.index.asof(trade['timestamp'])
-        if pd.notna(closest_index):
-            sell_markers[closest_index] = trade['price']
-            
     add_plots = []
-    # Check if there are any valid buy markers to plot before adding them
-    if buy_markers.notna().any():
-        add_plots.append(mpf.make_addplot(buy_markers, type='scatter', marker='^', color='g', markersize=100))
     
-    # Check if there are any valid sell markers to plot
-    if sell_markers.notna().any():
-        add_plots.append(mpf.make_addplot(sell_markers, type='scatter', marker='v', color='r', markersize=100))
+    # Define marker styles for different strategies
+    marker_styles = {
+        'macd_strategy': {'BUY': {'marker': '^', 'color': 'g'}, 'SELL': {'marker': 'v', 'color': 'r'}},
+        'random_strategy': {'BUY': {'marker': '^', 'color': 'b'}, 'SELL': {'marker': 'v', 'color': 'orange'}},
+    }
+
+    # Iterate through each unique strategy to plot its trades
+    for strategy_name in trades_df['strategy'].unique():
+        strategy_buy_signals = trades_df[(trades_df['side'] == 'BUY') & (trades_df['strategy'] == strategy_name)]
+        strategy_sell_signals = trades_df[(trades_df['side'] == 'SELL') & (trades_df['strategy'] == strategy_name)]
+
+        buy_markers = pd.Series(float('nan'), index=ohlc_df.index)
+        sell_markers = pd.Series(float('nan'), index=ohlc_df.index)
+
+        # Populate buy markers
+        for _, trade in strategy_buy_signals.iterrows():
+            closest_index = ohlc_df.index.asof(trade['timestamp'])
+            if pd.notna(closest_index):
+                buy_markers[closest_index] = trade['price']
+        
+        # Populate sell markers
+        for _, trade in strategy_sell_signals.iterrows():
+            closest_index = ohlc_df.index.asof(trade['timestamp'])
+            if pd.notna(closest_index):
+                sell_markers[closest_index] = trade['price']
+        
+        # Add buy plots for the current strategy
+        if buy_markers.notna().any():
+            style = marker_styles.get(strategy_name, {}).get('BUY', {'marker': '^', 'color': 'g'})
+            add_plots.append(mpf.make_addplot(buy_markers, type='scatter', marker=style['marker'], 
+                                              color=style['color'], markersize=100, secondary_y=False,
+                                              label=f'{strategy_name.replace("_strategy", "").upper()} BUY'))
+        
+        # Add sell plots for the current strategy
+        if sell_markers.notna().any():
+            style = marker_styles.get(strategy_name, {}).get('SELL', {'marker': 'v', 'color': 'r'})
+            add_plots.append(mpf.make_addplot(sell_markers, type='scatter', marker=style['marker'], 
+                                              color=style['color'], markersize=100, secondary_y=False,
+                                              label=f'{strategy_name.replace("_strategy", "").upper()} SELL'))
 
     print("Generating plot...")
     
@@ -95,12 +108,16 @@ def plot_trades(transactions_file, symbol):
     mpf.plot(ohlc_df, 
              type='candle', 
              style='yahoo',
-             title=f'{symbol} Trading Activity',
+             title=f'{symbol} Trading Activity by Strategy',
              ylabel='Price (USDT)',
              addplot=add_plots,
              volume=True,
              figratio=(16,9),
-             panel_ratios=(3, 1))
+             panel_ratios=(3, 1),
+             show_y_labels=True,
+             figscale=1.2,
+             update_width_config=dict(line_width=0.7),
+             legend_properties=dict(loc='upper right', frameon=True, prop=dict(size=9)))
 
     print("Plot displayed.")
 

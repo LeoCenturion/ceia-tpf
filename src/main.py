@@ -34,17 +34,17 @@ symbol = 'BTCUSDT'
 timeframe = '1m'  # Using 1 minute timeframe for historical data
 
 
-def log_transaction(timestamp, side, price, quantity, value):
+def log_transaction(timestamp, side, price, quantity, value, strategy_name):
     """Logs a transaction to the CSV file."""
     file_exists = os.path.isfile(TRANSACTION_LOG_FILE)
     with open(TRANSACTION_LOG_FILE, 'a', newline='') as f:
         writer = csv.writer(f)
         if not file_exists:
-            writer.writerow(['timestamp', 'side', 'price', 'quantity', 'value'])
+            writer.writerow(['timestamp', 'side', 'price', 'quantity', 'value', 'strategy'])
         
         # Convert ms timestamp to readable format
         ts = datetime.fromtimestamp(timestamp / 1000).strftime('%Y-%m-%d %H:%M:%S')
-        writer.writerow([ts, side, price, quantity, value])
+        writer.writerow([ts, side, price, quantity, value, strategy_name])
 
 
 def get_historical_data(symbol, interval, lookback):
@@ -92,7 +92,7 @@ def random_strategy(df: pd.DataFrame):
         return 'SELL'
 
 
-def execute_trade(signal, symbol, trade_amount, open_position_quantity, current_price, max_capital):
+def execute_trade(signal, symbol, trade_amount, open_position_quantity, current_price, max_capital, strategy_name):
     """
     Executes a trade based on the signal.
     Returns the quantity of the open position.
@@ -112,7 +112,7 @@ def execute_trade(signal, symbol, trade_amount, open_position_quantity, current_
                 executed_qty = float(order['executedQty'])
                 cummulative_quote_qty = float(order['cummulativeQuoteQty'])
                 avg_price = cummulative_quote_qty / executed_qty
-                log_transaction(order['transactTime'], 'BUY', avg_price, executed_qty, cummulative_quote_qty)
+                log_transaction(order['transactTime'], 'BUY', avg_price, executed_qty, cummulative_quote_qty, strategy_name)
 
                 return open_position_quantity + executed_qty  # Return the new total quantity
             except Exception as e:
@@ -133,7 +133,7 @@ def execute_trade(signal, symbol, trade_amount, open_position_quantity, current_
             executed_qty = float(order['executedQty'])
             cummulative_quote_qty = float(order['cummulativeQuoteQty'])
             avg_price = cummulative_quote_qty / executed_qty if executed_qty > 0 else 0
-            log_transaction(order['transactTime'], 'SELL', avg_price, executed_qty, cummulative_quote_qty)
+            log_transaction(order['transactTime'], 'SELL', avg_price, executed_qty, cummulative_quote_qty, strategy_name)
 
             return 0.0  # Position is now closed
         except Exception as e:
@@ -168,7 +168,7 @@ def main(strategy_func, trade_amount, max_capital):
                 position_open_str = f"Yes, size: {open_position_quantity:.6f} BTC ({current_position_value:.2f} USDT)" if open_position_quantity > 0 else "No"
                 print(f"Timestamp: {pd.Timestamp.now()}, Price: {current_price:.2f}, Signal: {signal}, Position: {position_open_str}")
 
-                open_position_quantity = execute_trade(signal, symbol, trade_amount, open_position_quantity, current_price, max_capital)
+                open_position_quantity = execute_trade(signal, symbol, trade_amount, open_position_quantity, current_price, max_capital, strategy_func.__name__)
 
                 # Wait for the next candle
                 time.sleep(60)
@@ -191,7 +191,7 @@ def main(strategy_func, trade_amount, max_capital):
                 executed_qty = float(order['executedQty'])
                 cummulative_quote_qty = float(order['cummulativeQuoteQty'])
                 avg_price = cummulative_quote_qty / executed_qty if executed_qty > 0 else 0
-                log_transaction(order['transactTime'], 'SELL', avg_price, executed_qty, cummulative_quote_qty)
+                log_transaction(order['transactTime'], 'SELL', avg_price, executed_qty, cummulative_quote_qty, strategy_func.__name__)
             except Exception as e:
                 print(f"An error occurred while closing position on exit: {e}")
 
