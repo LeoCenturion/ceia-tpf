@@ -9,8 +9,9 @@ from backtest_utils import (
 
 
 # Custom indicator for preprocessing
-def normalized_price_change(series: pd.Series, window: int = 1000) -> np.ndarray:
+def normalized_price_change(series: np.ndarray, window: int = 1000) -> np.ndarray:
     """Calculates (price[i] - price[i-1]) / std(price[-window:])."""
+    series = pd.Series(series)
     diff = series.diff()
     std_dev = series.rolling(window).std()
     with np.errstate(divide="ignore", invalid="ignore"):
