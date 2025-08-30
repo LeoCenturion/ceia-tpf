@@ -6,6 +6,7 @@ from binance.enums import *
 import csv
 from datetime import datetime
 import random
+from decimal import Decimal, ROUND_DOWN
 
 # API credentials from environment variables
 # Make sure to set BINANCE_API_KEY and BINANCE_API_SECRET in your environment
@@ -47,17 +48,37 @@ def log_transaction(timestamp, side, price, quantity, value, strategy_name):
         writer.writerow([ts, side, price, quantity, value, strategy_name])
 
 
-def get_symbol_precision(symbol):
+def get_symbol_info(symbol):
     """
-    Fetches the quantity precision (stepSize) for a given symbol from exchange info.
+    Fetches the quantity precision (stepSize), minQty, and minNotional for a given symbol.
     """
     info = client.get_exchange_info()
     for s in info['symbols']:
         if s['symbol'] == symbol:
+            min_qty = 0.0
+            step_size = 0.0
+            min_notional = 0.0
             for f in s['filters']:
                 if f['filterType'] == 'LOT_SIZE':
-                    return float(f['stepSize'])
-    raise ValueError(f"Could not find LOT_SIZE stepSize for symbol {symbol}")
+                    min_qty = float(f['minQty'])
+                    step_size = float(f['stepSize'])
+                elif f['filterType'] == 'MIN_NOTIONAL':
+                    min_notional = float(f['minNotional'])
+            
+            # Calculate decimal places from step_size
+            # Example: step_size = 0.001 -> decimal_places = 3
+            # Example: step_size = 1.0   -> decimal_places = 0
+            decimal_places = 0
+            if step_size > 0:
+                decimal_places = abs(Decimal(str(step_size)).as_tuple().exponent)
+            
+            return {
+                'min_qty': min_qty,
+                'step_size': step_size,
+                'decimal_places': decimal_places,
+                'min_notional': min_notional
+            }
+    raise ValueError(f"Could not find symbol information for {symbol}")
 
 def get_historical_data(symbol, interval, lookback):
     """
@@ -134,10 +155,31 @@ def execute_trade(signal, symbol, trade_amount, open_position_quantity, current_
             print(f"BUY signal ignored. Order would exceed max capital. Current value: {current_position_value:.2f} USDT, Max capital: {max_capital} USDT.")
             return open_position_quantity
     elif signal == 'SELL' and open_position_quantity > 0:
-        # Determine lot size precision dynamically
-        step_size = get_symbol_precision(symbol)
-        # Round quantity to the correct precision
-        rounded_quantity = float(f'{open_position_quantity:.{str(step_size).count("0")}f}')
+        # Get symbol info for precision and minimums
+        try:
+            symbol_info = get_symbol_info(symbol)
+            decimal_places = symbol_info['decimal_places']
+            min_qty = symbol_info['min_qty']
+            min_notional = symbol_info['min_notional']
+        except ValueError as e:
+            print(f"Error getting symbol info: {e}. Cannot execute SELL order safely.")
+            return open_position_quantity
+
+        # Round quantity to the correct precision, rounding down
+        open_position_decimal = Decimal(str(open_position_quantity))
+        rounding_precision = Decimal('1e-{}'.format(decimal_places))
+        rounded_quantity = float(open_position_decimal.quantize(rounding_precision, rounding=ROUND_DOWN))
+
+        # Check if rounded quantity is valid
+        if rounded_quantity <= 0:
+            print(f"SELL signal ignored. Rounded quantity is {rounded_quantity}, which is too small to trade.")
+            return open_position_quantity
+        if rounded_quantity < min_qty:
+            print(f"SELL signal ignored. Rounded quantity {rounded_quantity} is less than minimum quantity {min_qty}.")
+            return open_position_quantity
+        if rounded_quantity * current_price < min_notional:
+            print(f"SELL signal ignored. Notional value {rounded_quantity * current_price:.2f} is less than minimum notional {min_notional}.")
+            return open_position_quantity
 
         print(f"Executing SELL order for {rounded_quantity} {symbol}")
         try:
@@ -197,13 +239,42 @@ def main(strategy_func, trade_amount, max_capital):
         print("\nStopping bot...")
     finally:
         if open_position_quantity > 0:
-            # Get symbol precision for graceful shutdown
+            # Get symbol info for graceful shutdown
             try:
-                step_size = get_symbol_precision(symbol)
-                rounded_quantity = float(f'{open_position_quantity:.{str(step_size).count("0")}f}')
+                symbol_info = get_symbol_info(symbol)
+                decimal_places = symbol_info['decimal_places']
+                min_qty = symbol_info['min_qty']
+                min_notional = symbol_info['min_notional']
+            except ValueError as e:
+                print(f"Error getting symbol info on shutdown: {e}. Attempting to sell with original quantity (may fail).")
+                decimal_places = 8 # Fallback to a common high precision
+                min_qty = 0.0
+                min_notional = 0.0
+            
+            open_position_decimal = Decimal(str(open_position_quantity))
+            rounding_precision = Decimal('1e-{}'.format(decimal_places))
+            rounded_quantity = float(open_position_decimal.quantize(rounding_precision, rounding=ROUND_DOWN))
+
+            if rounded_quantity <= 0:
+                print(f"Warning: Open position quantity {open_position_quantity} rounded to {rounded_quantity} is too small to sell on exit. Position not closed.")
+                return # Exit finally without trying to sell 0 quantity
+            if rounded_quantity < min_qty:
+                print(f"Warning: Open position quantity {rounded_quantity} is less than min_qty {min_qty}. Position not closed.")
+                return
+            
+            # Current price is needed to check min_notional, get it again or assume a reasonable price
+            # For graceful shutdown, let's fetch the latest price
+            current_price_for_shutdown = 0.0
+            try:
+                df_latest = get_historical_data(symbol, timeframe, "1 minute ago UTC")
+                if not df_latest.empty:
+                    current_price_for_shutdown = df_latest['close'].iloc[-1]
             except Exception as e:
-                print(f"Could not get symbol precision for {symbol}: {e}. Attempting to sell with original quantity.")
-                rounded_quantity = open_position_quantity
+                print(f"Warning: Could not get current price for min_notional check on shutdown: {e}. Proceeding without check.")
+            
+            if current_price_for_shutdown > 0 and rounded_quantity * current_price_for_shutdown < min_notional:
+                print(f"Warning: Notional value {rounded_quantity * current_price_for_shutdown:.2f} is less than minimum notional {min_notional}. Position not closed on exit.")
+                return
 
             print(f"Closing open position of {rounded_quantity} {symbol}...")
             try:
