@@ -115,8 +115,7 @@ def plot_trades(transactions_file, symbol):
              figratio=(16,9),
              panel_ratios=(3, 1),
              figscale=1.2,
-             update_width_config=dict(line_width=0.7),
-             legend_properties=dict(loc='upper right', frameon=True, prop=dict(size=9)))
+             update_width_config=dict(line_width=0.7)) # Legend properties are automatically handled by addplot labels
 
     print("Plot displayed.")
 
