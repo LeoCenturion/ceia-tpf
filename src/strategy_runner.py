@@ -7,6 +7,7 @@ from backtest_utils import (
     sma,
     ewm,
     std,
+    rsi_indicator,
     fetch_historical_data,
     adjust_data_to_ubtc,
     optimize_strategy,
@@ -102,13 +103,53 @@ class MACD(Strategy):
             'signal_span': trial.suggest_int('signal_span', 5, 50),
         }
 
-#AI also add an RSI divergence strategy AI!
+
+class RSIDivergence(Strategy):
+    rsi_window = 14
+    divergence_period = 30
+    stop_loss = 0.05
+    take_profit = 0.10
+
+    def init(self):
+        self.rsi = self.I(rsi_indicator, self.data.Close, self.rsi_window)
+
+    def next(self):
+        if len(self.data.Close) < self.divergence_period + 1:
+            return
+
+        price = self.data.Close[-1]
+
+        # Bullish divergence: price makes a lower low, RSI makes a higher low
+        price_low_lookback = self.data.Low[-self.divergence_period:-1]
+        prev_price_low_idx_in_slice = price_low_lookback.argmin()
+        prev_low_idx = -(self.divergence_period - prev_price_low_idx_in_slice)
+
+        # Bearish divergence: price makes a higher high, RSI makes a lower high
+        price_high_lookback = self.data.High[-self.divergence_period:-1]
+        prev_price_high_idx_in_slice = price_high_lookback.argmax()
+        prev_high_idx = -(self.divergence_period - prev_price_high_idx_in_slice)
+
+        if self.data.Low[-1] < self.data.Low[prev_low_idx] and self.rsi[-1] > self.rsi[prev_low_idx]:
+            self.buy(sl=price * (1 - self.stop_loss), tp=price * (1 + self.take_profit))
+        elif self.data.High[-1] > self.data.High[prev_high_idx] and self.rsi[-1] < self.rsi[prev_high_idx]:
+            self.sell(sl=price * (1 + self.stop_loss), tp=price * (1 - self.take_profit))
+
+    @classmethod
+    def get_optuna_params(cls, trial):
+        """Suggest hyperparameters for Optuna optimization."""
+        return {
+            'rsi_window': trial.suggest_int('rsi_window', 5, 30),
+            'divergence_period': trial.suggest_int('divergence_period', 10, 60),
+        }
+
+
 def main():
     """Main function to run the optimization with default parameters."""
     strategies = {
         "MaCrossover": MaCrossover,
         "BollingerBands": BollingerBands,
-        "MACD": MACD
+        "MACD": MACD,
+        "RSIDivergence": RSIDivergence
     }
     run_optimizations(
         strategies=strategies,
