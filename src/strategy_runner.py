@@ -102,6 +102,7 @@ class MACD(Strategy):
             'signal_span': trial.suggest_int('signal_span', 5, 50),
         }
 
+#AI also add an RSI divergence strategy AI!
 def main():
     """Main function to run the optimization with default parameters."""
     strategies = {
