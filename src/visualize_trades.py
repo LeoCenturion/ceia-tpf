@@ -114,7 +114,6 @@ def plot_trades(transactions_file, symbol):
              volume=True,
              figratio=(16,9),
              panel_ratios=(3, 1),
-             show_y_labels=True,
              figscale=1.2,
              update_width_config=dict(line_width=0.7),
              legend_properties=dict(loc='upper right', frameon=True, prop=dict(size=9)))
