@@ -17,7 +17,6 @@ client = Client(API_KEY, API_SECRET, testnet=True)
 
 # Trading parameters
 symbol = 'BTCUSDT'
-quantity = 0.001  # Amount of BTC to buy/sell
 timeframe = '1m'  # Using 1 minute timeframe for historical data
 
 
@@ -55,70 +54,94 @@ def macd_strategy(df: pd.DataFrame, short_window=12, long_window=26, signal_wind
         return 'HOLD'
 
 
-def execute_trade(signal, symbol, quantity, position_open):
+def execute_trade(signal, symbol, trade_amount, open_position_quantity):
     """
     Executes a trade based on the signal.
+    Returns the quantity of the open position.
     """
-    if signal == 'BUY' and not position_open:
-        print(f"Executing BUY order for {quantity} {symbol}")
+    if signal == 'BUY' and open_position_quantity == 0:
+        print(f"Executing BUY order for {trade_amount} USDT worth of {symbol}")
         try:
-            # Use create_test_order for testing on testnet without executing
-            # order = client.create_test_order(
-            #     symbol=symbol, side=SIDE_BUY, type=ORDER_TYPE_MARKET, quantity=quantity)
+            # For SPOT market orders, we can specify quoteOrderQty for the amount in quote currency (USDT)
             order = client.create_order(
-                symbol=symbol, side=SIDE_BUY, type=ORDER_TYPE_MARKET, quantity=quantity)
+                symbol=symbol, side=SIDE_BUY, type=ORDER_TYPE_MARKET, quoteOrderQty=trade_amount)
             print(order)
-            return True  # Position is now open
+            return float(order['executedQty'])  # Return the executed quantity
         except Exception as e:
             print(f"An error occurred during BUY: {e}")
-            return False  # Position is not open
-    elif signal == 'SELL' and position_open:
-        print(f"Executing SELL order for {quantity} {symbol}")
+            return 0.0  # No position was opened
+    elif signal == 'SELL' and open_position_quantity > 0:
+        print(f"Executing SELL order for {open_position_quantity} {symbol}")
         try:
-            # Use create_test_order for testing on testnet without executing
-            # order = client.create_test_order(
-            #     symbol=symbol, side=SIDE_SELL, type=ORDER_TYPE_MARKET, quantity=quantity)
+            # When selling, we specify the quantity of the base asset (BTC)
             order = client.create_order(
-                symbol=symbol, side=SIDE_SELL, type=ORDER_TYPE_MARKET, quantity=quantity)
+                symbol=symbol, side=SIDE_SELL, type=ORDER_TYPE_MARKET, quantity=open_position_quantity)
             print(order)
-            return False  # Position is now closed
+            return 0.0  # Position is now closed
         except Exception as e:
             print(f"An error occurred during SELL: {e}")
-            return True  # Position is still open
-    return position_open  # No trade executed, return current position status
+            return open_position_quantity  # Position is still open
+    return open_position_quantity  # No trade executed, return current position status
 
 
-def main(strategy_func):
+def main(strategy_func, trade_amount):
     """
     Main trading loop.
     """
-    position_open = False
+    open_position_quantity = 0.0
     print("Starting trading bot...")
     print(f"Using strategy: {strategy_func.__name__}")
+    print(f"Trade amount: {trade_amount} USDT")
 
-    while True:
-        try:
-            # We need enough data for MACD calculation, e.g., long_window + signal_window
-            df = get_historical_data(symbol, timeframe, "100 minutes ago UTC")
-            if len(df) < 26 + 9:  # not enough data for MACD
-                print("Not enough historical data yet. Waiting...")
+    try:
+        while True:
+            try:
+                # We need enough data for MACD calculation, e.g., long_window + signal_window
+                df = get_historical_data(symbol, timeframe, "100 minutes ago UTC")
+                if len(df) < 26 + 9:  # not enough data for MACD
+                    print("Not enough historical data yet. Waiting...")
+                    time.sleep(60)
+                    continue
+
+                signal = strategy_func(df)
+                position_open_str = f"Yes, size: {open_position_quantity}" if open_position_quantity > 0 else "No"
+                print(f"Timestamp: {pd.Timestamp.now()}, Signal: {signal}, Position Open: {position_open_str}")
+
+                open_position_quantity = execute_trade(signal, symbol, trade_amount, open_position_quantity)
+
+                # Wait for the next candle
                 time.sleep(60)
-                continue
-
-            signal = strategy_func(df)
-            print(f"Timestamp: {pd.Timestamp.now()}, Signal: {signal}, Position Open: {position_open}")
-
-            position_open = execute_trade(signal, symbol, quantity, position_open)
-
-            # Wait for the next candle
-            time.sleep(60)
-        except Exception as e:
-            print(f"An error occurred in the main loop: {e}")
-            # Wait a bit before retrying to avoid spamming on persistent errors
-            time.sleep(60)
+            except Exception as e:
+                print(f"An error occurred in the main loop: {e}")
+                # Wait a bit before retrying to avoid spamming on persistent errors
+                time.sleep(60)
+    except KeyboardInterrupt:
+        print("\nStopping bot...")
+    finally:
+        if open_position_quantity > 0:
+            print(f"Closing open position of {open_position_quantity} {symbol}...")
+            try:
+                order = client.create_order(
+                    symbol=symbol, side=SIDE_SELL, type=ORDER_TYPE_MARKET, quantity=open_position_quantity)
+                print("Position closed successfully.")
+                print(order)
+            except Exception as e:
+                print(f"An error occurred while closing position on exit: {e}")
 
 
 if __name__ == '__main__':
+    import argparse
+
+    parser = argparse.ArgumentParser(description='A simple Binance trading bot.')
+    parser.add_argument('--trade-amount', type=float, default=15.0,
+                        help='The amount in USDT to use for each trade. Default is 15 USDT. '
+                             'Note: Binance has minimum order sizes.')
+    args = parser.parse_args()
+
+    if args.trade_amount < 11:
+        # Binance minimum order size is often around 10 USDT. Setting a bit higher.
+        print("Warning: trade-amount is very low. Binance might reject the order. Recommended: > 11 USDT.")
+
     # You can define other strategies and switch them here
     selected_strategy = macd_strategy
-    main(selected_strategy)
+    main(selected_strategy, args.trade_amount)
