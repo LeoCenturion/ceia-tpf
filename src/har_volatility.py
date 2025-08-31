@@ -22,10 +22,10 @@ def calculate_realized_volatility(df: pd.DataFrame, freq: str) -> pd.Series:
         A Series of realized variance values.
     """
     # Calculate log returns
-    df['log_return'] = np.log(df['close']).diff()
+    df['log_return'] = np.log(df['Close']).diff() # Use 'Close' as per fetch_historical_data output
 
     # Aggregate squared log returns to the desired frequency
-    # Assuming 'close' price is available for each 5-minute bar
+    # Assuming 'Close' price is available for each 5-minute bar
     realized_variance = df['log_return'].pow(2).resample(freq).sum()
     
     return realized_variance.dropna()
