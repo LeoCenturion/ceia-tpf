@@ -3,6 +3,7 @@ import numpy as np
 from backtesting import Strategy, Backtest
 from prophet import Prophet
 import statsmodels.api as sm
+from pykalman import KalmanFilter
 from backtest_utils import (
     run_optimizations,
     fetch_historical_data,
@@ -20,6 +21,14 @@ def normalized_price_change(series: np.ndarray, window: int = 1000) -> np.ndarra
         result = diff / std_dev
     result.replace([np.inf, -np.inf], np.nan, inplace=True)
     return result.fillna(0).values
+
+
+def kalman_filter_indicator(series: np.ndarray) -> np.ndarray:
+    """Applies a Kalman filter to a time series."""
+    # Using a simple KF configuration for smoothing
+    kf = KalmanFilter(initial_state_mean=0, n_dim_obs=1)
+    (filtered_state_means, _) = kf.filter(series)
+    return filtered_state_means.flatten()
 
 
 class ProphetStrategy(Strategy):
@@ -183,7 +192,63 @@ class SARIMAStrategy(Strategy):
             "std_window": trial.suggest_int("std_window", 500, 1500),
         }
 
-#AI add a new KalmanARIMAStrategy using kalman filters to refine the ARIMA approach AI!
+
+class KalmanARIMAStrategy(Strategy):
+    p = 12
+    d = 1
+    q = 12
+    refit_period = 24 * 10
+    std_window = 24 * 30
+    stop_loss = 0.05
+    take_profit = 0.10
+
+    def init(self):
+        self.model_fit = None
+        processed_data = self.I(
+            normalized_price_change, self.data.Close, self.std_window
+        )
+        self.kalman_filtered_data = self.I(kalman_filter_indicator, processed_data)
+
+    def next(self):
+        price = self.data.Close[-1]
+
+        # Refit model periodically and if we have enough data
+        if len(self.data) % self.refit_period == 0 and len(self.data) > self.std_window:
+            print(f"retraining KalmanARIMA. IDX ${len(self.data)}")
+            try:
+                model = sm.tsa.ARIMA(
+                    self.kalman_filtered_data, order=(self.p, self.d, self.q)
+                )
+                self.model_fit = model.fit()
+            except Exception:  # Catches convergence errors etc.
+                self.model_fit = None
+
+        if self.model_fit:
+            try:
+                forecast_processed = self.model_fit.forecast(steps=1)[0]
+                if forecast_processed > 0 and not self.position.is_long:
+                    self.buy(
+                        sl=price * (1 - self.stop_loss),
+                        tp=price * (1 + self.take_profit),
+                    )
+                elif forecast_processed < 0 and not self.position.is_short:
+                    self.sell(
+                        sl=price * (1 + self.stop_loss),
+                        tp=price * (1 - self.take_profit),
+                    )
+            except Exception:
+                pass  # Ignore forecast errors
+
+    @classmethod
+    def get_optuna_params(cls, trial):
+        return {
+            "p": trial.suggest_int("p", 1, 10),
+            "d": trial.suggest_int("d", 0, 2),
+            "q": trial.suggest_int("q", 0, 5),
+            "refit_period": trial.suggest_int("refit_period", 50, 200),
+            "std_window": trial.suggest_int("std_window", 500, 1500),
+        }
+
 
 def main():
     """Main function to run the optimization with default parameters."""
