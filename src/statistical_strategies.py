@@ -124,8 +124,8 @@ class ARIMAStrategy(Strategy):
             "p": trial.suggest_int("p", 1, 10),
             "d": trial.suggest_int("d", 0, 2),
             "q": trial.suggest_int("q", 0, 5),
-            "refit_period": trial.suggest_int("refit_period", 50, 200),
-            "std_window": trial.suggest_int("std_window", 500, 1500),
+            "refit_period": trial.suggest_int("refit_period", 24 * 5, 24 * 30),
+            "std_window": trial.suggest_categorical("std_window", [24 * 30, 24 * 30 * 2, 24 * 30 * 3]),
         }
 
 
@@ -245,10 +245,13 @@ class KalmanARIMAStrategy(Strategy):
             "p": trial.suggest_int("p", 1, 10),
             "d": trial.suggest_int("d", 0, 2),
             "q": trial.suggest_int("q", 0, 5),
-            "refit_period": trial.suggest_int("refit_period", 50, 200),
-            "std_window": trial.suggest_int("std_window", 500, 1500),
+            "refit_period": trial.suggest_int("refit_period", 24 * 5, 24 * 30),
+            "std_window": trial.suggest_int("std_window", 24 * 30,  24 * 30 * 3),
         }
-
+# AI implement the following ARIMAGARGHStrategy following the description
+# A powerful and logical extension is the combination of ARIMA and GARCH models into a single framework. This hybrid approach allows for the simultaneous modeling of both the conditional mean and the conditional variance of a time series, providing a more complete description of its dynamics. The methodology is straightforward: first, an ARIMA model is fitted to the return series to capture any linear autocorrelation in the mean. Then, a GARCH model is fitted to the residuals from the ARIMA model, which are treated as the shock series (ϵt​), to capture their time-varying volatility.  
+# This separation of concerns—one model for the mean and another for the variance—has proven effective. A study that explicitly tested this approach identified an ARIMA(12,1,12)-GARCH(1,1) model as the most appropriate for forecasting daily Bitcoin prices. The results clearly demonstrated that the combined model yielded superior forecasting ability compared to a standalone ARIMA model, as evidenced by lower RMSE, MAE, and MAPE values. This finding underscores a critical principle in financial econometrics: models that independently account for both the return and risk dynamics of an asset are likely to be more robust and accurate.
+# AI!
 
 def main():
     """Main function to run the optimization with default parameters."""
