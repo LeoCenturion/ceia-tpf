@@ -65,10 +65,10 @@ class ProphetStrategy(Strategy):
 
 
 class ARIMAStrategy(Strategy):
-    p = 5
+    p = 12
     d = 1
-    q = 0
-    refit_period = 24 * 30
+    q = 12
+    refit_period = 24 * 10
     std_window = 24 * 30
     stop_loss = 0.05
     take_profit = 0.10
@@ -183,6 +183,7 @@ class SARIMAStrategy(Strategy):
             "std_window": trial.suggest_int("std_window", 500, 1500),
         }
 
+#AI add a new KalmanARIMAStrategy using kalman filters to refine the ARIMA approach AI!
 
 def main():
     """Main function to run the optimization with default parameters."""
