@@ -363,6 +363,7 @@ if __name__ == "__main__":
     # print("\nStarting optimizations defined in main()...")
     # main()
     window = 5000
+    #AI Plot the trend and the prediction AI!
     errors = []
     for i in range(24, len(data)-1):
         prophet_data = pd.DataFrame({"ds": data.index[:i], "y": data.Close[:i]})
@@ -376,4 +377,4 @@ if __name__ == "__main__":
         print(data.Close.iloc[i+1])
         print(i)
         errors.append(forecast['yhat'] - data.Close.iloc[i+1])
-    
+
