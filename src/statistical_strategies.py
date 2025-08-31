@@ -363,18 +363,37 @@ if __name__ == "__main__":
     # print("\nStarting optimizations defined in main()...")
     # main()
     window = 5000
-    #AI Plot the trend and the prediction AI!
-    errors = []
-    for i in range(24, len(data)-1):
+    import matplotlib.pyplot as plt
+
+    # The following loop demonstrates one-step-ahead prediction with Prophet.
+    # WARNING: It is very slow because it retrains the model at each step.
+    predictions = []
+    for i in range(24, len(data) - 1):
         prophet_data = pd.DataFrame({"ds": data.index[:i], "y": data.Close[:i]})
         model = Prophet()
         model.fit(prophet_data)
-        future = model.make_future_dataframe(
-            periods=1, freq="h", include_history=True
-        )  # Assuming hourly data
+        future = model.make_future_dataframe(periods=1, freq="h", include_history=False)
         forecast = model.predict(future)
-        print(forecast)
-        print(data.Close.iloc[i+1])
-        print(i)
-        errors.append(forecast['yhat'] - data.Close.iloc[i+1])
+
+        prediction = forecast["yhat"].iloc[0]
+        predictions.append(prediction)
+
+    # Plotting the results
+    plot_range = range(24, 24 + len(predictions))
+    actual_values = data.Close.iloc[plot_range]
+
+    plt.figure(figsize=(15, 7))
+    plt.plot(actual_values.index, actual_values, label="Actual Price (Trend)")
+    plt.plot(
+        actual_values.index,
+        predictions,
+        label="Predicted Price (1-step ahead)",
+        linestyle="--",
+    )
+    plt.title("Prophet One-Step-Ahead Forecast vs Actual Price")
+    plt.xlabel("Date")
+    plt.ylabel("Price")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
 
