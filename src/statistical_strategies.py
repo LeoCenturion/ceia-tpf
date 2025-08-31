@@ -4,6 +4,11 @@ from backtesting import Strategy, Backtest
 from prophet import Prophet
 import statsmodels.api as sm
 from pykalman import KalmanFilter
+
+try:
+    from arch import arch_model
+except ImportError:
+    arch_model = None
 from backtest_utils import (
     run_optimizations,
     fetch_historical_data,
@@ -248,10 +253,80 @@ class KalmanARIMAStrategy(Strategy):
             "refit_period": trial.suggest_int("refit_period", 24 * 5, 24 * 30),
             "std_window": trial.suggest_int("std_window", 24 * 30,  24 * 30 * 3),
         }
-# AI implement the following ARIMAGARGHStrategy following the description
-# A powerful and logical extension is the combination of ARIMA and GARCH models into a single framework. This hybrid approach allows for the simultaneous modeling of both the conditional mean and the conditional variance of a time series, providing a more complete description of its dynamics. The methodology is straightforward: first, an ARIMA model is fitted to the return series to capture any linear autocorrelation in the mean. Then, a GARCH model is fitted to the residuals from the ARIMA model, which are treated as the shock series (ϵt​), to capture their time-varying volatility.  
-# This separation of concerns—one model for the mean and another for the variance—has proven effective. A study that explicitly tested this approach identified an ARIMA(12,1,12)-GARCH(1,1) model as the most appropriate for forecasting daily Bitcoin prices. The results clearly demonstrated that the combined model yielded superior forecasting ability compared to a standalone ARIMA model, as evidenced by lower RMSE, MAE, and MAPE values. This finding underscores a critical principle in financial econometrics: models that independently account for both the return and risk dynamics of an asset are likely to be more robust and accurate.
-# AI!
+
+
+class ARIMAGARCHStrategy(Strategy):
+    # ARIMA params
+    p, d, q = 12, 1, 12
+    # GARCH params
+    g_p, g_q = 1, 1
+
+    refit_period = 24 * 10
+    std_window = 24 * 30
+    stop_loss = 0.05
+    take_profit = 0.10
+
+    def init(self):
+        self.arima_fit = None
+        self.garch_fit = None
+        self.processed_data = self.I(
+            normalized_price_change, self.data.Close, self.std_window
+        )
+
+    def next(self):
+        price = self.data.Close[-1]
+
+        # Refit models periodically
+        if len(self.data) % self.refit_period == 0 and len(self.data) > self.std_window:
+            print(f"Retraining ARIMAGARCH. IDX ${len(self.data)}")
+            try:
+                # 1. Fit ARIMA model
+                arima_model = sm.tsa.ARIMA(
+                    self.processed_data, order=(self.p, self.d, self.q)
+                )
+                self.arima_fit = arima_model.fit()
+
+                # 2. Fit GARCH on ARIMA residuals
+                residuals = self.arima_fit.resid
+                garch_model = arch_model(residuals, p=self.g_p, q=self.g_q)
+                self.garch_fit = garch_model.fit(disp="off")
+
+            except Exception:
+                self.arima_fit = None
+                self.garch_fit = None
+
+        if self.arima_fit:
+            try:
+                # Forecast mean from ARIMA
+                forecast_mean = self.arima_fit.forecast(steps=1)[0]
+
+                if forecast_mean > 0 and not self.position.is_long:
+                    self.buy(
+                        sl=price * (1 - self.stop_loss),
+                        tp=price * (1 + self.take_profit),
+                    )
+                elif forecast_mean < 0 and not self.position.is_short:
+                    self.sell(
+                        sl=price * (1 + self.stop_loss),
+                        tp=price * (1 - self.take_profit),
+                    )
+            except Exception:
+                pass
+
+    @classmethod
+    def get_optuna_params(cls, trial):
+        return {
+            "p": trial.suggest_int("p", 1, 12),
+            "d": trial.suggest_int("d", 0, 2),
+            "q": trial.suggest_int("q", 0, 12),
+            "g_p": trial.suggest_int("g_p", 1, 5),
+            "g_q": trial.suggest_int("g_q", 1, 5),
+            "refit_period": trial.suggest_int("refit_period", 24 * 5, 24 * 30),
+            "std_window": trial.suggest_categorical(
+                "std_window", [24 * 30, 24 * 30 * 2, 24 * 30 * 3]
+            ),
+        }
+
 
 def main():
     """Main function to run the optimization with default parameters."""
