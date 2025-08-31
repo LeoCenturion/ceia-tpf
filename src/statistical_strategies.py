@@ -37,7 +37,7 @@ def kalman_filter_indicator(series: np.ndarray) -> np.ndarray:
 
 
 class ProphetStrategy(Strategy):
-    refit_period = 100  # Refit the model every N bars
+    refit_period = 24 * 30  # Refit the model every N bars
     stop_loss = 0.05
     take_profit = 0.10
 
@@ -74,7 +74,7 @@ class ProphetStrategy(Strategy):
     @classmethod
     def get_optuna_params(cls, trial):
         return {
-            "refit_period": trial.suggest_int("refit_period", 50, 200),
+            "refit_period": trial.suggest_int("refit_period", 24 * 5, 24 * 30 * 2),
         }
 
 
@@ -353,7 +353,7 @@ if __name__ == "__main__":
     )
     data = adjust_data_to_ubtc(data)
     print(f"data len {len(data)}")
-    bt = Backtest(data, ARIMAStrategy, cash=10_000, commission=0.002)
+    bt = Backtest(data, ProphetStrategy, cash=10_000, commission=0.002)
     stats = bt.run()
     print(stats)
     bt.plot()
