@@ -50,7 +50,7 @@ class ProphetStrategy(Strategy):
         if len(self.data.Close) > 1 and len(self.data.Close) % self.refit_period == 0:
             prophet_data = pd.DataFrame({"ds": self.data.index, "y": self.data.Close})
             self.model = Prophet()
-            self.model.fit(prophet_data, progress=False)
+            self.model.fit(prophet_data)
 
         # Generate forecast if model is fitted
         if self.model:
