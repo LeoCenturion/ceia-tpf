@@ -353,7 +353,7 @@ if __name__ == "__main__":
         start_date="2025-04-05T00:00:00Z",
     )
     data = adjust_data_to_ubtc(data)
-    # AI sort data from oldest to newest AI!
+    data.sort_index(inplace=True)
     # print(f"data len {len(data)}")
     # bt = Backtest(data, ProphetStrategy, cash=10_000, commission=0.002)
     # stats = bt.run()
