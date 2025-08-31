@@ -40,22 +40,23 @@ class ProphetStrategy(Strategy):
     refit_period = 24 * 30  # Refit the model every N bars
     stop_loss = 0.05
     take_profit = 0.10
-
+    lookback_length = 24 * 30 * 1
     def init(self):
         self.model = None
         self.forecast = None
 
     def next(self):
-        # Refit model periodically
         if len(self.data.Close) > 1 and len(self.data.Close) % self.refit_period == 0:
-            prophet_data = pd.DataFrame({"ds": self.data.index, "y": self.data.Close})
+            print(f"Refitting, idx {len(self.data)}")
+            prophet_data = pd.DataFrame({"ds": self.data.index[-self.lookback_length:], "y": self.data.Close[-self.lookback_length:]})
             self.model = Prophet()
             self.model.fit(prophet_data)
+            print(f"Model refitted")
 
         # Generate forecast if model is fitted
         if self.model:
             future = self.model.make_future_dataframe(
-                periods=1, freq="H"
+                periods=1, freq="h"
             )  # Assuming hourly data
             self.forecast = self.model.predict(future)
 
@@ -349,14 +350,30 @@ if __name__ == "__main__":
     print("Running single backtest for ARIMAStrategy...")
     data = fetch_historical_data(
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
-        start_date="2022-01-01T00:00:00Z",
+        start_date="2025-04-05T00:00:00Z",
     )
     data = adjust_data_to_ubtc(data)
-    print(f"data len {len(data)}")
-    bt = Backtest(data, ProphetStrategy, cash=10_000, commission=0.002)
-    stats = bt.run()
-    print(stats)
-    bt.plot()
+    # AI sort data from oldest to newest AI!
+    # print(f"data len {len(data)}")
+    # bt = Backtest(data, ProphetStrategy, cash=10_000, commission=0.002)
+    # stats = bt.run()
+    # print(stats)
+    # bt.plot()
 
     # print("\nStarting optimizations defined in main()...")
     # main()
+    window = 5000
+    errors = []
+    for i in range(24, len(data)-1):
+        prophet_data = pd.DataFrame({"ds": data.index[:i], "y": data.Close[:i]})
+        model = Prophet()
+        model.fit(prophet_data)
+        future = model.make_future_dataframe(
+            periods=1, freq="h", include_history=True
+        )  # Assuming hourly data
+        forecast = model.predict(future)
+        print(forecast)
+        print(data.Close.iloc[i+1])
+        print(i)
+        errors.append(forecast['yhat'] - data.Close.iloc[i+1])
+    
