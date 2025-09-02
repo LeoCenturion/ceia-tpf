@@ -132,7 +132,7 @@ def sanitize_metric_name(name):
 
 
 def optimize_strategy_random_chunks(
-    data, strategy, study_name, n_trials=100, n_chunks=20, chunk_size=300
+    data, strategy, study_name, n_trials=100, n_chunks=20, chunk_size=300, n_jobs=1
 ):
     """
     Optimize strategy hyperparameters using Optuna by backtesting on random data chunks.
@@ -205,11 +205,11 @@ def optimize_strategy_random_chunks(
         storage="sqlite:///optuna-study.db",
         load_if_exists=True,
     )
-    study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
+    study.optimize(objective, n_trials=n_trials, show_progress_bar=True, n_jobs=n_jobs)
     return study.best_params
 
 
-def optimize_strategy(data, strategy, study_name, n_trials=100):
+def optimize_strategy(data, strategy, study_name, n_trials=100, n_jobs=1):
     """
     Optimize strategy hyperparameters using Optuna.
     For each trial, run an expanding window backtest and log the averaged stats to MLflow.
@@ -251,11 +251,11 @@ def optimize_strategy(data, strategy, study_name, n_trials=100):
         return stats.get('Sortino Ratio', 0)
 
     study = optuna.create_study(study_name=study_name, direction='maximize', storage="sqlite:///optuna-study.db", load_if_exists=True)
-    study.optimize(objective, n_trials=n_trials)
+    study.optimize(objective, n_trials=n_trials, show_progress_bar=True, n_jobs=n_jobs)
     return study.best_params
 
 
-def run_optimizations(strategies, data_path, start_date, tracking_uri, experiment_name, n_trials_per_strategy=10):
+def run_optimizations(strategies, data_path, start_date, tracking_uri, experiment_name, n_trials_per_strategy=10, n_jobs=1):
     """
     Run optimization for a set of strategies.
 
@@ -279,10 +279,10 @@ def run_optimizations(strategies, data_path, start_date, tracking_uri, experimen
         # This outer run is for grouping the optimization trials
         with mlflow.start_run(run_name=f"Optimize_{name}"):
             print(f"Optimizing {name}...")
-            optimize_strategy(data, strategy, n_trials=n_trials_per_strategy, study_name=name)
+            optimize_strategy(data, strategy, n_trials=n_trials_per_strategy, study_name=name, n_jobs=n_jobs)
             print(f"Optimization for {name} complete.")
 
-def run_optimizations_random_chunks(strategies, data_path, start_date, tracking_uri, experiment_name, n_trials_per_strategy=10, n_chunks=15, chunk_size = 200):
+def run_optimizations_random_chunks(strategies, data_path, start_date, tracking_uri, experiment_name, n_trials_per_strategy=10, n_chunks=15, chunk_size = 200, n_jobs=1):
     """
     Run optimization for a set of strategies.
 
@@ -306,5 +306,5 @@ def run_optimizations_random_chunks(strategies, data_path, start_date, tracking_
         # This outer run is for grouping the optimization trials
         with mlflow.start_run(run_name=f"Optimize_{name}"):
             print(f"Optimizing {name}...")
-            optimize_strategy_random_chunks(data, strategy, n_trials=n_trials_per_strategy, study_name=name,n_chunks=n_chunks,chunk_size=chunk_size)
+            optimize_strategy_random_chunks(data, strategy, n_trials=n_trials_per_strategy, study_name=name,n_chunks=n_chunks,chunk_size=chunk_size, n_jobs=n_jobs)
             print(f"Optimization for {name} complete.")
