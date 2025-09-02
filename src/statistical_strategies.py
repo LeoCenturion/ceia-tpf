@@ -359,11 +359,41 @@ if __name__ == "__main__":
     data = adjust_data_to_ubtc(data)
     data.sort_index(inplace=True)
     print(f"data len {len(data)}")
-    #AI split the data into a few small datasets of 100 hours each. Then backtest each of those and average the stats. AI! 
-    bt = Backtest(data, ProphetStrategy, cash=10_000, commission=0.002)
-    stats = bt.run()
-    print(stats)
-    bt.plot()
+
+    chunk_size = 100
+    num_chunks_to_test = 5  # Limiting to 5 chunks to keep the test reasonably short
+    stats_list = []
+
+    print(f"Splitting data into {num_chunks_to_test} chunks of {chunk_size} hours and averaging backtest stats...")
+
+    for i in range(num_chunks_to_test):
+        start_idx = i * chunk_size
+        end_idx = start_idx + chunk_size
+        if end_idx > len(data):
+            break
+
+        chunk_data = data.iloc[start_idx:end_idx]
+        print(f"\n--- Backtesting on Chunk {i+1}/{num_chunks_to_test} (Index: {start_idx}-{end_idx}) ---")
+
+        bt = Backtest(chunk_data, ProphetStrategy, cash=10_000, commission=0.002)
+        try:
+            stats = bt.run()
+            stats_list.append(stats)
+            print(f"Chunk {i+1} Stats:\n{stats[['Return [%]', '# Trades', 'Win Rate [%]']]}")
+        except Exception as e:
+            print(f"Backtest on chunk {i+1} failed: {e}")
+
+    if stats_list:
+        stats_df = pd.DataFrame(stats_list)
+        
+        # Select only numeric columns for averaging
+        numeric_stats_df = stats_df.select_dtypes(include=np.number)
+        averaged_stats = numeric_stats_df.mean()
+
+        print("\n\n--- Averaged Backtest Stats ---")
+        print(averaged_stats)
+    else:
+        print("\nNo backtests were successfully completed.")
 
     # print("\nStarting optimizations defined in main()...")
     # main()
