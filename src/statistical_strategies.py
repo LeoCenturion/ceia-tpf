@@ -41,7 +41,7 @@ class ProphetStrategy(Strategy):
     Intractable. Prophet doesn't take data when predicting, so if we train every 30 days then all 30 days will have the same prediction.
     If we train every hour then it takes more than a day do backtest with hourly data from 2022 to 2025.
     """
-    refit_period = 24 * 30  # Refit the model every N bars
+    refit_period = 1 #24 * 30  # Refit the model every N bars
     stop_loss = 0.05
     take_profit = 0.10
     lookback_length = 24 * 30 * 1
@@ -365,7 +365,7 @@ if __name__ == "__main__":
     stats_list = []
 
     print(f"Splitting data into {num_chunks_to_test} chunks of {chunk_size} hours and averaging backtest stats...")
-
+    #AI make the chunks random AI!
     for i in range(num_chunks_to_test):
         start_idx = i * chunk_size
         end_idx = start_idx + chunk_size
