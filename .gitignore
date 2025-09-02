@@ -4,3 +4,5 @@
 /out/
 /.idea/workspace.xml
 .aider*
+/mlruns/
+/src/__pycache__/

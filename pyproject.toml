@@ -7,7 +7,7 @@ readme = "README.md"
 package-mode = false
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.11,<3.14"
 pandas = "^2.2.3"
 numpy = "^2.1.2"
 seaborn = "0.13.2"
@@ -26,6 +26,9 @@ mlflow = "^3.3.1"
 python-binance = "^1.0.29"
 mplfinance = "^0.12.10b0"
 statsmodels = "^0.14.5"
+pykalman = "^0.10.2"
+arch = "^7.2.0"
+matplotlib = "^3.10.6"
 
 
 [build-system]

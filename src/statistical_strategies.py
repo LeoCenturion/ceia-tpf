@@ -11,6 +11,7 @@ except ImportError:
     arch_model = None
 from backtest_utils import (
     run_optimizations,
+    run_optimizations_random_chunks,
     fetch_historical_data,
     adjust_data_to_ubtc,
 )
@@ -95,8 +96,7 @@ class ARIMAStrategy(Strategy):
         price = self.data.Close[-1]
 
         # Refit model periodically and if we have enough data
-        if len(self.data) % self.refit_period == 0 and len(self.data) > self.std_window:
-            print(f"retraining. IDX ${len(self.data)}")
+        if len(self.data) % self.refit_period == 0:
             try:
                 model = sm.tsa.ARIMA(
                     self.processed_data[-self.lookback_length:], order=(self.p, self.d, self.q)
@@ -152,7 +152,7 @@ class SARIMAStrategy(Strategy):
     def next(self):
         price = self.data.Close[-1]
 
-        if len(self.data) % self.refit_period == 0 and len(self.data) > self.std_window:
+        if len(self.data) % self.refit_period == 0:
             try:
                 model = sm.tsa.SARIMAX(
                     self.processed_data,
@@ -212,7 +212,7 @@ class KalmanARIMAStrategy(Strategy):
         price = self.data.Close[-1]
 
         # Refit model periodically and if we have enough data
-        if len(self.data) % self.refit_period == 0 and len(self.data) > self.std_window:
+        if len(self.data) % self.refit_period == 0 :
             print(f"retraining KalmanARIMA. IDX ${len(self.data)}")
             try:
                 model = sm.tsa.ARIMA(
@@ -269,7 +269,7 @@ class ARIMAGARCHStrategy(Strategy):
         price = self.data.Close[-1]
 
         # Refit models periodically
-        if len(self.data) % self.refit_period == 0 and len(self.data) > self.std_window:
+        if len(self.data) % self.refit_period == 0 :
             print(f"Retraining ARIMAGARCH. IDX ${len(self.data)}")
             try:
                 # 1. Fit ARIMA model
@@ -389,10 +389,16 @@ def backtest_random_chunks(
         print("\nNo backtests were successfully completed.")
 
 if __name__ == "__main__":
-    # Run a single backtest for SARIMAStrategy
-    print("Running single backtest for ARIMAStrategy...")
-    backtest_random_chunks(
-        ARIMAStrategy,
-        chunk_size = 300,
-        num_chunks_to_test=30
+    strategies = {
+        "ARIMAStrategy": ARIMAStrategy
+    }
+    run_optimizations_random_chunks(
+        strategies=strategies,
+        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
+        start_date="2022-01-01T00:00:00Z",
+        tracking_uri="sqlite:///mlflow.db",
+        experiment_name="Trading Strategies",
+        n_trials_per_strategy=20,
+        n_chunks=20,
+        chunk_size=200
     )
