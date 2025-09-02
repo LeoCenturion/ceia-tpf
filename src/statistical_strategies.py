@@ -15,7 +15,7 @@ from backtest_utils import (
     adjust_data_to_ubtc,
 )
 
-
+#AI don't standarize with the variance AI!
 # Custom indicator for preprocessing
 def normalized_price_change(series: np.ndarray, window: int = 1000) -> np.ndarray:
     """Calculates (price[i] - price[i-1]) / std(price[-window:])."""
@@ -79,7 +79,7 @@ class ProphetStrategy(Strategy):
     @classmethod
     def get_optuna_params(cls, trial):
         return {
-            "refit_period": trial.suggest_int("refit_period", 24 * 5, 24 * 30 * 2),
+            "refit_period": trial.suggest_categorical("refit_period", [1])
         }
 
 
@@ -88,7 +88,7 @@ class ARIMAStrategy(Strategy):
     d = 1
     q = 12
     refit_period = 1
-    std_window = 24 * 30
+    std_window = 24 * 10
     stop_loss = 0.05
     take_profit = 0.10
     lookback_length = 24 * 30 * 1
@@ -134,7 +134,7 @@ class ARIMAStrategy(Strategy):
             "p": trial.suggest_int("p", 1, 10),
             "d": trial.suggest_int("d", 0, 2),
             "q": trial.suggest_int("q", 0, 5),
-            "refit_period": trial.suggest_int("refit_period", 24 * 5, 24 * 30),
+            "refit_period": trial.suggest_categorical("refit_period", [1]),
             "std_window": trial.suggest_categorical("std_window", [24 * 30, 24 * 30 * 2, 24 * 30 * 3]),
         }
 
@@ -147,8 +147,8 @@ class SARIMAStrategy(Strategy):
         0,
         24,
     )  # Seasonal order, s=24 for daily seasonality on hourly data
-    refit_period = 100
-    std_window = 1000
+    refit_period = 1
+    std_window = 100
     stop_loss = 0.05
     take_profit = 0.10
 
@@ -198,7 +198,7 @@ class SARIMAStrategy(Strategy):
             "D": trial.suggest_int("D", 0, 2),
             "Q": trial.suggest_int("Q", 0, 2),
             "s": trial.suggest_categorical("s", [12, 24, 48]),
-            "refit_period": trial.suggest_int("refit_period", 50, 200),
+            "refit_period": trial.suggest_categorical("refit_period", [1]),
             "std_window": trial.suggest_int("std_window", 500, 1500),
         }
 
@@ -207,7 +207,7 @@ class KalmanARIMAStrategy(Strategy):
     p = 12
     d = 1
     q = 12
-    refit_period = 24 * 10
+    refit_period = 1
     std_window = 24 * 30
     stop_loss = 0.05
     take_profit = 0.10
@@ -266,7 +266,7 @@ class ARIMAGARCHStrategy(Strategy):
     # GARCH params
     g_p, g_q = 1, 1
 
-    refit_period = 24 * 10
+    refit_period = 1
     std_window = 24 * 30
     stop_loss = 0.05
     take_profit = 0.10
@@ -326,7 +326,7 @@ class ARIMAGARCHStrategy(Strategy):
             "q": trial.suggest_int("q", 0, 12),
             "g_p": trial.suggest_int("g_p", 1, 5),
             "g_q": trial.suggest_int("g_q", 1, 5),
-            "refit_period": trial.suggest_int("refit_period", 24 * 5, 24 * 30),
+            "refit_period": trial.suggest_categorical("refit_period", [1]),
             "std_window": trial.suggest_categorical(
                 "std_window", [24 * 30, 24 * 30 * 2, 24 * 30 * 3]
             ),
@@ -348,7 +348,11 @@ def main():
         n_trials_per_strategy=10,
     )
 
-def backtest_prophet():
+def backtest_random_chunks(
+        strategy,
+        chunk_size = 100,
+        num_chunks_to_test = 30
+):
     # Run a single backtest for SARIMAStrategy
     print("Running single backtest for ARIMAStrategy...")
     data = fetch_historical_data(
@@ -359,8 +363,7 @@ def backtest_prophet():
     data.sort_index(inplace=True)
     print(f"data len {len(data)}")
 
-    chunk_size = 100
-    num_chunks_to_test = 20  # Limiting to 5 chunks to keep the test reasonably short
+      # Limiting to 5 chunks to keep the test reasonably short
     stats_list = []
     np.random.seed(42)  # For reproducibility
     print(f"Splitting data into {num_chunks_to_test} random chunks of {chunk_size} hours and averaging backtest stats...")
@@ -376,7 +379,7 @@ def backtest_prophet():
         chunk_data = data.iloc[start_idx:end_idx]
         print(f"\n--- Backtesting on Chunk {i+1}/{num_chunks_to_test} (Index: {start_idx}-{end_idx}) ---")
 
-        bt = Backtest(chunk_data, ProphetStrategy, cash=10_000, commission=0.002)
+        bt = Backtest(chunk_data, strategy, cash=10_000, commission=0.002)
         try:
             stats = bt.run()
             stats_list.append(stats)
@@ -404,13 +407,8 @@ def backtest_prophet():
 if __name__ == "__main__":
     # Run a single backtest for SARIMAStrategy
     print("Running single backtest for ARIMAStrategy...")
-    data = fetch_historical_data(
-        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
-        start_date="2022-01-01T00:00:00Z",
+    backtest_random_chunks(
+        ARIMAStrategy,
+        chunk_size = 300,
+        num_chunks_to_test=30
     )
-    data = adjust_data_to_ubtc(data)
-    data.sort_index(inplace=True)
-    print(f"data len {len(data)}")
-
-    print("\nStarting optimizations defined in main()...")
-    main()
