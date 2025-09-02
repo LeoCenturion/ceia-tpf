@@ -15,17 +15,11 @@ from backtest_utils import (
     adjust_data_to_ubtc,
 )
 
-#AI don't standarize with the variance AI!
 # Custom indicator for preprocessing
-def normalized_price_change(series: np.ndarray, window: int = 1000) -> np.ndarray:
-    """Calculates (price[i] - price[i-1]) / std(price[-window:])."""
+def price_difference(series: np.ndarray) -> np.ndarray:
+    """Calculates (price[i] - price[i-1])."""
     series = pd.Series(series)
-    diff = series.diff()
-    std_dev = series.rolling(window).std()
-    with np.errstate(divide="ignore", invalid="ignore"):
-        result = diff / std_dev
-    result.replace([np.inf, -np.inf], np.nan, inplace=True)
-    return result.fillna(0).values
+    return series.diff().fillna(0).values
 
 
 def kalman_filter_indicator(series: np.ndarray) -> np.ndarray:
@@ -88,14 +82,13 @@ class ARIMAStrategy(Strategy):
     d = 1
     q = 12
     refit_period = 1
-    std_window = 24 * 10
     stop_loss = 0.05
     take_profit = 0.10
     lookback_length = 24 * 30 * 1
     def init(self):
         self.model_fit = None
         self.processed_data = self.I(
-            normalized_price_change, self.data.Close, self.std_window
+            price_difference, self.data.Close
         )
 
     def next(self):
@@ -135,7 +128,6 @@ class ARIMAStrategy(Strategy):
             "d": trial.suggest_int("d", 0, 2),
             "q": trial.suggest_int("q", 0, 5),
             "refit_period": trial.suggest_categorical("refit_period", [1]),
-            "std_window": trial.suggest_categorical("std_window", [24 * 30, 24 * 30 * 2, 24 * 30 * 3]),
         }
 
 
@@ -148,14 +140,13 @@ class SARIMAStrategy(Strategy):
         24,
     )  # Seasonal order, s=24 for daily seasonality on hourly data
     refit_period = 1
-    std_window = 100
     stop_loss = 0.05
     take_profit = 0.10
 
     def init(self):
         self.model_fit = None
         self.processed_data = self.I(
-            normalized_price_change, self.data.Close, self.std_window
+            price_difference, self.data.Close
         )
 
     def next(self):
@@ -199,7 +190,6 @@ class SARIMAStrategy(Strategy):
             "Q": trial.suggest_int("Q", 0, 2),
             "s": trial.suggest_categorical("s", [12, 24, 48]),
             "refit_period": trial.suggest_categorical("refit_period", [1]),
-            "std_window": trial.suggest_int("std_window", 500, 1500),
         }
 
 
@@ -208,14 +198,13 @@ class KalmanARIMAStrategy(Strategy):
     d = 1
     q = 12
     refit_period = 1
-    std_window = 24 * 30
     stop_loss = 0.05
     take_profit = 0.10
 
     def init(self):
         self.model_fit = None
         processed_data = self.I(
-            normalized_price_change, self.data.Close, self.std_window
+            price_difference, self.data.Close
         )
         self.kalman_filtered_data = self.I(kalman_filter_indicator, processed_data)
 
@@ -256,7 +245,6 @@ class KalmanARIMAStrategy(Strategy):
             "d": trial.suggest_int("d", 0, 2),
             "q": trial.suggest_int("q", 0, 5),
             "refit_period": trial.suggest_int("refit_period", 24 * 5, 24 * 30),
-            "std_window": trial.suggest_int("std_window", 24 * 30,  24 * 30 * 3),
         }
 
 
@@ -267,7 +255,6 @@ class ARIMAGARCHStrategy(Strategy):
     g_p, g_q = 1, 1
 
     refit_period = 1
-    std_window = 24 * 30
     stop_loss = 0.05
     take_profit = 0.10
 
@@ -275,7 +262,7 @@ class ARIMAGARCHStrategy(Strategy):
         self.arima_fit = None
         self.garch_fit = None
         self.processed_data = self.I(
-            normalized_price_change, self.data.Close, self.std_window
+            price_difference, self.data.Close
         )
 
     def next(self):
@@ -327,9 +314,6 @@ class ARIMAGARCHStrategy(Strategy):
             "g_p": trial.suggest_int("g_p", 1, 5),
             "g_q": trial.suggest_int("g_q", 1, 5),
             "refit_period": trial.suggest_categorical("refit_period", [1]),
-            "std_window": trial.suggest_categorical(
-                "std_window", [24 * 30, 24 * 30 * 2, 24 * 30 * 3]
-            ),
         }
 
 
