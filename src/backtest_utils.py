@@ -129,10 +129,89 @@ def adjust_data_to_ubtc(df: pd.DataFrame) -> pd.DataFrame:
 def sanitize_metric_name(name):
     """Sanitize metric name to be MLflow compliant."""
     return re.sub(r'[^a-zA-Z0-9_\-.\s:/]', '', name)
-# AI add a optimize_strategy_random_chunks function...
-# It should backtest on n different random chunks and average the stats
-# It should save only the average stats in mlflow but one plot and one trade csv should be saved for each chunk.
-# You can copy the implementation from backtest_random_chunks found in src/statisticall_strategies.py AI!
+
+
+def optimize_strategy_random_chunks(
+    data, strategy, study_name, n_trials=100, n_chunks=10, chunk_size=500
+):
+    """
+    Optimize strategy hyperparameters using Optuna by backtesting on random data chunks.
+    For each trial, it averages the stats over several random chunks and logs artifacts for each chunk.
+    """
+
+    def objective(trial):
+        params = strategy.get_optuna_params(trial)
+        stats_list = []
+        np.random.seed(42)  # For reproducibility of chunks across trials
+
+        run_name = f"{study_name}-" + "-".join([f"{k}={v}" for k, v in params.items()])
+        with mlflow.start_run(run_name=run_name, nested=True) as run:
+            mlflow.log_params(params)
+
+            for i in range(n_chunks):
+                max_start_idx = len(data) - chunk_size
+                if max_start_idx <= 0:
+                    print("Data is smaller than chunk size, cannot create random chunks.")
+                    break
+
+                start_idx = np.random.randint(0, max_start_idx)
+                end_idx = start_idx + chunk_size
+                chunk_data = data.iloc[start_idx:end_idx]
+
+                bt = Backtest(chunk_data, strategy, cash=10000, commission=0.002)
+                try:
+                    stats = bt.run(**params)
+                    if stats:
+                        stats_list.append(stats)
+
+                        # Log artifacts for each chunk, organizing them in subdirectories
+                        plot_filename = f"backtest_plot_chunk_{i}.html"
+                        trades_filename = f"trades_chunk_{i}.csv"
+
+                        bt.plot(filename=plot_filename, open_browser=False)
+                        mlflow.log_artifact(plot_filename, artifact_path=f"chunk_{i}")
+
+                        if not bt._trades.empty:
+                            bt._trades.to_csv(trades_filename, index=False)
+                            mlflow.log_artifact(trades_filename, artifact_path=f"chunk_{i}")
+
+                        # Clean up local files
+                        if os.path.exists(plot_filename):
+                            os.remove(plot_filename)
+                        if os.path.exists(trades_filename):
+                            os.remove(trades_filename)
+                except Exception:
+                    pass  # Backtest can fail, e.g., if no trades are made
+
+            if not stats_list:
+                return 0
+
+            # Average the stats
+            stats_df = pd.DataFrame(stats_list)
+            for col in stats_df.columns:
+                if pd.api.types.is_timedelta64_dtype(stats_df[col]):
+                    stats_df[col] = stats_df[col].dt.total_seconds()
+
+            numeric_stats_df = stats_df.select_dtypes(include=np.number)
+            averaged_stats = numeric_stats_df.mean().to_dict()
+
+            # Log averaged stats to MLflow
+            for key, value in averaged_stats.items():
+                sanitized_key = sanitize_metric_name(key)
+                mlflow.log_metric(sanitized_key, value)
+
+            return averaged_stats.get("Sortino Ratio", 0)
+
+    study = optuna.create_study(
+        study_name=study_name,
+        direction="maximize",
+        storage="sqlite:///optuna-study.db",
+        load_if_exists=True,
+    )
+    study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
+    return study.best_params
+
+
 def optimize_strategy(data, strategy, study_name, n_trials=100):
     """
     Optimize strategy hyperparameters using Optuna.
