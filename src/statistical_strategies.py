@@ -362,7 +362,7 @@ def backtest_prophet():
     chunk_size = 100
     num_chunks_to_test = 20  # Limiting to 5 chunks to keep the test reasonably short
     stats_list = []
-    #AI add a seed to make it reproducible AI!
+    np.random.seed(42)  # For reproducibility
     print(f"Splitting data into {num_chunks_to_test} random chunks of {chunk_size} hours and averaging backtest stats...")
     for i in range(num_chunks_to_test):
         max_start_idx = len(data) - chunk_size
