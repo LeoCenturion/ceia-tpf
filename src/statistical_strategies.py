@@ -386,8 +386,12 @@ if __name__ == "__main__":
     if stats_list:
         stats_df = pd.DataFrame(stats_list)
 
+        # Convert timedelta columns to total seconds before averaging
+        for col in stats_df.columns:
+            if pd.api.types.is_timedelta64_dtype(stats_df[col]):
+                stats_df[col] = stats_df[col].dt.total_seconds()
+
         # Select only numeric columns for averaging
-        # AI also filter or convert timedeltas here AI!
         numeric_stats_df = stats_df.select_dtypes(include=np.number)
         averaged_stats = numeric_stats_df.mean()
 
