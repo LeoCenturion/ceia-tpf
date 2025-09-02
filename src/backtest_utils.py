@@ -132,7 +132,7 @@ def sanitize_metric_name(name):
 
 
 def optimize_strategy_random_chunks(
-    data, strategy, study_name, n_trials=100, n_chunks=10, chunk_size=500
+    data, strategy, study_name, n_trials=100, n_chunks=20, chunk_size=300
 ):
     """
     Optimize strategy hyperparameters using Optuna by backtesting on random data chunks.
@@ -159,29 +159,26 @@ def optimize_strategy_random_chunks(
                 chunk_data = data.iloc[start_idx:end_idx]
 
                 bt = Backtest(chunk_data, strategy, cash=10000, commission=0.002)
-                try:
-                    stats = bt.run(**params)
-                    if stats:
-                        stats_list.append(stats)
+                stats = bt.run(**params)
+                if stats is not None:
+                    stats_list.append(stats)
+                    # Log artifacts for each chunk, organizing them in subdirectories
+                    plot_filename = f"backtest_plot_chunk_{i}.html"
+                    trades_filename = f"trades_chunk_{i}.csv"
 
-                        # Log artifacts for each chunk, organizing them in subdirectories
-                        plot_filename = f"backtest_plot_chunk_{i}.html"
-                        trades_filename = f"trades_chunk_{i}.csv"
+                    bt.plot(filename=plot_filename, open_browser=False)
+                    mlflow.log_artifact(plot_filename, artifact_path=f"chunk_{i}")
 
-                        bt.plot(filename=plot_filename, open_browser=False)
-                        mlflow.log_artifact(plot_filename, artifact_path=f"chunk_{i}")
-
-                        if not bt._trades.empty:
-                            bt._trades.to_csv(trades_filename, index=False)
-                            mlflow.log_artifact(trades_filename, artifact_path=f"chunk_{i}")
+                    if bt._strategy.closed_trades:
+                        # AI closed_trades is a tuple. Turn it to csv AI!
+                        bt._strategy.closed_trades.to_csv(trades_filename, index=False)
+                        mlflow.log_artifact(trades_filename, artifact_path=f"chunk_{i}")
 
                         # Clean up local files
                         if os.path.exists(plot_filename):
                             os.remove(plot_filename)
                         if os.path.exists(trades_filename):
                             os.remove(trades_filename)
-                except Exception:
-                    pass  # Backtest can fail, e.g., if no trades are made
 
             if not stats_list:
                 return 0
@@ -282,4 +279,31 @@ def run_optimizations(strategies, data_path, start_date, tracking_uri, experimen
         with mlflow.start_run(run_name=f"Optimize_{name}"):
             print(f"Optimizing {name}...")
             optimize_strategy(data, strategy, n_trials=n_trials_per_strategy, study_name=name)
+            print(f"Optimization for {name} complete.")
+
+def run_optimizations_random_chunks(strategies, data_path, start_date, tracking_uri, experiment_name, n_trials_per_strategy=10, n_chunks=15, chunk_size = 200):
+    """
+    Run optimization for a set of strategies.
+
+    :param strategies: Dictionary of strategy names to strategy classes.
+    :param data_path: Path to the historical data CSV file.
+    :param start_date: Start date for the data.
+    :param tracking_uri: MLflow tracking URI.
+    :param experiment_name: MLflow experiment name.
+    :param n_trials_per_strategy: Number of Optuna trials for each strategy.
+    """
+    mlflow.set_tracking_uri(tracking_uri)
+    mlflow.set_experiment(experiment_name)
+
+    data = fetch_historical_data(
+        data_path=data_path,
+        start_date=start_date
+    )
+    data = adjust_data_to_ubtc(data)
+    data.sort_index(inplace=True)
+    for name, strategy in strategies.items():
+        # This outer run is for grouping the optimization trials
+        with mlflow.start_run(run_name=f"Optimize_{name}"):
+            print(f"Optimizing {name}...")
+            optimize_strategy_random_chunks(data, strategy, n_trials=n_trials_per_strategy, study_name=name,n_chunks=n_chunks,chunk_size=chunk_size)
             print(f"Optimization for {name} complete.")
