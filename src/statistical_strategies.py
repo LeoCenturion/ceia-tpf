@@ -51,11 +51,11 @@ class ProphetStrategy(Strategy):
 
     def next(self):
         if len(self.data.Close) > 1 and len(self.data.Close) % self.refit_period == 0:
-            print(f"Refitting, idx {len(self.data)} len {len(self.data.index[-self.lookback_length:])}")
+            # print(f"Refitting, idx {len(self.data)} len {len(self.data.index[-self.lookback_length:])}")
             prophet_data = pd.DataFrame({"ds": self.data.index[-self.lookback_length:], "y": self.data.Close[-self.lookback_length:]})
             self.model = Prophet()
             self.model.fit(prophet_data)
-            print(f"Model refitted")
+            # print(f"Model refitted")
 
         # Generate forecast if model is fitted
         if self.model:
@@ -87,11 +87,11 @@ class ARIMAStrategy(Strategy):
     p = 12
     d = 1
     q = 12
-    refit_period = 24 * 10
+    refit_period = 1
     std_window = 24 * 30
     stop_loss = 0.05
     take_profit = 0.10
-
+    lookback_length = 24 * 30 * 1
     def init(self):
         self.model_fit = None
         self.processed_data = self.I(
@@ -106,7 +106,7 @@ class ARIMAStrategy(Strategy):
             print(f"retraining. IDX ${len(self.data)}")
             try:
                 model = sm.tsa.ARIMA(
-                    self.processed_data, order=(self.p, self.d, self.q)
+                    self.processed_data[-self.lookback_length:], order=(self.p, self.d, self.q)
                 )
                 self.model_fit = model.fit()
             except Exception:  # Catches convergence errors etc.
@@ -348,8 +348,7 @@ def main():
         n_trials_per_strategy=10,
     )
 
-
-if __name__ == "__main__":
+def backtest_prophet():
     # Run a single backtest for SARIMAStrategy
     print("Running single backtest for ARIMAStrategy...")
     data = fetch_historical_data(
@@ -361,9 +360,9 @@ if __name__ == "__main__":
     print(f"data len {len(data)}")
 
     chunk_size = 100
-    num_chunks_to_test = 5  # Limiting to 5 chunks to keep the test reasonably short
+    num_chunks_to_test = 20  # Limiting to 5 chunks to keep the test reasonably short
     stats_list = []
-
+    #AI add a seed to make it reproducible AI!
     print(f"Splitting data into {num_chunks_to_test} random chunks of {chunk_size} hours and averaging backtest stats...")
     for i in range(num_chunks_to_test):
         max_start_idx = len(data) - chunk_size
@@ -402,41 +401,16 @@ if __name__ == "__main__":
     else:
         print("\nNo backtests were successfully completed.")
 
-    # print("\nStarting optimizations defined in main()...")
-    # main()
-    # window = 5000
-    # import matplotlib.pyplot as plt
+if __name__ == "__main__":
+    # Run a single backtest for SARIMAStrategy
+    print("Running single backtest for ARIMAStrategy...")
+    data = fetch_historical_data(
+        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
+        start_date="2022-01-01T00:00:00Z",
+    )
+    data = adjust_data_to_ubtc(data)
+    data.sort_index(inplace=True)
+    print(f"data len {len(data)}")
 
-    # The following loop demonstrates one-step-ahead prediction with Prophet.
-    # WARNING: It is very slow because it retrains the model at each step.
-    # predictions = []
-
-    # for i in range(24, len(data) - 1):
-    #     prophet_data = pd.DataFrame({"ds": data.index[:i], "y": data.Close[:i]})
-    #     model = Prophet()
-    #     model.fit(prophet_data)
-    #     future = model.make_future_dataframe(periods=1, freq="h", include_history=False)
-    #     forecast = model.predict(future)
-
-    #     prediction = forecast["yhat"].iloc[0]
-    #     predictions.append(prediction)
-
-    # # Plotting the results
-    # plot_range = range(24, 24 + len(predictions))
-    # actual_values = data.Close.iloc[plot_range]
-
-    # plt.figure(figsize=(15, 7))
-    # plt.plot(actual_values.index, actual_values, label="Actual Price (Trend)")
-    # plt.plot(
-    #     actual_values.index,
-    #     predictions,
-    #     label="Predicted Price (1-step ahead)",
-    #     linestyle="--",
-    # )
-    # plt.title("Prophet One-Step-Ahead Forecast vs Actual Price")
-    # plt.xlabel("Date")
-    # plt.ylabel("Price")
-    # plt.legend()
-    # plt.grid(True)
-    # plt.show()
-
+    print("\nStarting optimizations defined in main()...")
+    main()
