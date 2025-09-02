@@ -129,40 +129,10 @@ def adjust_data_to_ubtc(df: pd.DataFrame) -> pd.DataFrame:
 def sanitize_metric_name(name):
     """Sanitize metric name to be MLflow compliant."""
     return re.sub(r'[^a-zA-Z0-9_\-.\s:/]', '', name)
-
-def run_expanding_window_backtest(data, strategy, params, window_size, step_size, name):
-    """
-    Run backtest with expanding window.
-    """
-    from collections import defaultdict
-
-    stats_list = []
-
-    for i in range(window_size, len(data), step_size):
-        window_data = data.iloc[i-window_size:i]
-        bt = Backtest(window_data, strategy, cash=10000, commission=.002)
-        stats = bt.run(**params)
-        stats_list.append(stats)
-
-    if not stats_list:
-        return []
-
-    # Average the stats
-    stats_df = pd.DataFrame(stats_list)
-    numeric_stats_df = stats_df.select_dtypes(include='number')
-    averaged_stats = numeric_stats_df.mean().to_dict()
-
-    run_name = f"{name}-" + "-".join([f"{k}={v}" for k, v in params.items()])
-    with mlflow.start_run(run_name=run_name, nested=True):
-        mlflow.log_params(params)
-
-        # Sanitize and log metrics
-        for key, value in averaged_stats.items():
-            sanitized_key = sanitize_metric_name(key)
-            mlflow.log_metric(sanitized_key, value)
-
-    return averaged_stats.get('Return [%]', [])
-
+# AI add a optimize_strategy_random_chunks function...
+# It should backtest on n different random chunks and average the stats
+# It should save only the average stats in mlflow but one plot and one trade csv should be saved for each chunk.
+# You can copy the implementation from backtest_random_chunks found in src/statisticall_strategies.py AI!
 def optimize_strategy(data, strategy, study_name, n_trials=100):
     """
     Optimize strategy hyperparameters using Optuna.
@@ -171,58 +141,28 @@ def optimize_strategy(data, strategy, study_name, n_trials=100):
     def objective(trial):
         params = strategy.get_optuna_params(trial)
 
-        # Run expanding window backtest for the given params
-        stats_list = []
-        last_bt_instance = None # To store the Backtest object for the last successful step
-        step_size = 1000 # Increment for expanding window
-        min_window_size = step_size # Assuming minimum window size is the step_size
+        bt = Backtest(data, strategy, cash=10000, commission=0.002)
+        stats = bt.run(**params)
 
-        for i in range(min_window_size, len(data) + 1, step_size):
-            window_data = data.iloc[:i]
-
-            # Skip if window_data is empty or too small for strategy to initialize (e.g., for indicators)
-            # A more robust check might involve actual strategy requirements.
-            if len(window_data) < min_window_size: 
-                continue 
-
-            bt = Backtest(window_data, strategy, cash=10000, commission=.002)
-            stats = bt.run(**params)
-
-            if stats is not None: # Only append if backtest ran successfully
-                stats_list.append(stats)
-                last_bt_instance = bt # Keep track of the last successful Backtest instance
-
-        if not stats_list:
-            return 0 # Return a neutral value if no backtests were run
-
-
-        stats_df = pd.DataFrame(stats_list)
-        columns_to_drop = ['Duration', 'Max. Drawdown Duration', 'Avg. Drawdown Duration', 'Max. Trade Duration', 'Avg. Trade Duration']
-        stats_df = stats_df.drop(columns=columns_to_drop, errors='ignore') # Use errors='ignore' for robustness
-
-
-        averaged_stats = stats_df.select_dtypes(include=np.number).mean().to_dict()
-
-        # Log to MLflow
         run_name = f"{study_name}-" + "-".join([f"{k}={v}" for k, v in params.items()])
         with mlflow.start_run(run_name=run_name, nested=True):
             mlflow.log_params(params)
-            for key, value in averaged_stats.items():
+            for key, value in stats.items():
                 sanitized_key = sanitize_metric_name(key)
                 mlflow.log_metric(sanitized_key, value)
 
             # Log artifacts for the last step if available
-            if last_bt_instance:
+            if bt:
                 plot_filename = "backtest_plot.html"
                 trades_filename = "trades.csv"
 
                 # Save plot
                 # open_browser=False prevents the plot from opening automatically
-                last_bt_instance.plot(filename=plot_filename, open_browser=False)
+                bt.plot(filename=plot_filename, open_browser=False)
                 mlflow.log_artifact(plot_filename)
                 # Save trades
-                if last_bt_instance._strategy.trades:
-                    last_bt_instance._strategy.trades.to_csv(trades_filename, index=False)
+                if bt._strategy.trades:
+                    bt._strategy.trades.to_csv(trades_filename, index=False)
                     mlflow.log_artifact(trades_filename)
 
                 # Clean up created files
@@ -231,7 +171,7 @@ def optimize_strategy(data, strategy, study_name, n_trials=100):
                 if os.path.exists(trades_filename):
                     os.remove(trades_filename)
 
-        return averaged_stats.get('Sortino Ratio', 0)
+        return stats.get('Sortino Ratio', 0)
 
     study = optuna.create_study(study_name=study_name, direction='maximize', storage="sqlite:///optuna-study.db", load_if_exists=True)
     study.optimize(objective, n_trials=n_trials)
