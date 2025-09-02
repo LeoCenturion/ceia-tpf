@@ -169,9 +169,9 @@ def optimize_strategy_random_chunks(
                     bt.plot(filename=plot_filename, open_browser=False)
                     mlflow.log_artifact(plot_filename, artifact_path=f"chunk_{i}")
 
-                    if bt._strategy.closed_trades:
-                        # AI closed_trades is a tuple. Turn it to csv AI!
-                        bt._strategy.closed_trades.to_csv(trades_filename, index=False)
+                    trades_df = stats['_trades']
+                    if not trades_df.empty:
+                        trades_df.to_csv(trades_filename, index=False)
                         mlflow.log_artifact(trades_filename, artifact_path=f"chunk_{i}")
 
                         # Clean up local files
