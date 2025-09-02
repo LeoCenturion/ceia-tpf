@@ -364,13 +364,15 @@ if __name__ == "__main__":
     num_chunks_to_test = 5  # Limiting to 5 chunks to keep the test reasonably short
     stats_list = []
 
-    print(f"Splitting data into {num_chunks_to_test} chunks of {chunk_size} hours and averaging backtest stats...")
-    #AI make the chunks random AI!
+    print(f"Splitting data into {num_chunks_to_test} random chunks of {chunk_size} hours and averaging backtest stats...")
     for i in range(num_chunks_to_test):
-        start_idx = i * chunk_size
-        end_idx = start_idx + chunk_size
-        if end_idx > len(data):
+        max_start_idx = len(data) - chunk_size
+        if max_start_idx <= 0:
+            print("Data is smaller than chunk size, cannot create random chunks.")
             break
+
+        start_idx = np.random.randint(0, max_start_idx)
+        end_idx = start_idx + chunk_size
 
         chunk_data = data.iloc[start_idx:end_idx]
         print(f"\n--- Backtesting on Chunk {i+1}/{num_chunks_to_test} (Index: {start_idx}-{end_idx}) ---")
