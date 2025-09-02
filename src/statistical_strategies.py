@@ -37,6 +37,10 @@ def kalman_filter_indicator(series: np.ndarray) -> np.ndarray:
 
 
 class ProphetStrategy(Strategy):
+    """
+    Intractable. Prophet doesn't take data when predicting, so if we train every 30 days then all 30 days will have the same prediction.
+    If we train every hour then it takes more than a day do backtest with hourly data from 2022 to 2025.
+    """
     refit_period = 24 * 30  # Refit the model every N bars
     stop_loss = 0.05
     take_profit = 0.10
@@ -47,7 +51,7 @@ class ProphetStrategy(Strategy):
 
     def next(self):
         if len(self.data.Close) > 1 and len(self.data.Close) % self.refit_period == 0:
-            print(f"Refitting, idx {len(self.data)}")
+            print(f"Refitting, idx {len(self.data)} len {len(self.data.index[-self.lookback_length:])}")
             prophet_data = pd.DataFrame({"ds": self.data.index[-self.lookback_length:], "y": self.data.Close[-self.lookback_length:]})
             self.model = Prophet()
             self.model.fit(prophet_data)
@@ -56,7 +60,7 @@ class ProphetStrategy(Strategy):
         # Generate forecast if model is fitted
         if self.model:
             future = self.model.make_future_dataframe(
-                periods=1, freq="h"
+                periods=1, freq="h", include_history=False
             )  # Assuming hourly data
             self.forecast = self.model.predict(future)
 
@@ -350,50 +354,52 @@ if __name__ == "__main__":
     print("Running single backtest for ARIMAStrategy...")
     data = fetch_historical_data(
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
-        start_date="2025-04-05T00:00:00Z",
+        start_date="2022-01-01T00:00:00Z",
     )
     data = adjust_data_to_ubtc(data)
     data.sort_index(inplace=True)
-    # print(f"data len {len(data)}")
-    # bt = Backtest(data, ProphetStrategy, cash=10_000, commission=0.002)
-    # stats = bt.run()
-    # print(stats)
-    # bt.plot()
+    print(f"data len {len(data)}")
+    #AI split the data into a few small datasets of 100 hours each. Then backtest each of those and average the stats. AI! 
+    bt = Backtest(data, ProphetStrategy, cash=10_000, commission=0.002)
+    stats = bt.run()
+    print(stats)
+    bt.plot()
 
     # print("\nStarting optimizations defined in main()...")
     # main()
-    window = 5000
-    import matplotlib.pyplot as plt
+    # window = 5000
+    # import matplotlib.pyplot as plt
 
     # The following loop demonstrates one-step-ahead prediction with Prophet.
     # WARNING: It is very slow because it retrains the model at each step.
-    predictions = []
-    for i in range(24, len(data) - 1):
-        prophet_data = pd.DataFrame({"ds": data.index[:i], "y": data.Close[:i]})
-        model = Prophet()
-        model.fit(prophet_data)
-        future = model.make_future_dataframe(periods=1, freq="h", include_history=False)
-        forecast = model.predict(future)
+    # predictions = []
 
-        prediction = forecast["yhat"].iloc[0]
-        predictions.append(prediction)
+    # for i in range(24, len(data) - 1):
+    #     prophet_data = pd.DataFrame({"ds": data.index[:i], "y": data.Close[:i]})
+    #     model = Prophet()
+    #     model.fit(prophet_data)
+    #     future = model.make_future_dataframe(periods=1, freq="h", include_history=False)
+    #     forecast = model.predict(future)
 
-    # Plotting the results
-    plot_range = range(24, 24 + len(predictions))
-    actual_values = data.Close.iloc[plot_range]
+    #     prediction = forecast["yhat"].iloc[0]
+    #     predictions.append(prediction)
 
-    plt.figure(figsize=(15, 7))
-    plt.plot(actual_values.index, actual_values, label="Actual Price (Trend)")
-    plt.plot(
-        actual_values.index,
-        predictions,
-        label="Predicted Price (1-step ahead)",
-        linestyle="--",
-    )
-    plt.title("Prophet One-Step-Ahead Forecast vs Actual Price")
-    plt.xlabel("Date")
-    plt.ylabel("Price")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+    # # Plotting the results
+    # plot_range = range(24, 24 + len(predictions))
+    # actual_values = data.Close.iloc[plot_range]
+
+    # plt.figure(figsize=(15, 7))
+    # plt.plot(actual_values.index, actual_values, label="Actual Price (Trend)")
+    # plt.plot(
+    #     actual_values.index,
+    #     predictions,
+    #     label="Predicted Price (1-step ahead)",
+    #     linestyle="--",
+    # )
+    # plt.title("Prophet One-Step-Ahead Forecast vs Actual Price")
+    # plt.xlabel("Date")
+    # plt.ylabel("Price")
+    # plt.legend()
+    # plt.grid(True)
+    # plt.show()
 
