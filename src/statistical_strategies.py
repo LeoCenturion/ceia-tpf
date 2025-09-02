@@ -385,8 +385,9 @@ if __name__ == "__main__":
 
     if stats_list:
         stats_df = pd.DataFrame(stats_list)
-        
+
         # Select only numeric columns for averaging
+        # AI also filter or convert timedeltas here AI!
         numeric_stats_df = stats_df.select_dtypes(include=np.number)
         averaged_stats = numeric_stats_df.mean()
 
