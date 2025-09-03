@@ -33,7 +33,6 @@ def kalman_filter_indicator(series: np.ndarray) -> np.ndarray:
     (filtered_state_means, _) = kf.filter(series)
     return filtered_state_means.flatten()
 
-# AI I'd like all strategies to have a configurable threshold to adopt a long or short possition. E.g. it should buy only if forecast_price > price*threshold AI!
 class ProphetStrategy(Strategy):
     """
     Intractable. Prophet doesn't take data when predicting, so if we train every 30 days then all 30 days will have the same prediction.
@@ -42,6 +41,7 @@ class ProphetStrategy(Strategy):
     refit_period = 1 #24 * 30  # Refit the model every N bars
     stop_loss = 0.05
     take_profit = 0.10
+    threshold = 0.001
     def init(self):
         self.model = None
         self.forecast = None
@@ -64,11 +64,11 @@ class ProphetStrategy(Strategy):
         price = self.data.Close[-1]
         if self.forecast is not None:
             forecast_price = self.forecast["yhat"].iloc[-1]
-            if forecast_price > price and not self.position.is_long:
+            if forecast_price > price * (1 + self.threshold) and not self.position.is_long:
                 self.buy(
                     sl=price * (1 - self.stop_loss), tp=price * (1 + self.take_profit)
                 )
-            elif forecast_price < price and not self.position.is_short:
+            elif forecast_price < price * (1 - self.threshold) and not self.position.is_short:
                 self.sell(
                     sl=price * (1 + self.stop_loss), tp=price * (1 - self.take_profit)
                 )
@@ -76,7 +76,8 @@ class ProphetStrategy(Strategy):
     @classmethod
     def get_optuna_params(cls, trial):
         return {
-            "refit_period": trial.suggest_categorical("refit_period", [1])
+            "refit_period": trial.suggest_categorical("refit_period", [1]),
+            "threshold": trial.suggest_float("threshold", 0, 0.01),
         }
 
 
@@ -87,7 +88,11 @@ class ARIMAStrategy(Strategy):
     refit_period = 1
     stop_loss = 0.05
     take_profit = 0.10
+    threshold = 1e-5
+    threshold = 1e-5
+    threshold = 1e-5
     lookback_length = 24 * 30 * 1
+    threshold = 1e-5
     def init(self):
         self.model_fit = None
         self.processed_data = self.I(
@@ -110,12 +115,12 @@ class ARIMAStrategy(Strategy):
         if self.model_fit:
             try:
                 forecast_processed = self.model_fit.forecast(steps=1)[0]
-                if forecast_processed > 0 and not self.position.is_long:
+                if forecast_processed > self.threshold and not self.position.is_long:
                     self.buy(
                         sl=price * (1 - self.stop_loss),
                         tp=price * (1 + self.take_profit),
                     )
-                elif forecast_processed < 0 and not self.position.is_short:
+                elif forecast_processed < -self.threshold and not self.position.is_short:
                     self.sell(
                         sl=price * (1 + self.stop_loss),
                         tp=price * (1 - self.take_profit),
@@ -130,6 +135,7 @@ class ARIMAStrategy(Strategy):
             "d": trial.suggest_int("d", 0, 2),
             "q": trial.suggest_int("q", 0, 5),
             "refit_period": trial.suggest_categorical("refit_period", [1]),
+            "threshold": trial.suggest_float("threshold", 0, 1e-4),
         }
 
 
@@ -168,12 +174,12 @@ class SARIMAStrategy(Strategy):
         if self.model_fit:
             try:
                 forecast_processed = self.model_fit.forecast(steps=1)[0]
-                if forecast_processed > 0 and not self.position.is_long:
+                if forecast_processed > self.threshold and not self.position.is_long:
                     self.buy(
                         sl=price * (1 - self.stop_loss),
                         tp=price * (1 + self.take_profit),
                     )
-                elif forecast_processed < 0 and not self.position.is_short:
+                elif forecast_processed < -self.threshold and not self.position.is_short:
                     self.sell(
                         sl=price * (1 + self.stop_loss),
                         tp=price * (1 - self.take_profit),
@@ -192,6 +198,7 @@ class SARIMAStrategy(Strategy):
             "Q": trial.suggest_int("Q", 0, 2),
             "s": trial.suggest_categorical("s", [12, 24, 48]),
             "refit_period": trial.suggest_categorical("refit_period", [1]),
+            "threshold": trial.suggest_float("threshold", 0, 1e-4),
         }
 
 
@@ -227,12 +234,12 @@ class KalmanARIMAStrategy(Strategy):
         if self.model_fit:
             try:
                 forecast_processed = self.model_fit.forecast(steps=1)[0]
-                if forecast_processed > 0 and not self.position.is_long:
+                if forecast_processed > self.threshold and not self.position.is_long:
                     self.buy(
                         sl=price * (1 - self.stop_loss),
                         tp=price * (1 + self.take_profit),
                     )
-                elif forecast_processed < 0 and not self.position.is_short:
+                elif forecast_processed < -self.threshold and not self.position.is_short:
                     self.sell(
                         sl=price * (1 + self.stop_loss),
                         tp=price * (1 - self.take_profit),
@@ -245,7 +252,8 @@ class KalmanARIMAStrategy(Strategy):
         return {
             "p": trial.suggest_int("p", 1, 10),
             "d": trial.suggest_int("d", 0, 2),
-            "q": trial.suggest_int("q", 0, 5)
+            "q": trial.suggest_int("q", 0, 5),
+            "threshold": trial.suggest_float("threshold", 0, 1e-4),
         }
 
 
@@ -368,12 +376,12 @@ class ARIMAXGARCHStrategy(Strategy):
                 # Forecast from ARIMAX using the GARCH forecast as exog
                 forecast = self.arimax_fit.forecast(steps=1, exog=[next_vol])[0]
 
-                if forecast > 0 and not self.position.is_long:
+                if forecast > self.threshold and not self.position.is_long:
                     self.buy(
                         sl=price * (1 - self.stop_loss),
                         tp=price * (1 + self.take_profit),
                     )
-                elif forecast < 0 and not self.position.is_short:
+                elif forecast < -self.threshold and not self.position.is_short:
                     self.sell(
                         sl=price * (1 + self.stop_loss),
                         tp=price * (1 - self.take_profit),
@@ -390,6 +398,7 @@ class ARIMAXGARCHStrategy(Strategy):
             "g_p": trial.suggest_int("g_p", 1, 3),
             "g_q": trial.suggest_int("g_q", 1, 3),
             "refit_period": trial.suggest_categorical("refit_period", [1]),
+            "threshold": trial.suggest_float("threshold", 0, 1e-4),
         }
 
 
