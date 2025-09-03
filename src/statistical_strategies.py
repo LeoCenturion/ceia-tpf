@@ -5,6 +5,7 @@ from prophet import Prophet
 import statsmodels.api as sm
 from pykalman import KalmanFilter
 import logging
+import itertools
 logging.getLogger("prophet").setLevel(logging.WARNING)
 
 try:
@@ -318,7 +319,35 @@ def backtest_random_chunks(
         print(averaged_stats)
     else:
         print("\nNo backtests were successfully completed.")
-#AI Add a function that performs box jenkin to find the best arima parameters AI!
+
+
+def find_best_arima_params(data: pd.Series, p_range=range(0, 5), d_range=range(0, 3), q_range=range(0, 5)):
+    """
+    Performs a grid search to find the best (p, d, q) parameters for an ARIMA model
+    based on the Akaike Information Criterion (AIC).
+    """
+    best_aic = float("inf")
+    best_order = None
+    best_model = None
+
+    # Generate all different combinations of p, d, and q triplets
+    pdq = list(itertools.product(p_range, d_range, q_range))
+
+    for order in pdq:
+        try:
+            model = sm.tsa.ARIMA(data, order=order)
+            results = model.fit()
+            if results.aic < best_aic:
+                best_aic = results.aic
+                best_order = order
+                best_model = results
+        except Exception:
+            # Errors can occur for certain parameter combinations
+            continue
+
+    print(f"Best ARIMA{best_order} model found with AIC: {best_aic}")
+    return best_order, best_model
+
 
 if __name__ == "__main__":
     strategies = {
