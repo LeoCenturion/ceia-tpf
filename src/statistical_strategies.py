@@ -320,11 +320,9 @@ def backtest_random_chunks(
     else:
         print("\nNo backtests were successfully completed.")
 
-#AI change it from SARIMAX to ARIMAX AI!
-class SARIMAXGARCHStrategy(Strategy):
-    # SARIMAX params
+class ARIMAXGARCHStrategy(Strategy):
+    # ARIMAX params
     p, d, q = 5, 1, 0
-    P, D, Q, s = 1, 1, 0, 24
     # GARCH params
     g_p, g_q = 1, 1
 
@@ -333,7 +331,7 @@ class SARIMAXGARCHStrategy(Strategy):
     take_profit = 0.10
 
     def init(self):
-        self.sarimax_fit = None
+        self.arimax_fit = None
         self.garch_fit = None
         self.processed_data = self.I(price_difference, self.data.Close)
 
@@ -350,26 +348,25 @@ class SARIMAXGARCHStrategy(Strategy):
                 # Get historical conditional volatility as exogenous variable
                 cond_vol = self.garch_fit.conditional_volatility
 
-                # 2. Fit SARIMAX with GARCH volatility as exog
-                sarimax_model = sm.tsa.SARIMAX(
+                # 2. Fit ARIMAX with GARCH volatility as exog
+                arimax_model = sm.tsa.ARIMA(
                     self.processed_data,
                     exog=cond_vol,
                     order=(self.p, self.d, self.q),
-                    seasonal_order=(self.P, self.D, self.Q, self.s),
                 )
-                self.sarimax_fit = sarimax_model.fit(disp=False)
+                self.arimax_fit = arimax_model.fit()
             except Exception:
-                self.sarimax_fit = None
+                self.arimax_fit = None
                 self.garch_fit = None
 
-        if self.sarimax_fit and self.garch_fit:
+        if self.arimax_fit and self.garch_fit:
             try:
                 # Forecast next volatility from GARCH
                 garch_forecast = self.garch_fit.forecast(horizon=1)
                 next_vol = np.sqrt(garch_forecast.variance.iloc[-1, 0])
 
-                # Forecast from SARIMAX using the GARCH forecast as exog
-                forecast = self.sarimax_fit.forecast(steps=1, exog=[next_vol])[0]
+                # Forecast from ARIMAX using the GARCH forecast as exog
+                forecast = self.arimax_fit.forecast(steps=1, exog=[next_vol])[0]
 
                 if forecast > 0 and not self.position.is_long:
                     self.buy(
@@ -390,10 +387,6 @@ class SARIMAXGARCHStrategy(Strategy):
             "p": trial.suggest_int("p", 1, 5),
             "d": trial.suggest_int("d", 0, 2),
             "q": trial.suggest_int("q", 0, 5),
-            "P": trial.suggest_int("P", 0, 2),
-            "D": trial.suggest_int("D", 0, 2),
-            "Q": trial.suggest_int("Q", 0, 2),
-            "s": trial.suggest_categorical("s", [12, 24]),
             "g_p": trial.suggest_int("g_p", 1, 3),
             "g_q": trial.suggest_int("g_q", 1, 3),
             "refit_period": trial.suggest_categorical("refit_period", [1]),
