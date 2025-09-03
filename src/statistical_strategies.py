@@ -4,6 +4,8 @@ from backtesting import Strategy, Backtest
 from prophet import Prophet
 import statsmodels.api as sm
 from pykalman import KalmanFilter
+import logging
+logging.getLogger("prophet").setLevel(logging.WARNING)
 
 try:
     from arch import arch_model
@@ -39,7 +41,6 @@ class ProphetStrategy(Strategy):
     refit_period = 1 #24 * 30  # Refit the model every N bars
     stop_loss = 0.05
     take_profit = 0.10
-    lookback_length = 24 * 30 * 1
     def init(self):
         self.model = None
         self.forecast = None
@@ -47,7 +48,7 @@ class ProphetStrategy(Strategy):
     def next(self):
         if len(self.data.Close) > 1 and len(self.data.Close) % self.refit_period == 0:
             # print(f"Refitting, idx {len(self.data)} len {len(self.data.index[-self.lookback_length:])}")
-            prophet_data = pd.DataFrame({"ds": self.data.index[-self.lookback_length:], "y": self.data.Close[-self.lookback_length:]})
+            prophet_data = pd.DataFrame({"ds": self.data.index, "y": self.data.Close})
             self.model = Prophet()
             self.model.fit(prophet_data)
             # print(f"Model refitted")
@@ -243,77 +244,7 @@ class KalmanARIMAStrategy(Strategy):
         return {
             "p": trial.suggest_int("p", 1, 10),
             "d": trial.suggest_int("d", 0, 2),
-            "q": trial.suggest_int("q", 0, 5),
-            "refit_period": trial.suggest_int("refit_period", 24 * 5, 24 * 30),
-        }
-
-
-class ARIMAGARCHStrategy(Strategy):
-    # ARIMA params
-    p, d, q = 12, 1, 12
-    # GARCH params
-    g_p, g_q = 1, 1
-
-    refit_period = 1
-    stop_loss = 0.05
-    take_profit = 0.10
-
-    def init(self):
-        self.arima_fit = None
-        self.garch_fit = None
-        self.processed_data = self.I(
-            price_difference, self.data.Close
-        )
-
-    def next(self):
-        price = self.data.Close[-1]
-
-        # Refit models periodically
-        if len(self.data) % self.refit_period == 0 :
-            print(f"Retraining ARIMAGARCH. IDX ${len(self.data)}")
-            try:
-                # 1. Fit ARIMA model
-                arima_model = sm.tsa.ARIMA(
-                    self.processed_data, order=(self.p, self.d, self.q)
-                )
-                self.arima_fit = arima_model.fit()
-
-                # 2. Fit GARCH on ARIMA residuals
-                residuals = self.arima_fit.resid
-                garch_model = arch_model(residuals, p=self.g_p, q=self.g_q)
-                self.garch_fit = garch_model.fit(disp="off")
-
-            except Exception:
-                self.arima_fit = None
-                self.garch_fit = None
-
-        if self.arima_fit:
-            try:
-                # Forecast mean from ARIMA
-                forecast_mean = self.arima_fit.forecast(steps=1)[0]
-
-                if forecast_mean > 0 and not self.position.is_long:
-                    self.buy(
-                        sl=price * (1 - self.stop_loss),
-                        tp=price * (1 + self.take_profit),
-                    )
-                elif forecast_mean < 0 and not self.position.is_short:
-                    self.sell(
-                        sl=price * (1 + self.stop_loss),
-                        tp=price * (1 - self.take_profit),
-                    )
-            except Exception:
-                pass
-
-    @classmethod
-    def get_optuna_params(cls, trial):
-        return {
-            "p": trial.suggest_int("p", 1, 12),
-            "d": trial.suggest_int("d", 0, 2),
-            "q": trial.suggest_int("q", 0, 12),
-            "g_p": trial.suggest_int("g_p", 1, 5),
-            "g_q": trial.suggest_int("g_q", 1, 5),
-            "refit_period": trial.suggest_categorical("refit_period", [1]),
+            "q": trial.suggest_int("q", 0, 5)
         }
 
 
@@ -349,7 +280,7 @@ def backtest_random_chunks(
 
       # Limiting to 5 chunks to keep the test reasonably short
     stats_list = []
-    np.random.seed(42)  # For reproducibility
+    np.random.seed(42)  # For reproducible
     print(f"Splitting data into {num_chunks_to_test} random chunks of {chunk_size} hours and averaging backtest stats...")
     for i in range(num_chunks_to_test):
         max_start_idx = len(data) - chunk_size
@@ -387,10 +318,13 @@ def backtest_random_chunks(
         print(averaged_stats)
     else:
         print("\nNo backtests were successfully completed.")
+#AI Add a function that performs box jenkin to find the best arima parameters AI!
 
 if __name__ == "__main__":
     strategies = {
-        "ARIMAStrategy": ARIMAStrategy
+        # "ARIMAStrategy": ARIMAStrategy,
+        # "KalmanARIMAStrategy": KalmanARIMAStrategy,
+        "ProphetStrategy": ProphetStrategy
     }
     run_optimizations_random_chunks(
         strategies=strategies,
@@ -398,7 +332,7 @@ if __name__ == "__main__":
         start_date="2022-01-01T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",
         experiment_name="Trading Strategies",
-        n_trials_per_strategy=20,
-        n_chunks=20,
+        n_trials_per_strategy=1,
+        n_chunks=2,
         chunk_size=200
     )
