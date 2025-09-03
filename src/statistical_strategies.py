@@ -422,26 +422,28 @@ def find_best_arima_params(data: pd.Series, p_range=range(0, 5), d_range=range(0
 
 
 if __name__ == "__main__":
-    data = fetch_historical_data(
-        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
-        start_date="2022-01-01T00:00:00Z"
-    )
-    data = adjust_data_to_ubtc(data)
-    data.sort_index(inplace=True)
-    best_order, best_model = find_best_arima_params(data.Close)
-    print(f"Best arima order {best_order}")
-    # strategies = {
-    #     # "ARIMAStrategy": ARIMAStrategy,
-    #     # "KalmanARIMAStrategy": KalmanARIMAStrategy,
-    #     "ProphetStrategy": ProphetStrategy
-    # }
-    # run_optimizations_random_chunks(
-    #     strategies=strategies,
+    # data = fetch_historical_data(
     #     data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
-    #     start_date="2022-01-01T00:00:00Z",
-    #     tracking_uri="sqlite:///mlflow.db",
-    #     experiment_name="Trading Strategies",
-    #     n_trials_per_strategy=1,
-    #     n_chunks=2,
-    #     chunk_size=200
+    #     start_date="2022-01-01T00:00:00Z"
     # )
+    # data = adjust_data_to_ubtc(data)
+    # data.sort_index(inplace=True)
+    # best_order, best_model = find_best_arima_params(data.Close)
+    # print(f"Best arima order {best_order}")
+    strategies = {
+        "ARIMAStrategy": ARIMAStrategy,
+        "KalmanARIMAStrategy": KalmanARIMAStrategy,
+        "ARIMAXGARCHStrategy": ARIMAXGARCHStrategy,
+        "ProphetStrategy": ProphetStrategy
+    }
+    run_optimizations_random_chunks(
+        strategies=strategies,
+        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
+        start_date="2022-01-01T00:00:00Z",
+        tracking_uri="sqlite:///mlflow.db",
+        experiment_name="Trading Strategies",
+        n_trials_per_strategy=2,
+        n_chunks=3,
+        chunk_size=200,
+        n_jobs=12
+    )
