@@ -33,7 +33,7 @@ def kalman_filter_indicator(series: np.ndarray) -> np.ndarray:
     (filtered_state_means, _) = kf.filter(series)
     return filtered_state_means.flatten()
 
-
+# AI I'd like all strategies to have a configurable threshold to adopt a long or short possition. E.g. it should buy only if forecast_price > price*threshold AI!
 class ProphetStrategy(Strategy):
     """
     Intractable. Prophet doesn't take data when predicting, so if we train every 30 days then all 30 days will have the same prediction.
