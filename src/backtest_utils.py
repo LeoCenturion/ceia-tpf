@@ -78,6 +78,7 @@ def fetch_historical_data(
         },
         inplace=True,
     )
+    df.sort_index(inplace=True)
     return df
 
 
@@ -132,7 +133,7 @@ def sanitize_metric_name(name):
 
 
 def optimize_strategy_random_chunks(
-    data, strategy, study_name, n_trials=100, n_chunks=20, chunk_size=300, n_jobs=1
+    data, strategy, study_name, n_trials=100, n_chunks=20, chunk_size=300, n_jobs=8
 ):
     """
     Optimize strategy hyperparameters using Optuna by backtesting on random data chunks.
@@ -158,7 +159,7 @@ def optimize_strategy_random_chunks(
                 end_idx = start_idx + chunk_size
                 chunk_data = data.iloc[start_idx:end_idx]
 
-                bt = Backtest(chunk_data, strategy, cash=10000, commission=0.002)
+                bt = Backtest(chunk_data, strategy, cash=10000, commission=0.01)
                 stats = bt.run(**params)
                 if stats is not None:
                     stats_list.append(stats)
@@ -197,7 +198,7 @@ def optimize_strategy_random_chunks(
                 sanitized_key = sanitize_metric_name(key)
                 mlflow.log_metric(sanitized_key, value)
 
-            return averaged_stats.get("Sortino Ratio", 0)
+            return averaged_stats.get("Sharpe Ratio", 0)
 
     study = optuna.create_study(
         study_name=study_name,
@@ -209,7 +210,7 @@ def optimize_strategy_random_chunks(
     return study.best_params
 
 
-def optimize_strategy(data, strategy, study_name, n_trials=100, n_jobs=1):
+def optimize_strategy(data, strategy, study_name, n_trials=100, n_jobs=8):
     """
     Optimize strategy hyperparameters using Optuna.
     For each trial, run an expanding window backtest and log the averaged stats to MLflow.
@@ -217,7 +218,7 @@ def optimize_strategy(data, strategy, study_name, n_trials=100, n_jobs=1):
     def objective(trial):
         params = strategy.get_optuna_params(trial)
 
-        bt = Backtest(data, strategy, cash=10000, commission=0.002)
+        bt = Backtest(data, strategy, cash=10000, commission=0.001)
         stats = bt.run(**params)
 
         run_name = f"{study_name}-" + "-".join([f"{k}={v}" for k, v in params.items()])
@@ -248,7 +249,7 @@ def optimize_strategy(data, strategy, study_name, n_trials=100, n_jobs=1):
                 if os.path.exists(trades_filename):
                     os.remove(trades_filename)
 
-        return stats.get('Sortino Ratio', 0)
+        return stats.get('Sharpe Ratio', 0)
 
     study = optuna.create_study(study_name=study_name, direction='maximize', storage="sqlite:///optuna-study.db", load_if_exists=True)
     study.optimize(objective, n_trials=n_trials, show_progress_bar=True, n_jobs=n_jobs)
