@@ -168,7 +168,8 @@ def optimize_strategy_random_chunks(
                     trades_filename = f"trades_chunk_{i}.csv"
 
                     bt.plot(filename=plot_filename, open_browser=False)
-                    mlflow.log_artifact(plot_filename, artifact_path=f"chunk_{i}")
+                    if os.path.exists(plot_filename):
+                        mlflow.log_artifact(plot_filename, artifact_path=f"chunk_{i}")
 
                     trades_df = stats['_trades']
                     if not trades_df.empty:
@@ -236,7 +237,8 @@ def optimize_strategy(data, strategy, study_name, n_trials=100, n_jobs=8):
                 # Save plot
                 # open_browser=False prevents the plot from opening automatically
                 bt.plot(filename=plot_filename, open_browser=False)
-                mlflow.log_artifact(plot_filename)
+                if os.path.exists(plot_filename):
+                    mlflow.log_artifact(plot_filename)
                 # Save trades
                 trades_df = stats['_trades']
                 if not trades_df.empty:
