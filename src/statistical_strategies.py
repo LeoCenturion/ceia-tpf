@@ -320,7 +320,7 @@ def backtest_random_chunks(
     else:
         print("\nNo backtests were successfully completed.")
 
-
+# AI implement a new strategy where the output of GARCH is used as an exogenous variable in SARIMAX AI!
 def find_best_arima_params(data: pd.Series, p_range=range(0, 5), d_range=range(0, 3), q_range=range(0, 5)):
     """
     Performs a grid search to find the best (p, d, q) parameters for an ARIMA model
@@ -350,18 +350,26 @@ def find_best_arima_params(data: pd.Series, p_range=range(0, 5), d_range=range(0
 
 
 if __name__ == "__main__":
-    strategies = {
-        # "ARIMAStrategy": ARIMAStrategy,
-        # "KalmanARIMAStrategy": KalmanARIMAStrategy,
-        "ProphetStrategy": ProphetStrategy
-    }
-    run_optimizations_random_chunks(
-        strategies=strategies,
+    data = fetch_historical_data(
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
-        start_date="2022-01-01T00:00:00Z",
-        tracking_uri="sqlite:///mlflow.db",
-        experiment_name="Trading Strategies",
-        n_trials_per_strategy=1,
-        n_chunks=2,
-        chunk_size=200
+        start_date="2022-01-01T00:00:00Z"
     )
+    data = adjust_data_to_ubtc(data)
+    data.sort_index(inplace=True)
+    best_order, best_model = find_best_arima_params(data.Close)
+    print(f"Best arima order {best_order}")
+    # strategies = {
+    #     # "ARIMAStrategy": ARIMAStrategy,
+    #     # "KalmanARIMAStrategy": KalmanARIMAStrategy,
+    #     "ProphetStrategy": ProphetStrategy
+    # }
+    # run_optimizations_random_chunks(
+    #     strategies=strategies,
+    #     data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
+    #     start_date="2022-01-01T00:00:00Z",
+    #     tracking_uri="sqlite:///mlflow.db",
+    #     experiment_name="Trading Strategies",
+    #     n_trials_per_strategy=1,
+    #     n_chunks=2,
+    #     chunk_size=200
+    # )
