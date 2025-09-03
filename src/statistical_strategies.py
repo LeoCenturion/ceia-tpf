@@ -320,7 +320,7 @@ def backtest_random_chunks(
     else:
         print("\nNo backtests were successfully completed.")
 
-
+#AI change it from SARIMAX to ARIMAX AI!
 class SARIMAXGARCHStrategy(Strategy):
     # SARIMAX params
     p, d, q = 5, 1, 0
