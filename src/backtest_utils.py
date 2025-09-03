@@ -139,6 +139,8 @@ def optimize_strategy_random_chunks(
     Optimize strategy hyperparameters using Optuna by backtesting on random data chunks.
     For each trial, it averages the stats over several random chunks and logs artifacts for each chunk.
     """
+    parent_run = mlflow.active_run()
+    parent_run_id = parent_run.info.run_id if parent_run else None
 
     def objective(trial):
         params = strategy.get_optuna_params(trial)
@@ -146,7 +148,8 @@ def optimize_strategy_random_chunks(
         np.random.seed(42)  # For reproducibility of chunks across trials
 
         run_name = f"{study_name}-" + "-".join([f"{k}={v}" for k, v in params.items()])
-        with mlflow.start_run(run_name=run_name, nested=True) as run:
+        tags = {"mlflow.parentRunId": parent_run_id} if parent_run_id else {}
+        with mlflow.start_run(run_name=run_name, tags=tags) as run:
             mlflow.log_params(params)
 
             for i in range(n_chunks):
@@ -216,6 +219,9 @@ def optimize_strategy(data, strategy, study_name, n_trials=100, n_jobs=8):
     Optimize strategy hyperparameters using Optuna.
     For each trial, run an expanding window backtest and log the averaged stats to MLflow.
     """
+    parent_run = mlflow.active_run()
+    parent_run_id = parent_run.info.run_id if parent_run else None
+
     def objective(trial):
         params = strategy.get_optuna_params(trial)
 
@@ -223,7 +229,8 @@ def optimize_strategy(data, strategy, study_name, n_trials=100, n_jobs=8):
         stats = bt.run(**params)
 
         run_name = f"{study_name}-" + "-".join([f"{k}={v}" for k, v in params.items()])
-        with mlflow.start_run(run_name=run_name, nested=True):
+        tags = {"mlflow.parentRunId": parent_run_id} if parent_run_id else {}
+        with mlflow.start_run(run_name=run_name, tags=tags):
             mlflow.log_params(params)
             for key, value in stats.items():
                 sanitized_key = sanitize_metric_name(key)
