@@ -445,13 +445,14 @@ if __name__ == "__main__":
         "ARIMAXGARCHStrategy": ARIMAXGARCHStrategy,
         "ProphetStrategy": ProphetStrategy
     }
+    # AI I want to know how many chunks would take to cover 20% of the dataset. Make a function AI!
     run_optimizations_random_chunks(
         strategies=strategies,
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
         start_date="2022-01-01T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",
         experiment_name="Trading Strategies",
-        n_trials_per_strategy=2,
+        n_trials_per_strategy=20,
         n_chunks=3,
         chunk_size=200,
         n_jobs=12
