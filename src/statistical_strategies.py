@@ -430,13 +430,36 @@ def find_best_arima_params(data: pd.Series, p_range=range(0, 5), d_range=range(0
     return best_order, best_model
 
 
+def calculate_chunks_for_coverage(total_data_size: int, chunk_size: int, coverage_percentage: float = 20.0) -> int:
+    """
+    Calculates the number of chunks required to cover a certain percentage of the dataset.
+
+    This calculation provides an estimate of how many random chunks one might need to sample
+    to have seen a certain percentage of the total data points, assuming minimal overlap.
+    The actual coverage with random sampling might be less due to overlapping chunks.
+
+    :param total_data_size: The total number of data points in the dataset.
+    :param chunk_size: The size of each chunk.
+    :param coverage_percentage: The desired percentage of the dataset to cover (e.g., 20 for 20%).
+    :return: The estimated number of chunks required.
+    """
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be positive.")
+    if not (0 <= coverage_percentage <= 100):
+        raise ValueError("coverage_percentage must be between 0 and 100.")
+
+    data_to_cover = total_data_size * (coverage_percentage / 100.0)
+    num_chunks = data_to_cover / chunk_size
+    return int(np.ceil(num_chunks))
+
+
 if __name__ == "__main__":
-    # data = fetch_historical_data(
-    #     data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
-    #     start_date="2022-01-01T00:00:00Z"
-    # )
-    # data = adjust_data_to_ubtc(data)
-    # data.sort_index(inplace=True)
+    data = fetch_historical_data(
+        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
+        start_date="2022-01-01T00:00:00Z"
+    )
+    data = adjust_data_to_ubtc(data)
+    data.sort_index(inplace=True)
     # best_order, best_model = find_best_arima_params(data.Close)
     # print(f"Best arima order {best_order}")
     strategies = {
@@ -445,7 +468,10 @@ if __name__ == "__main__":
         "ARIMAXGARCHStrategy": ARIMAXGARCHStrategy,
         "ProphetStrategy": ProphetStrategy
     }
-    # AI I want to know how many chunks would take to cover 20% of the dataset. Make a function AI!
+    chunk_size = 200
+    coverage = 20
+    n_chunks = calculate_chunks_for_coverage(len(data), chunk_size, coverage)
+    print(f"To cover {coverage}% of the dataset ({len(data)} points) with chunks of size {chunk_size}, you need approximately {n_chunks} chunks.")
     run_optimizations_random_chunks(
         strategies=strategies,
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
@@ -453,7 +479,7 @@ if __name__ == "__main__":
         tracking_uri="sqlite:///mlflow.db",
         experiment_name="Trading Strategies",
         n_trials_per_strategy=20,
-        n_chunks=3,
-        chunk_size=200,
+        n_chunks=n_chunks,
+        chunk_size=chunk_size,
         n_jobs=12
     )
