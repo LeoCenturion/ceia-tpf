@@ -167,8 +167,8 @@ def optimize_strategy_random_chunks(
                 if stats is not None:
                     stats_list.append(stats)
                     # Log artifacts for each chunk, organizing them in subdirectories
-                    plot_filename = f"backtest_plot_chunk_{i}.html"
-                    trades_filename = f"trades_chunk_{i}.csv"
+                    plot_filename = f"backtest_plot_trial_{trial.number}_chunk_{i}.html"
+                    trades_filename = f"trades_trial_{trial.number}_chunk_{i}.csv"
 
                     bt.plot(filename=plot_filename, open_browser=False)
                     if os.path.exists(plot_filename):
@@ -179,11 +179,11 @@ def optimize_strategy_random_chunks(
                         trades_df.to_csv(trades_filename, index=False)
                         mlflow.log_artifact(trades_filename, artifact_path=f"chunk_{i}")
 
-                        # Clean up local files
-                        if os.path.exists(plot_filename):
-                            os.remove(plot_filename)
-                        if os.path.exists(trades_filename):
-                            os.remove(trades_filename)
+                    # Clean up local files
+                    if os.path.exists(plot_filename):
+                        os.remove(plot_filename)
+                    if os.path.exists(trades_filename):
+                        os.remove(trades_filename)
 
             if not stats_list:
                 return 0
