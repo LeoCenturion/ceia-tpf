@@ -254,6 +254,7 @@ class KalmanARIMAStrategy(Strategy):
             "d": trial.suggest_int("d", 0, 2),
             "q": trial.suggest_int("q", 0, 5),
             "threshold": trial.suggest_float("threshold", 0, 1e-4),
+            "refit_period": trial.suggest_categorical("refit_period", [1]),
         }
 
 
@@ -463,13 +464,13 @@ if __name__ == "__main__":
     # best_order, best_model = find_best_arima_params(data.Close)
     # print(f"Best arima order {best_order}")
     strategies = {
-        "ARIMAStrategy": ARIMAStrategy,
-        "KalmanARIMAStrategy": KalmanARIMAStrategy,
-        "ARIMAXGARCHStrategy": ARIMAXGARCHStrategy,
-        "ProphetStrategy": ProphetStrategy
+        "ARIMAStrategy": ARIMAStrategy
+        # "KalmanARIMAStrategy": KalmanARIMAStrategy,
+        # "ARIMAXGARCHStrategy": ARIMAXGARCHStrategy,
+        # "ProphetStrategy": ProphetStrategy
     }
     chunk_size = 200
-    coverage = 20
+    coverage = 10
     n_chunks = calculate_chunks_for_coverage(len(data), chunk_size, coverage)
     print(f"To cover {coverage}% of the dataset ({len(data)} points) with chunks of size {chunk_size}, you need approximately {n_chunks} chunks.")
     run_optimizations_random_chunks(
@@ -478,7 +479,7 @@ if __name__ == "__main__":
         start_date="2022-01-01T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",
         experiment_name="Trading Strategies",
-        n_trials_per_strategy=20,
+        n_trials_per_strategy=3,
         n_chunks=n_chunks,
         chunk_size=chunk_size,
         n_jobs=12
