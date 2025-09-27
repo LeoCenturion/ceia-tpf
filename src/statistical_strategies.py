@@ -111,6 +111,11 @@ class ARIMAStrategy(Strategy):
                 self.model_fit = model.fit()
             except Exception:  # Catches convergence errors etc.
                 self.model_fit = None
+        elif self.model_fit:
+            try:
+                self.model_fit = self.model_fit.append([self.processed_data[-1]])
+            except Exception:
+                self.model_fit = None
 
         if self.model_fit:
             try:
@@ -170,6 +175,11 @@ class SARIMAStrategy(Strategy):
                 self.model_fit = model.fit(disp=False)
             except Exception:
                 self.model_fit = None
+        elif self.model_fit:
+            try:
+                self.model_fit = self.model_fit.append([self.processed_data[-1]])
+            except Exception:
+                self.model_fit = None
 
         if self.model_fit:
             try:
@@ -226,6 +236,11 @@ class KalmanARIMAStrategy(Strategy):
                 model = sm.tsa.ARIMA(self.kalman_filtered_data, order=(self.p, self.d, self.q))
                 self.model_fit = model.fit()
             except Exception:  # Catches convergence errors etc.
+                self.model_fit = None
+        elif self.model_fit:
+            try:
+                self.model_fit = self.model_fit.append([self.kalman_filtered_data[-1]])
+            except Exception:
                 self.model_fit = None
 
         if self.model_fit:
