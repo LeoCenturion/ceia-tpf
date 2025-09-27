@@ -85,7 +85,7 @@ class ARIMAStrategy(Strategy):
     p = 12
     d = 1
     q = 12
-    refit_period = 1
+    refit_period = 24 * 7  # Refit weekly
     stop_loss = 0.05
     take_profit = 0.10
     threshold = 1e-5
@@ -139,7 +139,7 @@ class ARIMAStrategy(Strategy):
             "p": trial.suggest_int("p", 1, 10),
             "d": trial.suggest_int("d", 0, 2),
             "q": trial.suggest_int("q", 0, 5),
-            "refit_period": trial.suggest_categorical("refit_period", [1]),
+            "refit_period": trial.suggest_categorical("refit_period", [24, 24 * 7, 24 * 30]),
             "threshold": trial.suggest_categorical("threshold", [0.1, 0.01, 0.001, 0.0001])
         }
 
@@ -152,7 +152,7 @@ class SARIMAStrategy(Strategy):
         0,
         24,
     )  # Seasonal order, s=24 for daily seasonality on hourly data
-    refit_period = 1
+    refit_period = 24 * 7  # Refit weekly
     stop_loss = 0.05
     take_profit = 0.10
     threshold = 1e-5
@@ -207,7 +207,7 @@ class SARIMAStrategy(Strategy):
             "D": trial.suggest_int("D", 0, 2),
             "Q": trial.suggest_int("Q", 0, 2),
             "s": trial.suggest_categorical("s", [12, 24, 48]),
-            "refit_period": trial.suggest_categorical("refit_period", [1]),
+            "refit_period": trial.suggest_categorical("refit_period", [24, 24 * 7, 24 * 30]),
             "threshold": trial.suggest_categorical("threshold", [0.1, 0.01, 0.001, 0.0001]),
         }
 
@@ -216,7 +216,7 @@ class KalmanARIMAStrategy(Strategy):
     p = 12
     d = 0
     q = 12
-    refit_period = 1
+    refit_period = 24 * 7  # Refit weekly
     stop_loss = 0.05
     take_profit = 0.10
     threshold = 0.001  # Default threshold: 0.1%
@@ -271,7 +271,7 @@ class KalmanARIMAStrategy(Strategy):
             "d": trial.suggest_int("d", 0, 1),
             "q": trial.suggest_int("q", 0, 5),
             "threshold": trial.suggest_float("threshold", 1e-4, 1e-2, log=True),
-            "refit_period": trial.suggest_categorical("refit_period", [1]),
+            "refit_period": trial.suggest_categorical("refit_period", [24, 24 * 7, 24 * 30]),
         }
 
 
