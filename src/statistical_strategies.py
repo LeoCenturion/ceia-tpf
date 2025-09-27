@@ -21,9 +21,9 @@ from backtest_utils import (
 
 # Custom indicator for preprocessing
 def price_difference(series: np.ndarray) -> np.ndarray:
-    """Calculates (price[i] - price[i-1])."""
-    series = pd.Series(series)
-    return series.diff().fillna(0).values
+    """Calculates (price[i] - price[i-1])/price[i-1]."""
+    series: pd.Series = pd.Series(series)
+    return series.pct_change().fillna(0).values
 
 
 def kalman_filter_indicator(series: np.ndarray) -> np.ndarray:
@@ -77,7 +77,7 @@ class ProphetStrategy(Strategy):
     def get_optuna_params(cls, trial):
         return {
             "refit_period": trial.suggest_categorical("refit_period", [1]),
-            "threshold": trial.suggest_float("threshold", 0, 0.01),
+            "threshold": trial.suggest_categorical("threshold", [0.1, 0.01, 0.001, 0.0001]),
         }
 
 
@@ -135,7 +135,7 @@ class ARIMAStrategy(Strategy):
             "d": trial.suggest_int("d", 0, 2),
             "q": trial.suggest_int("q", 0, 5),
             "refit_period": trial.suggest_categorical("refit_period", [1]),
-            "threshold": trial.suggest_float("threshold", 0, 1e-4),
+            "threshold": trial.suggest_categorical("threshold", [0.1, 0.01, 0.001, 0.0001])
         }
 
 
@@ -150,7 +150,7 @@ class SARIMAStrategy(Strategy):
     refit_period = 1
     stop_loss = 0.05
     take_profit = 0.10
-
+    threshold = 1e-5
     def init(self):
         self.model_fit = None
         self.processed_data = self.I(
@@ -198,35 +198,32 @@ class SARIMAStrategy(Strategy):
             "Q": trial.suggest_int("Q", 0, 2),
             "s": trial.suggest_categorical("s", [12, 24, 48]),
             "refit_period": trial.suggest_categorical("refit_period", [1]),
-            "threshold": trial.suggest_float("threshold", 0, 1e-4),
+            "threshold": trial.suggest_categorical("threshold", [0.1, 0.01, 0.001, 0.0001]),
         }
 
 
 class KalmanARIMAStrategy(Strategy):
     p = 12
-    d = 1
+    d = 0
     q = 12
     refit_period = 1
     stop_loss = 0.05
     take_profit = 0.10
+    threshold = 0.001  # Default threshold: 0.1%
 
     def init(self):
         self.model_fit = None
-        processed_data = self.I(
-            price_difference, self.data.Close
-        )
+        processed_data = self.I(price_difference, self.data.Close)
         self.kalman_filtered_data = self.I(kalman_filter_indicator, processed_data)
 
     def next(self):
         price = self.data.Close[-1]
 
         # Refit model periodically and if we have enough data
-        if len(self.data) % self.refit_period == 0 :
+        if len(self.data) % self.refit_period == 0:
             print(f"retraining KalmanARIMA. IDX ${len(self.data)}")
             try:
-                model = sm.tsa.ARIMA(
-                    self.kalman_filtered_data, order=(self.p, self.d, self.q)
-                )
+                model = sm.tsa.ARIMA(self.kalman_filtered_data, order=(self.p, self.d, self.q))
                 self.model_fit = model.fit()
             except Exception:  # Catches convergence errors etc.
                 self.model_fit = None
@@ -234,12 +231,17 @@ class KalmanARIMAStrategy(Strategy):
         if self.model_fit:
             try:
                 forecast_processed = self.model_fit.forecast(steps=1)[0]
+
+                # New logic: buy if forecast is > threshold % of current price
                 if forecast_processed > self.threshold and not self.position.is_long:
+                    print(f'forecast: {forecast_processed}, trhesh: {self.threshold}, buying')
                     self.buy(
                         sl=price * (1 - self.stop_loss),
                         tp=price * (1 + self.take_profit),
                     )
-                elif forecast_processed < -self.threshold and not self.position.is_short:
+                # Sell if forecast is < threshold % of current price
+                elif forecast_processed < self.threshold and not self.position.is_short:
+                    print(f'forecast: {forecast_processed}, trhesh: {self.threshold}, selling')
                     self.sell(
                         sl=price * (1 + self.stop_loss),
                         tp=price * (1 - self.take_profit),
@@ -251,9 +253,9 @@ class KalmanARIMAStrategy(Strategy):
     def get_optuna_params(cls, trial):
         return {
             "p": trial.suggest_int("p", 1, 10),
-            "d": trial.suggest_int("d", 0, 2),
+            "d": trial.suggest_int("d", 0, 1),
             "q": trial.suggest_int("q", 0, 5),
-            "threshold": trial.suggest_float("threshold", 0, 1e-4),
+            "threshold": trial.suggest_float("threshold", 1e-4, 1e-2, log=True),
             "refit_period": trial.suggest_categorical("refit_period", [1]),
         }
 
@@ -338,11 +340,11 @@ class ARIMAXGARCHStrategy(Strategy):
     refit_period = 1
     stop_loss = 0.05
     take_profit = 0.10
-
+    threshold = 0.5
     def init(self):
         self.arimax_fit = None
         self.garch_fit = None
-        self.processed_data = self.I(price_difference, self.data.Close)
+        self.processed_data = self.I(lambda series: price_difference(series)*10000.0, self.data.Close)
 
     def next(self):
         price = self.data.Close[-1]
@@ -394,12 +396,12 @@ class ARIMAXGARCHStrategy(Strategy):
     def get_optuna_params(cls, trial):
         return {
             "p": trial.suggest_int("p", 1, 5),
-            "d": trial.suggest_int("d", 0, 2),
+            "d": trial.suggest_int("d", 0, 1),
             "q": trial.suggest_int("q", 0, 5),
             "g_p": trial.suggest_int("g_p", 1, 3),
             "g_q": trial.suggest_int("g_q", 1, 3),
             "refit_period": trial.suggest_categorical("refit_period", [1]),
-            "threshold": trial.suggest_float("threshold", 0, 1e-4),
+            "threshold": trial.suggest_categorical("threshold", [0.1, 0.01, 0.001, 0.0001]),
         }
 
 
@@ -431,6 +433,26 @@ def find_best_arima_params(data: pd.Series, p_range=range(0, 5), d_range=range(0
     return best_order, best_model
 
 
+def kalman_arima_forecast(series: pd.Series, p: int, d: int, q: int) -> float:
+    """
+    Applies a Kalman filter to the price difference of a series,
+    fits an ARIMA model, and returns a one-step forecast.
+    """
+    # 1. Preprocess the data
+    processed_data = price_difference(series.values)
+    kalman_filtered_data = kalman_filter_indicator(processed_data)
+
+    # 2. Fit ARIMA model
+    try:
+        model = sm.tsa.ARIMA(kalman_filtered_data, order=(p, d, q))
+        model_fit = model.fit()
+        # 3. Generate forecast
+        forecast = model_fit.forecast(steps=1)[0]
+        return forecast
+    except Exception:  # Catches convergence errors etc.
+        return 0.0
+
+
 def calculate_chunks_for_coverage(total_data_size: int, chunk_size: int, coverage_percentage: float = 20.0) -> int:
     """
     Calculates the number of chunks required to cover a certain percentage of the dataset.
@@ -454,6 +476,20 @@ def calculate_chunks_for_coverage(total_data_size: int, chunk_size: int, coverag
     return int(np.ceil(num_chunks))
 
 
+def run_strategy_backtest(data, strategy, threshold):
+    """
+    Runs a single backtest for the strategy on the full dataset.
+    """
+    print("Running single backtest for KalmanARIMAStrategy...")
+    bt = Backtest(data, strategy, cash=10_000, commission=0.002)
+    stats = bt.run(threshold=threshold)
+    print(stats)
+    plot_filename = "kalman_arima_backtest.html"
+    bt.plot(filename=plot_filename, open_browser=False)
+    print(f"Backtest plot saved to {plot_filename}")
+    return stats
+
+
 if __name__ == "__main__":
     data = fetch_historical_data(
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
@@ -461,26 +497,34 @@ if __name__ == "__main__":
     )
     data = adjust_data_to_ubtc(data)
     data.sort_index(inplace=True)
-    # best_order, best_model = find_best_arima_params(data.Close)
-    # print(f"Best arima order {best_order}")
     strategies = {
-        "ARIMAStrategy": ARIMAStrategy
+        "ARIMAStrategy": ARIMAStrategy,
         # "KalmanARIMAStrategy": KalmanARIMAStrategy,
         # "ARIMAXGARCHStrategy": ARIMAXGARCHStrategy,
         # "ProphetStrategy": ProphetStrategy
     }
     chunk_size = 200
-    coverage = 10
+    coverage = 30
     n_chunks = calculate_chunks_for_coverage(len(data), chunk_size, coverage)
     print(f"To cover {coverage}% of the dataset ({len(data)} points) with chunks of size {chunk_size}, you need approximately {n_chunks} chunks.")
-    run_optimizations_random_chunks(
+
+    # # Example call to kalman_arima_forecast
+    # train_data = data.Close[:-1]
+    # actual_value = data.Close[-1]
+    # forecast = kalman_arima_forecast(train_data, p=12, d=1, q=12)
+    # error = actual_value - forecast
+    # print(f"Kalman+ARIMA 1-step forecast: {forecast}")
+    # print(f"Actual value: {actual_value}")
+    # print(f"Forecast error: {error}")
+
+    run_optimizations(
         strategies=strategies,
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
         start_date="2022-01-01T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",
-        experiment_name="Trading Strategies",
-        n_trials_per_strategy=3,
-        n_chunks=n_chunks,
-        chunk_size=chunk_size,
+        experiment_name="Trading Strategies 2",
+        n_trials_per_strategy=12,
         n_jobs=12
     )
+
+    # run_strategy_backtest(data.iloc[:300], ProphetStrategy, threshold = 0.2/100.0)
