@@ -535,7 +535,7 @@ if __name__ == "__main__":
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
         start_date="2022-01-01T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",
-        experiment_name="Trading Strategies 2",
+        experiment_name="Trading Strategies 3",
         n_trials_per_strategy=12,
         n_jobs=12
     )
