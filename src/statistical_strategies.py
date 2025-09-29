@@ -511,8 +511,8 @@ if __name__ == "__main__":
     data = adjust_data_to_ubtc(data)
     data.sort_index(inplace=True)
     strategies = {
-        "ARIMAStrategy": ARIMAStrategy,
-        # "KalmanARIMAStrategy": KalmanARIMAStrategy,
+        # "ARIMAStrategy": ARIMAStrategy,
+        "KalmanARIMAStrategy": KalmanARIMAStrategy,
         # "ARIMAXGARCHStrategy": ARIMAXGARCHStrategy,
         # "ProphetStrategy": ProphetStrategy
     }
