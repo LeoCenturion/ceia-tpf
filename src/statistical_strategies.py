@@ -98,6 +98,19 @@ class ARIMAStrategy(Strategy):
         )
 
     def next(self):
+        # Iteratively update Kalman filter
+        # The length of processed_data grows by 1 at each step.
+        if len(self.processed_data) > len(self.kalman_filtered_data):
+            (
+                self.kalman_state_mean,
+                self.kalman_state_covariance,
+            ) = self.kf.filter_update(
+                self.kalman_state_mean,
+                self.kalman_state_covariance,
+                observation=self.processed_data[-1],
+            )
+            self.kalman_filtered_data.append(self.kalman_state_mean.flatten()[0])
+
         price = self.data.Close[-1]
 
         # Refit model periodically and if we have enough data
@@ -221,8 +234,13 @@ class KalmanARIMAStrategy(Strategy):
 
     def init(self):
         self.model_fit = None
-        processed_data = self.I(price_difference, self.data.Close)
-        self.kalman_filtered_data = self.I(kalman_filter_indicator, processed_data)
+        self.processed_data = self.I(price_difference, self.data.Close)
+
+        # Kalman Filter initialization for iterative updates
+        self.kf = KalmanFilter(initial_state_mean=0, n_dim_obs=1)
+        self.kalman_state_mean = self.kf.initial_state_mean
+        self.kalman_state_covariance = self.kf.initial_state_covariance
+        self.kalman_filtered_data = []
 
     def next(self):
         price = self.data.Close[-1]
