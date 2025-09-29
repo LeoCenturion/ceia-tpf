@@ -269,11 +269,18 @@ def optimize_strategy(data, strategy, study_name, n_trials=100, n_jobs=8):
                 if os.path.exists(trades_filename):
                     os.remove(trades_filename)
 
-        return stats.get('Sharpe Ratio', 0)
+        sharpe_ratio = stats.get('Sharpe Ratio', 0)
+        if sharpe_ratio is None or np.isnan(sharpe_ratio):
+            return 0.0
+        return sharpe_ratio
 
     study = optuna.create_study(study_name=study_name, direction='maximize', storage="sqlite:///optuna-study.db", load_if_exists=True)
     study.optimize(objective, n_trials=n_trials, show_progress_bar=True, n_jobs=n_jobs)
-    return study.best_params
+    try:
+        return study.best_params
+    except ValueError:
+        print(f"Study {study_name} finished, but no best trial was found.")
+        return None
 
 
 def run_optimizations(strategies, data_path, start_date, tracking_uri, experiment_name, n_trials_per_strategy=10, n_jobs=1):
