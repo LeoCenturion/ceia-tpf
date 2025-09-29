@@ -149,7 +149,7 @@ def optimize_strategy_random_chunks(
 
         run_name = f"{study_name}-" + "-".join([f"{k}={v}" for k, v in params.items()])
         tags = {"mlflow.parentRunId": parent_run_id} if parent_run_id else {}
-        with mlflow.start_run(run_name=run_name, tags=tags) as run:
+        with mlflow.start_run(run_name=run_name, tags=tags, nested=True) as run:
             mlflow.log_params(params)
 
             for i in range(n_chunks):
@@ -202,7 +202,10 @@ def optimize_strategy_random_chunks(
                 sanitized_key = sanitize_metric_name(key)
                 mlflow.log_metric(sanitized_key, value)
 
-            return averaged_stats.get("Sharpe Ratio", 0)
+            sharpe_ratio = averaged_stats.get("Sharpe Ratio", 0)
+            if sharpe_ratio is None or np.isnan(sharpe_ratio):
+                return 0.0
+            return sharpe_ratio
 
     study = optuna.create_study(
         study_name=study_name,
@@ -230,12 +233,20 @@ def optimize_strategy(data, strategy, study_name, n_trials=100, n_jobs=8):
 
         run_name = f"{study_name}-" + "-".join([f"{k}={v}" for k, v in params.items()])
         tags = {"mlflow.parentRunId": parent_run_id} if parent_run_id else {}
-        with mlflow.start_run(run_name=run_name, tags=tags):
+        with mlflow.start_run(run_name=run_name, tags=tags, nested=True):
             mlflow.log_params(params)
+
             for key, value in stats.items():
+                print(f' key value {key} {value} {type(value)}')
+                if isinstance(value, pd.Timestamp):
+                    value = value.timestamp()
+                if isinstance(value, pd.Timedelta):
+                    value = value.total_seconds()
+                if not np.issubdtype(type(value), np.number):
+                    print('skipping')
+                    continue
                 sanitized_key = sanitize_metric_name(key)
                 mlflow.log_metric(sanitized_key, value)
-
             # Log artifacts for the last step if available
             if bt:
                 plot_filename = "backtest_plot.html"
@@ -285,11 +296,17 @@ def run_optimizations(strategies, data_path, start_date, tracking_uri, experimen
     )
     data = adjust_data_to_ubtc(data)
 
+    # Get the actual start and end dates from the data
+    actual_start_date = data.index.min().strftime('%Y-%m-%d %H:%M:%S')
+    actual_end_date = data.index.max().strftime('%Y-%m-%d %H:%M:%S')
+
     for name, strategy in strategies.items():
         # This outer run is for grouping the optimization trials
         with mlflow.start_run(run_name=f"Optimize_{name}"):
+            mlflow.log_param("start_date", actual_start_date)
+            mlflow.log_param("end_date", actual_end_date)
             print(f"Optimizing {name}...")
-            optimize_strategy(data, strategy, n_trials=n_trials_per_strategy, study_name=name, n_jobs=n_jobs)
+            optimize_strategy(data, strategy, n_trials=n_trials_per_strategy, study_name=f'{experiment_name}-{name}', n_jobs=n_jobs)
             print(f"Optimization for {name} complete.")
 
 def run_optimizations_random_chunks(strategies, data_path, start_date, tracking_uri, experiment_name, n_trials_per_strategy=10, n_chunks=15, chunk_size = 200, n_jobs=1):
@@ -312,9 +329,18 @@ def run_optimizations_random_chunks(strategies, data_path, start_date, tracking_
     )
     data = adjust_data_to_ubtc(data)
     data.sort_index(inplace=True)
+
+    # Get the actual start and end dates from the data
+    actual_start_date = data.index.min().strftime('%Y-%m-%d %H:%M:%S')
+    actual_end_date = data.index.max().strftime('%Y-%m-%d %H:%M:%S')
+
     for name, strategy in strategies.items():
         # This outer run is for grouping the optimization trials
         with mlflow.start_run(run_name=f"Optimize_{name}"):
+            mlflow.log_param("start_date", actual_start_date)
+            mlflow.log_param("end_date", actual_end_date)
+            mlflow.log_param("training_window_size", chunk_size)
+            mlflow.log_param("n_random_chunks", n_chunks)
             print(f"Optimizing {name}...")
             optimize_strategy_random_chunks(data, strategy, n_trials=n_trials_per_strategy, study_name=name,n_chunks=n_chunks,chunk_size=chunk_size, n_jobs=n_jobs)
             print(f"Optimization for {name} complete.")
