@@ -342,5 +342,5 @@ def run_optimizations_random_chunks(strategies, data_path, start_date, tracking_
             mlflow.log_param("training_window_size", chunk_size)
             mlflow.log_param("n_random_chunks", n_chunks)
             print(f"Optimizing {name}...")
-            optimize_strategy_random_chunks(data, strategy, n_trials=n_trials_per_strategy, study_name=name,n_chunks=n_chunks,chunk_size=chunk_size, n_jobs=n_jobs)
+            optimize_strategy_random_chunks(data, strategy, n_trials=n_trials_per_strategy, study_name=f'{experiment_name}-{name}',n_chunks=n_chunks,chunk_size=chunk_size, n_jobs=n_jobs)
             print(f"Optimization for {name} complete.")
