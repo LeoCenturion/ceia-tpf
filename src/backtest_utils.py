@@ -283,6 +283,76 @@ def optimize_strategy(data, strategy, study_name, n_trials=100, n_jobs=8):
         return None
 
 
+def optimize_classification_strategy(data, strategy, study_name, n_trials=100, n_jobs=8):
+    """
+    Optimize a classification-based strategy using Optuna.
+    This function is similar to `optimize_strategy` but is tailored for classification
+    tasks by optimizing for 'F1 Score' by default. The strategy should compute
+    and return 'F1 Score' in its stats.
+    """
+    parent_run = mlflow.active_run()
+    parent_run_id = parent_run.info.run_id if parent_run else None
+
+    def objective(trial):
+        params = strategy.get_optuna_params(trial)
+
+        bt = Backtest(data, strategy, cash=10000, commission=0.001)
+        stats = bt.run(**params)
+
+        run_name = f"{study_name}-" + "-".join([f"{k}={v}" for k, v in params.items()])
+        tags = {"mlflow.parentRunId": parent_run_id} if parent_run else {}
+        with mlflow.start_run(run_name=run_name, tags=tags, nested=True):
+            mlflow.log_params(params)
+
+            for key, value in stats.items():
+                print(f' key value {key} {value} {type(value)}')
+                if isinstance(value, pd.Timestamp):
+                    value = value.timestamp()
+                if isinstance(value, pd.Timedelta):
+                    value = value.total_seconds()
+                if not np.issubdtype(type(value), np.number):
+                    print('skipping')
+                    continue
+                sanitized_key = sanitize_metric_name(key)
+                mlflow.log_metric(sanitized_key, value)
+            # Log artifacts for the last step if available
+            if bt:
+                plot_filename = "backtest_plot.html"
+                trades_filename = "trades.csv"
+
+                # Save plot
+                # open_browser=False prevents the plot from opening automatically
+                bt.plot(filename=plot_filename, open_browser=False)
+                if os.path.exists(plot_filename):
+                    mlflow.log_artifact(plot_filename)
+                # Save trades
+                trades_df = stats['_trades']
+                if not trades_df.empty:
+                    trades_df.to_csv(trades_filename, index=False)
+                    mlflow.log_artifact(trades_filename)
+
+                # Clean up created files
+                if os.path.exists(plot_filename):
+                    os.remove(plot_filename)
+                if os.path.exists(trades_filename):
+                    os.remove(trades_filename)
+
+        # For classification, we might optimize for a metric like F1 score
+        # The strategy needs to compute and return this.
+        f1_score = stats.get('F1 Score', 0)
+        if f1_score is None or np.isnan(f1_score):
+            return 0.0
+        return f1_score
+
+    study = optuna.create_study(study_name=study_name, direction='maximize', storage="sqlite:///optuna-study.db", load_if_exists=True)
+    study.optimize(objective, n_trials=n_trials, show_progress_bar=True, n_jobs=n_jobs)
+    try:
+        return study.best_params
+    except ValueError:
+        print(f"Study {study_name} finished, but no best trial was found.")
+        return None
+
+
 def run_optimizations(strategies, data_path, start_date, tracking_uri, experiment_name, n_trials_per_strategy=10, n_jobs=1):
     """
     Run optimization for a set of strategies.
