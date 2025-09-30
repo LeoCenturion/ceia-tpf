@@ -371,7 +371,7 @@ class ARIMAXGARCHStrategy(Strategy):
     # GARCH params
     g_p, g_q = 1, 1
 
-    refit_period = 1
+    refit_period = 24 * 7
     stop_loss = 0.05
     take_profit = 0.10
     threshold = 0.5
@@ -403,6 +403,18 @@ class ARIMAXGARCHStrategy(Strategy):
             except Exception:
                 self.arimax_fit = None
                 self.garch_fit = None
+        elif self.arimax_fit and self.garch_fit:
+            try:
+                # This is an approximation: GARCH is not refit, so volatility estimates can become stale.
+                # Forecast volatility for the current step to use as exog for appending.
+                garch_forecast = self.garch_fit.forecast(horizon=1)
+                next_vol = np.sqrt(garch_forecast.variance.iloc[-1, 0])
+
+                self.arimax_fit = self.arimax_fit.append(
+                    [self.processed_data[-1]], exog=np.array([[next_vol]])
+                )
+            except Exception:
+                self.arimax_fit = None
 
         if self.arimax_fit and self.garch_fit:
             try:
@@ -434,7 +446,7 @@ class ARIMAXGARCHStrategy(Strategy):
             "q": trial.suggest_int("q", 0, 5),
             "g_p": trial.suggest_int("g_p", 1, 3),
             "g_q": trial.suggest_int("g_q", 1, 3),
-            "refit_period": trial.suggest_categorical("refit_period", [1]),
+            "refit_period": trial.suggest_categorical("refit_period", [24 * 7, 24 * 30]),
             "threshold": trial.suggest_categorical("threshold", [0.1, 0.01, 0.001, 0.0001]),
         }
 
