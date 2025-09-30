@@ -224,17 +224,33 @@ class KalmanARIMAStrategy(Strategy):
         self.processed_data = self.I(price_difference, self.data.Close)
 
         # Kalman Filter initialization for iterative updates
-        self.kf = KalmanFilter(initial_state_mean=0, n_dim_obs=1)
-        self.kalman_state_mean = self.kf.initial_state_mean
-        self.kalman_state_covariance = self.kf.initial_state_covariance
-        self.kalman_filtered_data = []
+        self.kalman_state_mean = 0
+        self.kalman_state_covariance = 1
+        self.kalman_mean_history =[]
+        self.kf = KalmanFilter(
+            initial_state_mean=self.kalman_state_mean,
+            initial_state_covariance=self.kalman_state_covariance,
+            n_dim_obs=1
+        )
+
+        self.kalman_filtered_data = self.I(kalman_filter_indicator, self.processed_data)
+    def kalman_update(self, series):
+        if len(series) <= 1: # Initialize the Kalman filter
+            self.kalman_state_mean, self.kalman_state_covariance = self.kf.filter(series)
+            print(self.kalman_state_mean)
+            self.kalman_mean_history.append(self.kalman_state_mean[:, 0].flatten())
+        else:
+            self.kalman_state_mean, self.kalman_state_covariance = self.kf.filter_update(self.kalman_state_mean,self.kalman_state_covariance,series)
+            print(self.kalman_state_mean)
+            self.kalman_mean_history.append(self.kalman_state_mean[:, 0].flatten())
+        return self.kalman_mean_history
 
     def next(self):
         price = self.data.Close[-1]
-
+        
         # Refit model periodically and if we have enough data
         if len(self.data) % self.refit_period == 0:
-            print(f"retraining KalmanARIMA. IDX ${len(self.data)}")
+            # print(f"retraining KalmanARIMA. IDX ${len(self.data)}")
             try:
                 model = sm.tsa.ARIMA(self.kalman_filtered_data, order=(self.p, self.d, self.q))
                 self.model_fit = model.fit()
@@ -252,14 +268,14 @@ class KalmanARIMAStrategy(Strategy):
 
                 # New logic: buy if forecast is > threshold % of current price
                 if forecast_processed > self.threshold and not self.position.is_long:
-                    print(f'forecast: {forecast_processed}, trhesh: {self.threshold}, buying')
+                    # print(f'forecast: {forecast_processed}, trhesh: {self.threshold}, buying')
                     self.buy(
                         sl=price * (1 - self.stop_loss),
                         tp=price * (1 + self.take_profit),
                     )
                 # Sell if forecast is < threshold % of current price
                 elif forecast_processed < self.threshold and not self.position.is_short:
-                    print(f'forecast: {forecast_processed}, trhesh: {self.threshold}, selling')
+                    # print(f'forecast: {forecast_processed}, trhesh: {self.threshold}, selling')
                     self.sell(
                         sl=price * (1 + self.stop_loss),
                         tp=price * (1 - self.take_profit),
@@ -517,8 +533,8 @@ if __name__ == "__main__":
     data.sort_index(inplace=True)
     strategies = {
         # "ARIMAStrategy": ARIMAStrategy,
-        "KalmanARIMAStrategy": KalmanARIMAStrategy,
-        # "ARIMAXGARCHStrategy": ARIMAXGARCHStrategy,
+        # "KalmanARIMAStrategy": KalmanARIMAStrategy,
+        "ARIMAXGARCHStrategy": ARIMAXGARCHStrategy,
         # "ProphetStrategy": ProphetStrategy
     }
     chunk_size = 200
@@ -545,4 +561,4 @@ if __name__ == "__main__":
         n_jobs=12
     )
 
-    # run_strategy_backtest(data.iloc[:300], ProphetStrategy, threshold = 0.2/100.0)
+    # run_strategy_backtest(data.iloc[:3000], KalmanARIMAStrategy, threshold = 0.2/100.0)
