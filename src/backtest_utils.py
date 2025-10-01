@@ -250,8 +250,8 @@ def optimize_strategy(data, strategy, study_name, n_trials=100, n_jobs=8):
                 mlflow.log_metric(sanitized_key, value)
             # Log artifacts for the last step if available
             if bt:
-                plot_filename = "backtest_plot.html"
-                trades_filename = "trades.csv"
+                plot_filename = f"backtest_plot_trial_{trial.number}.html"
+                trades_filename = f"trades_trial_{trial.number}.csv"
 
                 # Save plot
                 # open_browser=False prevents the plot from opening automatically
@@ -318,8 +318,8 @@ def optimize_classification_strategy(data, strategy, study_name, n_trials=100, n
                 mlflow.log_metric(sanitized_key, value)
             # Log artifacts for the last step if available
             if bt:
-                plot_filename = "backtest_plot.html"
-                trades_filename = "trades.csv"
+                plot_filename = f"backtest_plot_trial_{trial.number}.html"
+                trades_filename = f"trades_trial_{trial.number}.csv"
 
                 # Save plot
                 # open_browser=False prevents the plot from opening automatically
