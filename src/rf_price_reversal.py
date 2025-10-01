@@ -192,6 +192,7 @@ def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3
 
     return y_pred, y_test
 
+# AI make a function to plot the awesome oscilator time series (in full or a sample) marking all the tops and bottoms AI! 
 
 def main():
     """
@@ -237,8 +238,9 @@ def main():
 
     # 5. Run Backtest
     print("Running walk-forward backtest...")
-    model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
-    manual_backtest(X, y, model, test_size=0.3)
+    # model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
+    # manual_backtest(X, y, model, test_size=0.3)
+    print(y.info())
 
 if __name__ == "__main__":
     main()
