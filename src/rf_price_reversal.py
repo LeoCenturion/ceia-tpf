@@ -102,19 +102,19 @@ def create_target_variable(df: pd.DataFrame) -> pd.DataFrame:
     if ao is None or ao.isnull().all():
         # Return an empty DataFrame if AO can't be calculated
         return pd.DataFrame(columns=df.columns.tolist() + ['target'])
-    
+
     # Find peaks (tops) and troughs (bottoms) in the AO
     peaks, _ = find_peaks(ao)
     troughs, _ = find_peaks(-ao)
-    
+
     # Create the target column, initially with NaNs
     df['target'] = np.nan
     df.loc[df.index[peaks], 'target'] = 1  # Tops
     df.loc[df.index[troughs], 'target'] = 0 # Bottoms
-    
+
     # We are only interested in classifying the reversal points
     reversal_points_df = df.dropna(subset=['target'])
-    
+
     return reversal_points_df
 
 def select_features(X: pd.DataFrame, y: pd.Series, corr_threshold=0.7, p_value_threshold=0.05) -> list:
@@ -131,12 +131,18 @@ def select_features(X: pd.DataFrame, y: pd.Series, corr_threshold=0.7, p_value_t
             continue
 
         corr, p_value = pearsonr(temp_df.iloc[:, 0], temp_df.iloc[:, 1])
-        
+
         if abs(corr) >= corr_threshold and p_value < p_value_threshold:
             selected_features.append(col)
-            
+
     print(f"Selected {len(selected_features)} features out of {len(X.columns)} based on correlation criteria.")
     return selected_features
+
+# AI write a backtesting function that manually backtest given a dataframe ...
+# for i in range(start, len(self._data)):
+#                data._set_length(i + 1)
+# in each iteration it should retrain the model (if needed) and predict the target.
+# run a classification report in the end AI!
 
 def main():
     """
@@ -148,7 +154,7 @@ def main():
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
         start_date="2022-01-01T00:00:00Z"
     )
-    
+
     # 2. Create Target Variable
     print("Identifying tops and bottoms to create target variable...")
     reversal_data = create_target_variable(data.copy())
