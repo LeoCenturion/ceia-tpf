@@ -216,7 +216,7 @@ def plot_awesome_oscillator(data: pd.DataFrame, reversal_points: pd.DataFrame, s
 
     plt.figure(figsize=(15, 7))
     plt.plot(plot_data.index, plot_data['ao'], label='Awesome Oscillator', color='gray', alpha=0.7)
-
+    print(plot_reversal_points['target'].info())
     tops = plot_reversal_points[plot_reversal_points['target'] == 1]
     bottoms = plot_reversal_points[plot_reversal_points['target'] == 0]
 
