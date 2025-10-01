@@ -60,6 +60,10 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     features = pd.DataFrame(index=df.index)
 
+    # Price and percentage change
+    features['Close'] = df['Close']
+    features['pct_change'] = df['Close'].pct_change()
+
     # Momentum Indicators
     features['RSI'] = rsi_indicator(df['Close'], n=14)
     stoch = stochastic_oscillator(df['High'], df['Low'], df['Close'])

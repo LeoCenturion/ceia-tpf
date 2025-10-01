@@ -42,7 +42,8 @@ def _create_features(data):
         'Upper_Band': upper_band,
         'Lower_Band': lower_band,
         'Volatility': volatility,
-        'Lagged_Return': lagged_return
+        'Lagged_Return': lagged_return,
+        'Close': close
     })
 
     # Create relative features
@@ -50,7 +51,7 @@ def _create_features(data):
     df['BB_Width'] = (df['Upper_Band'] - df['Lower_Band']) / df['SMA20']
 
     # Select and clean final features
-    final_features = df[['RSI', 'Momentum', 'Volatility', 'Lagged_Return', 'SMA_Ratio', 'BB_Width']]
+    final_features = df[['RSI', 'Momentum', 'Volatility', 'Lagged_Return', 'SMA_Ratio', 'BB_Width', 'Close']]
     return final_features.bfill().ffill().values
 
 
