@@ -95,28 +95,26 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
 
 def create_target_variable(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Identifies local tops (1) and bottoms (0) using the Awesome Oscillator (AO)
-    and returns a DataFrame containing only the rows with these reversal points.
+    Identifies local tops (1), bottoms (-1), and non-reversal points (0)
+    using the Awesome Oscillator (AO) and returns the DataFrame with a 'target' column.
     """
     # Calculate Awesome Oscillator
     ao = awesome_oscillator(df['High'], df['Low'])
     if ao is None or ao.isnull().all():
-        # Return an empty DataFrame if AO can't be calculated
-        return pd.DataFrame(columns=df.columns.tolist() + ['target'])
+        # If AO can't be calculated, label all points as neutral
+        df['target'] = 0
+        return df
 
     # Find peaks (tops) and troughs (bottoms) in the AO
     peaks, _ = find_peaks(ao)
     troughs, _ = find_peaks(-ao)
 
-    # Create the target column, initially with NaNs
-    df['target'] = np.nan
+    # Create the target column, default to 0 (neutral)
+    df['target'] = 0
     df.loc[df.index[peaks], 'target'] = 1  # Tops
-    df.loc[df.index[troughs], 'target'] = 0 # Bottoms
+    df.loc[df.index[troughs], 'target'] = -1 # Bottoms
 
-    # We are only interested in classifying the reversal points
-    reversal_points_df = df.dropna(subset=['target'])
-
-    return reversal_points_df
+    return df
 
 def select_features(X: pd.DataFrame, y: pd.Series, corr_threshold=0.7, p_value_threshold=0.05) -> list:
     """
@@ -187,7 +185,7 @@ def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3
 
     # Evaluate
     print("\n--- Backtest Classification Report ---")
-    print(classification_report(y_test, y_pred, target_names=['Bottom (0)', 'Top (1)'], zero_division=0))
+    print(classification_report(y_test, y_pred, labels=[-1, 0, 1], target_names=['Bottom (-1)', 'Neutral (0)', 'Top (1)'], zero_division=0))
     accuracy = accuracy_score(y_test, y_pred)
     print(f"Backtest Accuracy: {accuracy:.2f}")
 
@@ -216,9 +214,8 @@ def plot_awesome_oscillator(data: pd.DataFrame, reversal_points: pd.DataFrame, s
 
     plt.figure(figsize=(15, 7))
     plt.plot(plot_data.index, plot_data['ao'], label='Awesome Oscillator', color='gray', alpha=0.7)
-    print(plot_reversal_points['target'].info())
     tops = plot_reversal_points[plot_reversal_points['target'] == 1]
-    bottoms = plot_reversal_points[plot_reversal_points['target'] == 0]
+    bottoms = plot_reversal_points[plot_reversal_points['target'] == -1]
 
     # Get AO values at the reversal points
     ao_at_tops = plot_data.loc[tops.index, 'ao']
@@ -256,7 +253,7 @@ def main():
     # Optional: Plot the Awesome Oscillator with identified reversal points for visualization
     plot_awesome_oscillator(data, reversal_data, sample_size=500)
     
-    if reversal_data.empty:
+    if (reversal_data['target'] == 0).all():
         print("No reversal points (tops/bottoms) were identified. Exiting.")
         return
         
@@ -285,9 +282,8 @@ def main():
 
     # 5. Run Backtest
     print("Running walk-forward backtest...")
-    # model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
-    # manual_backtest(X, y, model, test_size=0.3)
-    print(y.info())
+    model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
+    manual_backtest(X, y, model, test_size=0.3)
 
 if __name__ == "__main__":
     main()
