@@ -138,11 +138,60 @@ def select_features(X: pd.DataFrame, y: pd.Series, corr_threshold=0.7, p_value_t
     print(f"Selected {len(selected_features)} features out of {len(X.columns)} based on correlation criteria.")
     return selected_features
 
-# AI write a backtesting function that manually backtest given a dataframe ...
-# for i in range(start, len(self._data)):
-#                data._set_length(i + 1)
-# in each iteration it should retrain the model (if needed) and predict the target.
-# run a classification report in the end AI!
+
+def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3):
+    """
+    Performs a manual walk-forward backtest with an expanding window.
+    At each step in the test set, the model is retrained using all historical data
+    up to that point before making a prediction for the next step.
+
+    Args:
+        X (pd.DataFrame): The feature matrix.
+        y (pd.Series): The target vector.
+        model: A scikit-learn compatible classifier.
+        test_size (float): The proportion of the dataset to be used for testing.
+    """
+    split_index = int(len(X) * (1 - test_size))
+    X_test = X.iloc[split_index:]
+    y_test = y.iloc[split_index:]
+
+    y_pred = []
+
+    print("Starting walk-forward backtest with retraining at each step...")
+    # Walk forward
+    for i in range(len(X_test)):
+        current_split_index = split_index + i
+
+        # Define current training data (expanding window)
+        X_train_current = X.iloc[:current_split_index]
+        y_train_current = y.iloc[:current_split_index]
+
+        # Define current test sample
+        X_test_current = X.iloc[current_split_index:current_split_index + 1]
+
+        # Scale data
+        scaler = StandardScaler()
+        X_train_current_scaled = scaler.fit_transform(X_train_current)
+        X_test_current_scaled = scaler.transform(X_test_current)
+
+        # Retrain model
+        model.fit(X_train_current_scaled, y_train_current)
+
+        # Predict
+        prediction = model.predict(X_test_current_scaled)
+        y_pred.append(prediction[0])
+
+        if (i + 1) % 50 == 0 or (i + 1) == len(X_test):
+            print(f"Processed {i+1}/{len(X_test)} steps...")
+
+    # Evaluate
+    print("\n--- Backtest Classification Report ---")
+    print(classification_report(y_test, y_pred, target_names=['Bottom (0)', 'Top (1)'], zero_division=0))
+    accuracy = accuracy_score(y_test, y_pred)
+    print(f"Backtest Accuracy: {accuracy:.2f}")
+
+    return y_pred, y_test
+
 
 def main():
     """
@@ -186,39 +235,10 @@ def main():
         
     print(f"Final features being used: {list(X.columns)}")
 
-    # 5. Split Data (Sequential Split)
-    # Using a sequential split to avoid training on future data.
-    test_size = 0.3
-    split_index = int(len(X) * (1 - test_size))
-
-    X_train = X.iloc[:split_index]
-    X_test = X.iloc[split_index:]
-    y_train = y.iloc[:split_index]
-    y_test = y.iloc[split_index:]
-
-    print(f"Train set size: {len(X_train)}, Test set size: {len(X_test)}")
-
-    # 6. Scale Features
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
-    
-    # 7. Train Model
-    print("Training Random Forest Classifier...")
+    # 5. Run Backtest
+    print("Running walk-forward backtest...")
     model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
-    model.fit(X_train_scaled, y_train)
-    
-    # 8. Evaluate Model
-    print("Evaluating model performance...")
-    y_pred = model.predict(X_test_scaled)
-    
-    # Print classification report
-    print("\nClassification Report:")
-    print(classification_report(y_test, y_pred, target_names=['Bottom (0)', 'Top (1)'], zero_division=0))
-    
-    # Print overall accuracy
-    accuracy = accuracy_score(y_test, y_pred)
-    print(f"Overall Accuracy: {accuracy:.2f}")
+    manual_backtest(X, y, model, test_size=0.3)
 
 if __name__ == "__main__":
     main()
