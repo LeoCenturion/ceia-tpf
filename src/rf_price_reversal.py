@@ -101,7 +101,7 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
 
     return features
 
-def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_pct_change', peak_distance: int = 1) -> pd.DataFrame:
+def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_pct_change', peak_distance: int = 1, peak_threshold: float = 0) -> pd.DataFrame:
     """
     Identifies local tops (1), bottoms (-1), and non-reversal points (0)
     using different methods, and returns the DataFrame with a 'target' column.
@@ -133,8 +133,8 @@ def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_pct_change', p
         return df
 
     # Find peaks (tops) and troughs (bottoms) in the AO
-    peaks, _ = find_peaks(ao, distance=peak_distance)
-    troughs, _ = find_peaks(-ao, distance=peak_distance)
+    peaks, _ = find_peaks(ao, distance=peak_distance, threshold=peak_threshold)
+    troughs, _ = find_peaks(-ao, distance=peak_distance, threshold=peak_threshold)
 
     # Create the target column, default to 0 (neutral)
     df['target'] = 0
@@ -284,6 +284,12 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     peak_method = trial.suggest_categorical('peak_method', ['ao_on_price', 'ao_on_pct_change', 'pct_change_on_ao'])
     peak_distance = trial.suggest_int('peak_distance', 1, 5)
 
+    if peak_method == 'ao_on_price':
+        # Threshold is a difference, so values can be smaller than absolute price
+        peak_threshold = trial.suggest_float('peak_threshold', 0.0, 100.0)
+    else:  # For pct_change based methods, the scale is much smaller
+        peak_threshold = trial.suggest_float('peak_threshold', 0.0, 0.005)
+
     # Feature selection hyperparameter
     corr_threshold = trial.suggest_float('corr_threshold', 0.1, 0.7)
 
@@ -298,7 +304,7 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     print(f"Params: {trial.params}")
 
     # Create Target Variable
-    reversal_data = create_target_variable(data.copy(), method=peak_method, peak_distance=peak_distance)
+    reversal_data = create_target_variable(data.copy(), method=peak_method, peak_distance=peak_distance, peak_threshold=peak_threshold)
 
     # Prune trial if not enough reversal points are found
     if reversal_data['target'].nunique() < 3 or reversal_data['target'].value_counts().get(1, 0) < 5 or reversal_data['target'].value_counts().get(-1, 0) < 5:
