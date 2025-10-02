@@ -260,7 +260,7 @@ def main():
     data = fetch_historical_data(
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
         start_date="2022-01-01T00:00:00Z"
-    )
+    ).iloc[-2000:]
 
     # 2. Create Target Variable
     print("Identifying tops and bottoms to create target variable...")
@@ -303,7 +303,7 @@ def main():
     print("Running walk-forward backtest...")
     class_weights = {-1: 10, 1: 10, 0: 1}
     model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1, class_weight=class_weights)
-    # manual_backtest(X, y, model, test_size=0.3)
+    manual_backtest(X, y, model, test_size=0.3)
 
 if __name__ == "__main__":
     main()
