@@ -282,7 +282,7 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     # === 1. Define Hyperparameter Search Space ===
     # Peak detection hyperparameters
     peak_method = trial.suggest_categorical('peak_method', ['ao_on_price', 'ao_on_pct_change', 'pct_change_on_ao'])
-    peak_distance = trial.suggest_float('peak_distance', 0.1, 7.0)
+    peak_distance = trial.suggest_int('peak_distance', 1, 5)
 
     # Feature selection hyperparameter
     corr_threshold = trial.suggest_float('corr_threshold', 0.1, 0.7)
