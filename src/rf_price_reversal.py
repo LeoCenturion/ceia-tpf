@@ -292,8 +292,6 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     max_depth = trial.suggest_int('max_depth', 5, 50, log=True)
     min_samples_split = trial.suggest_int('min_samples_split', 2, 20)
     min_samples_leaf = trial.suggest_int('min_samples_leaf', 1, 20)
-    reversal_weight = trial.suggest_float('reversal_weight', 1.0, 20.0)
-    class_weights = {-1: reversal_weight, 1: reversal_weight, 0: 1}
 
     # === 2. Run the ML Pipeline ===
     print(f"\n--- Starting Trial {trial.number} ---")
@@ -327,7 +325,7 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
         min_samples_leaf=min_samples_leaf,
         random_state=42,
         n_jobs=-1,
-        class_weight=class_weights
+        class_weight='balanced'
     )
     _, _, report = manual_backtest(X, y, model, test_size=0.3)
 
