@@ -57,32 +57,34 @@ def stochastic_oscillator(high: pd.Series, low: pd.Series, close: pd.Series, n: 
 
 def create_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Creates a set of technical analysis features.
+    Creates a set of technical analysis features based on percentage changes.
     """
     features = pd.DataFrame(index=df.index)
 
     # Price and percentage change
-    features['Close'] = df['Close']
-    features['pct_change'] = df['Close'].pct_change()
+    high_pct = df['High'].pct_change().fillna(0)
+    low_pct = df['Low'].pct_change().fillna(0)
+    close_pct = df['Close'].pct_change().fillna(0)
+    features['pct_change'] = close_pct
 
     # Momentum Indicators
-    features['RSI'] = rsi_indicator(df['Close'], n=14)
-    stoch = stochastic_oscillator(df['High'], df['Low'], df['Close'])
+    features['RSI'] = rsi_indicator(close_pct, n=14)
+    stoch = stochastic_oscillator(high_pct, low_pct, close_pct)
     features['Stoch_K'] = stoch['%K']
     features['Stoch_D'] = stoch['%D']
 
     # Trend Indicators
-    macd_df = macd(df['Close'])
+    macd_df = macd(close_pct)
     features['MACD'] = macd_df['MACD']
     features['MACD_Signal'] = macd_df['Signal']
     features['MACD_Hist'] = macd_df['Hist']
 
     # Volume Indicators
-    features['MFI'] = mfi(df['High'], df['Low'], df['Close'], df['Volume'], n=14)
+    features['MFI'] = mfi(high_pct, low_pct, close_pct, df['Volume'], n=14)
 
     # Volatility Indicators
-    sma20 = sma(df['Close'], 20)
-    std20 = std(df['Close'], 20)
+    sma20 = sma(close_pct, 20)
+    std20 = std(close_pct, 20)
     features['BB_Upper'] = sma20 + (std20 * 2)
     features['BB_Lower'] = sma20 - (std20 * 2)
     features['BB_Width'] = (features['BB_Upper'] - features['BB_Lower']) / sma20
@@ -96,10 +98,14 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
 def create_target_variable(df: pd.DataFrame) -> pd.DataFrame:
     """
     Identifies local tops (1), bottoms (-1), and non-reversal points (0)
-    using the Awesome Oscillator (AO) and returns the DataFrame with a 'target' column.
+    using the Awesome Oscillator (AO) on price percentage changes,
+    and returns the DataFrame with a 'target' column.
     """
-    # Calculate Awesome Oscillator
-    ao = awesome_oscillator(df['High'], df['Low'])
+    # Calculate Awesome Oscillator on percentage change
+    high_pct = df['High'].pct_change().fillna(0)
+    low_pct = df['Low'].pct_change().fillna(0)
+    ao = awesome_oscillator(high_pct, low_pct)
+
     if ao is None or ao.isnull().all():
         # If AO can't be calculated, label all points as neutral
         df['target'] = 0
