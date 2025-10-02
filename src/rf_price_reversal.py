@@ -295,8 +295,9 @@ def main():
 
     # 5. Run Backtest
     print("Running walk-forward backtest...")
-    model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
-    # manual_backtest(X, y, model, test_size=0.3)
+    class_weights = {-1: 10, 1: 10, 0: 1}
+    model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1, class_weight=class_weights)
+    manual_backtest(X, y, model, test_size=0.3)
 
 if __name__ == "__main__":
     main()
