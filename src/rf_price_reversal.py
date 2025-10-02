@@ -2,6 +2,12 @@ import pandas as pd
 import numpy as np
 from scipy.stats import pearsonr
 from scipy.signal import find_peaks
+import pandas as pd
+import numpy as np
+from scipy.stats import pearsonr
+from scipy.signal import find_peaks
+import optuna
+from functools import partial
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, accuracy_score
@@ -95,7 +101,7 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
 
     return features
 
-def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_pct_change') -> pd.DataFrame:
+def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_pct_change', peak_distance: int = 1) -> pd.DataFrame:
     """
     Identifies local tops (1), bottoms (-1), and non-reversal points (0)
     using different methods, and returns the DataFrame with a 'target' column.
@@ -127,8 +133,8 @@ def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_pct_change') -
         return df
 
     # Find peaks (tops) and troughs (bottoms) in the AO
-    peaks, _ = find_peaks(ao)
-    troughs, _ = find_peaks(-ao)
+    peaks, _ = find_peaks(ao, distance=peak_distance)
+    troughs, _ = find_peaks(-ao, distance=peak_distance)
 
     # Create the target column, default to 0 (neutral)
     df['target'] = 0
@@ -206,11 +212,14 @@ def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3
 
     # Evaluate
     print("\n--- Backtest Classification Report ---")
-    print(classification_report(y_test, y_pred, labels=[-1, 0, 1], target_names=['Bottom (-1)', 'Neutral (0)', 'Top (1)'], zero_division=0))
+    report_str = classification_report(y_test, y_pred, labels=[-1, 0, 1], target_names=['Bottom (-1)', 'Neutral (0)', 'Top (1)'], zero_division=0)
+    print(report_str)
+    report_dict = classification_report(y_test, y_pred, labels=[-1, 0, 1], target_names=['Bottom (-1)', 'Neutral (0)', 'Top (1)'], zero_division=0, output_dict=True)
+
     accuracy = accuracy_score(y_test, y_pred)
     print(f"Backtest Accuracy: {accuracy:.2f}")
 
-    return y_pred, y_test
+    return y_pred, y_test, report_dict
 
 
 def plot_reversals_on_candlestick(data: pd.DataFrame, reversal_points: pd.DataFrame, sample_size: int = None):
@@ -266,9 +275,76 @@ def plot_reversals_on_candlestick(data: pd.DataFrame, reversal_points: pd.DataFr
              panel_ratios=(3, 1))
 
 
+def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
+    """
+    Optuna objective function to tune hyperparameters for the RF price reversal model.
+    """
+    # === 1. Define Hyperparameter Search Space ===
+    # Peak detection hyperparameters
+    peak_method = trial.suggest_categorical('peak_method', ['ao_on_price', 'ao_on_pct_change', 'pct_change_on_ao'])
+    peak_distance = trial.suggest_int('peak_distance', 1, 20)
+
+    # Feature selection hyperparameter
+    corr_threshold = trial.suggest_float('corr_threshold', 0.1, 0.7)
+
+    # Model hyperparameters
+    n_estimators = trial.suggest_int('n_estimators', 50, 300)
+    max_depth = trial.suggest_int('max_depth', 5, 50, log=True)
+    min_samples_split = trial.suggest_int('min_samples_split', 2, 20)
+    min_samples_leaf = trial.suggest_int('min_samples_leaf', 1, 20)
+    reversal_weight = trial.suggest_float('reversal_weight', 1.0, 20.0)
+    class_weights = {-1: reversal_weight, 1: reversal_weight, 0: 1}
+
+    # === 2. Run the ML Pipeline ===
+    print(f"\n--- Starting Trial {trial.number} ---")
+    print(f"Params: {trial.params}")
+
+    # Create Target Variable
+    reversal_data = create_target_variable(data.copy(), method=peak_method, peak_distance=peak_distance)
+
+    # Prune trial if not enough reversal points are found
+    if reversal_data['target'].nunique() < 3 or reversal_data['target'].value_counts().get(1, 0) < 5 or reversal_data['target'].value_counts().get(-1, 0) < 5:
+        print("Not enough reversal points found with these parameters. Pruning trial.")
+        raise optuna.exceptions.TrialPruned()
+
+    y = reversal_data['target']
+
+    # Create Features
+    features_df = create_features(data)
+    X = features_df.loc[reversal_data.index]
+    X = X.loc[:, (X != X.iloc[0]).any()]  # Drop constant columns
+
+    # Feature Selection
+    selected_cols = select_features(X, y, corr_threshold=corr_threshold)
+    if selected_cols:
+        X = X[selected_cols]
+    
+    # Run Backtest
+    model = RandomForestClassifier(
+        n_estimators=n_estimators,
+        max_depth=max_depth,
+        min_samples_split=min_samples_split,
+        min_samples_leaf=min_samples_leaf,
+        random_state=42,
+        n_jobs=-1,
+        class_weight=class_weights
+    )
+    _, _, report = manual_backtest(X, y, model, test_size=0.3)
+
+    # === 3. Calculate and Return the Objective Metric ===
+    f1_top = report.get('Top (1)', {}).get('f1-score', 0.0)
+    f1_bottom = report.get('Bottom (-1)', {}).get('f1-score', 0.0)
+    
+    # We want to maximize the average F1 score for identifying tops and bottoms
+    objective_value = (f1_top + f1_bottom) / 2
+    print(f"Trial {trial.number} finished. Avg F1 (Top/Bottom): {objective_value:.4f}")
+    
+    return objective_value
+
+
 def main():
     """
-    Main function to run the Random Forest price reversal classification task.
+    Main function to run the Optuna hyperparameter optimization study.
     """
     # 1. Load Data
     print("Loading historical data...")
@@ -277,58 +353,33 @@ def main():
         start_date="2022-01-01T00:00:00Z"
     ).iloc[-2000:]
 
-    # Define the methods for peak detection
-    methods = {
-        'ao_on_price': "AO on actual price values",
-        'ao_on_pct_change': "AO on percentage change of values",
-        'pct_change_on_ao': "Percentage change of AO on actual price values"
-    }
-
-    for method, description in methods.items():
-        print(f"\n\n{'='*20} RUNNING FOR METHOD: {method.upper()} ({description}) {'='*20}")
-
-        # 2. Create Target Variable
-        print("Identifying tops and bottoms to create target variable...")
-        reversal_data = create_target_variable(data.copy(), method=method)
-
-        # Optional: Plot the candlestick chart with identified reversal points for visualization
-        # plot_reversals_on_candlestick(data, reversal_data, sample_size=8000)
-
-        if (reversal_data['target'] == 0).all():
-            print("No reversal points (tops/bottoms) were identified. Skipping this method.")
-            continue
-
-        y = reversal_data['target']
-
-        # 3. Create Features for the entire dataset
-        print("Generating technical analysis features...")
-        features_df = create_features(data)
+    # 2. Setup and Run Optuna Study
+    study_name = "rf_price_reversal_study"
+    storage_name = f"sqlite:///{study_name}.db"
     
-        # Align features with the reversal points
-        X = features_df.loc[reversal_data.index]
+    print(f"Starting Optuna study: {study_name}. Storage: {storage_name}")
     
-        # Drop any columns that might be constant
-        X = X.loc[:, (X != X.iloc[0]).any()]
+    # Use a partial function to pass the loaded data to the objective function
+    objective_with_data = partial(objective, data=data)
 
-        # 4. Feature Selection
-        print("Performing feature selection...")
-        selected_cols = select_features(X, y)
+    study = optuna.create_study(
+        direction='maximize',
+        study_name=study_name,
+        storage=storage_name,
+        load_if_exists=True
+    )
 
-        if not selected_cols:
-            print("No features met the high correlation criteria. Using all generated features instead.")
-        else:
-            X = X[selected_cols]
-        
-        print(f"Final features being used: {list(X.columns)}")
+    try:
+        study.optimize(objective_with_data, n_trials=50, n_jobs=-1)
+    except KeyboardInterrupt:
+        print("Study interrupted by user. Will show best results so far.")
 
-        print("\nTarget variable distribution:")
-        print(y.value_counts())
-
-        # 5. Run Backtest
-        print("Running walk-forward backtest...")
-        class_weights = {-1: 10, 1: 10, 0: 1}
-        model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1, class_weight=class_weights)
-        manual_backtest(X, y, model, test_size=0.3)
+    # 3. Print Study Results
+    print("\n--- Optuna Study Best Results ---")
+    print(f"Best trial value (Average F1 Score): {study.best_value}")
+    print("Best parameters found:")
+    for key, value in study.best_params.items():
+        print(f"  {key}: {value}")
 
 if __name__ == "__main__":
     main()
