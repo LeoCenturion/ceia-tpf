@@ -198,9 +198,9 @@ class MultiIndicatorStrategy(Strategy):
 def main():
     """Main function to run the optimization with default parameters."""
     strategies = {
-        # "MaCrossover": MaCrossover,
-        # "BollingerBands": BollingerBands,
-        # "MACD": MACD,
+        "MaCrossover": MaCrossover,
+        "BollingerBands": BollingerBands,
+        "MACD": MACD,
         "RSIDivergence": RSIDivergence,
         "MultiIndicatorStrategy": MultiIndicatorStrategy
     }
@@ -210,7 +210,9 @@ def main():
         start_date="2022-01-01T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",
         experiment_name="Trading Strategies",
-        n_trials_per_strategy=10
+        n_trials_per_strategy=12,
+        n_jobs=12
+
     )
 
 

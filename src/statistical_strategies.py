@@ -286,9 +286,9 @@ class KalmanARIMAStrategy(Strategy):
     @classmethod
     def get_optuna_params(cls, trial):
         return {
-            "p": trial.suggest_int("p", 1, 10),
-            "d": trial.suggest_int("d", 0, 1),
-            "q": trial.suggest_int("q", 0, 5),
+            "p": trial.suggest_int("p", 5, 10),
+            "d": trial.suggest_int("d", 1, 3),
+            "q": trial.suggest_int("q", 3, 7),
             "threshold": trial.suggest_float("threshold", 1e-4, 1e-2, log=True),
             "refit_period": trial.suggest_categorical("refit_period", [24 * 7, 24 * 30]),
         }
@@ -447,7 +447,7 @@ class ARIMAXGARCHStrategy(Strategy):
             "g_p": trial.suggest_int("g_p", 1, 3),
             "g_q": trial.suggest_int("g_q", 1, 3),
             "refit_period": trial.suggest_categorical("refit_period", [24 * 7, 24 * 30]),
-            "threshold": trial.suggest_categorical("threshold", [0.1, 0.01, 0.001, 0.0001]),
+            "threshold": trial.suggest_categorical("threshold", [0.01, 0.001, 0.0001]),
         }
 
 
@@ -545,8 +545,8 @@ if __name__ == "__main__":
     data.sort_index(inplace=True)
     strategies = {
         # "ARIMAStrategy": ARIMAStrategy,
-        # "KalmanARIMAStrategy": KalmanARIMAStrategy,
-        "ARIMAXGARCHStrategy": ARIMAXGARCHStrategy,
+        "KalmanARIMAStrategy": KalmanARIMAStrategy,
+        # "ARIMAXGARCHStrategy": ARIMAXGARCHStrategy,
         # "ProphetStrategy": ProphetStrategy
     }
     chunk_size = 200
@@ -568,7 +568,7 @@ if __name__ == "__main__":
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
         start_date="2022-01-01T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",
-        experiment_name="Trading Strategies 3",
+        experiment_name="Statistical Strategies",
         n_trials_per_strategy=12,
         n_jobs=12
     )
