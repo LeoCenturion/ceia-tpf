@@ -254,21 +254,21 @@ def main():
     data = fetch_historical_data(
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
         start_date="2022-01-01T00:00:00Z"
-    )
+    ).iloc[-2000:]
 
     # 2. Create Target Variable
     print("Identifying tops and bottoms to create target variable...")
     reversal_data = create_target_variable(data.copy())
 
     # Optional: Plot the candlestick chart with identified reversal points for visualization
-    plot_reversals_on_candlestick(data, reversal_data, sample_size=500)
-    
+    # plot_reversals_on_candlestick(data, reversal_data, sample_size=500)
+
     if (reversal_data['target'] == 0).all():
         print("No reversal points (tops/bottoms) were identified. Exiting.")
         return
-        
+
     y = reversal_data['target']
-    
+
     # 3. Create Features for the entire dataset
     print("Generating technical analysis features...")
     features_df = create_features(data)
@@ -282,18 +282,20 @@ def main():
     # 4. Feature Selection
     print("Performing feature selection...")
     selected_cols = select_features(X, y)
-    
+
     if not selected_cols:
         print("No features met the high correlation criteria. Using all generated features instead.")
     else:
         X = X[selected_cols]
         
     print(f"Final features being used: {list(X.columns)}")
-
+    print(X, y)
+    # AI print the nuber of each category in y AI!
+    print(y.info())
     # 5. Run Backtest
     print("Running walk-forward backtest...")
     model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
-    manual_backtest(X, y, model, test_size=0.3)
+    # manual_backtest(X, y, model, test_size=0.3)
 
 if __name__ == "__main__":
     main()
