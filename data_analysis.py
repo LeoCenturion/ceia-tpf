@@ -19,6 +19,20 @@ sns.set(style="whitegrid")
 print("Libraries loaded.")
 
 #%% [markdown]
+# ### Helper Functions
+
+#%%
+def sma(series, n):
+    """Calculates the Simple Moving Average."""
+    return series.rolling(window=n).mean()
+
+def awesome_oscillator(high: pd.Series, low: pd.Series, fast_period: int = 5, slow_period: int = 34) -> pd.Series:
+    """Calculates the Awesome Oscillator."""
+    median_price = (high + low) / 2
+    ao = sma(median_price, fast_period) - sma(median_price, slow_period)
+    return ao
+
+#%% [markdown]
 # ## 2. Load and Prepare Data
 
 #%%
@@ -147,3 +161,59 @@ plt.show()
 
 #%% [markdown]
 # The CDF plot shows the probability of observing a price change of a certain magnitude or less. For example, you can use it to find the value on the x-axis that corresponds to 0.95 on the y-axis to see what magnitude of price change accounts for 95% of all hourly movements.
+
+#%% [markdown]
+# ## 4. Awesome Oscillator Analysis
+
+#%% [markdown]
+# We will now analyze the Awesome Oscillator (AO). We'll compute it in two ways:
+# 1. Using the raw `High` and `Low` prices.
+# 2. Using the percentage change of the `High` and `Low` prices.
+# 
+# This comparison will help visualize how the oscillator behaves on the price series versus the returns series.
+
+#%%
+# Calculate AO on raw prices
+print("Calculating Awesome Oscillator on raw prices...")
+df['ao_price'] = awesome_oscillator(df['high'], df['low'])
+
+# Calculate AO on percentage change
+print("Calculating Awesome Oscillator on price percentage changes...")
+df['high_pct_change'] = df['high'].pct_change()
+df['low_pct_change'] = df['low'].pct_change()
+
+# Fill NaNs created by pct_change for AO calculation
+high_pct_change_filled = df['high_pct_change'].fillna(0)
+low_pct_change_filled = df['low_pct_change'].fillna(0)
+df['ao_pct_change'] = awesome_oscillator(high_pct_change_filled, low_pct_change_filled)
+
+print("Awesome Oscillators calculated.")
+print(df[['ao_price', 'ao_pct_change']].head())
+
+#%% [markdown]
+# ### 4.1. Plotting Awesome Oscillators
+
+#%%
+print("Plotting Awesome Oscillators for comparison...")
+fig, axes = plt.subplots(2, 1, figsize=(15, 10), sharex=True)
+
+# Plot AO on price
+axes[0].plot(df.index, df['ao_price'], label='AO on Price', color='blue', linewidth=0.8)
+axes[0].set_title('Awesome Oscillator on Raw Price (High/Low)')
+axes[0].set_ylabel('AO Value')
+axes[0].grid(True)
+axes[0].legend()
+
+# Plot AO on percentage change
+axes[1].plot(df.index, df['ao_pct_change'], label='AO on % Change', color='green', linewidth=0.8)
+axes[1].set_title('Awesome Oscillator on Price Percentage Change')
+axes[1].set_ylabel('AO Value')
+axes[1].grid(True)
+axes[1].legend()
+
+plt.xlabel('Date')
+fig.tight_layout()
+plt.show()
+
+#%% [markdown]
+# The plots show a stark difference. The AO on raw prices reflects longer-term price trends and momentum, with large swings. The AO on percentage change is much more stationary and centered around zero, reflecting the short-term volatility and returns behavior rather than the price level itself.
