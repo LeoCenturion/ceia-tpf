@@ -282,7 +282,7 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     # === 1. Define Hyperparameter Search Space ===
     # Peak detection hyperparameters
     peak_method = trial.suggest_categorical('peak_method', ['ao_on_price', 'ao_on_pct_change', 'pct_change_on_ao'])
-    peak_distance = trial.suggest_int('peak_distance', 1, 20)
+    peak_distance = trial.suggest_float('peak_distance', 0.1, 7.0)
 
     # Feature selection hyperparameter
     corr_threshold = trial.suggest_float('corr_threshold', 0.1, 0.7)
@@ -354,7 +354,7 @@ def main():
     ).iloc[-2000:]
 
     # 2. Setup and Run Optuna Study
-    study_name = "rf_price_reversal_study"
+    study_name = "optuna-study"
     storage_name = f"sqlite:///{study_name}.db"
     
     print(f"Starting Optuna study: {study_name}. Storage: {storage_name}")
@@ -364,7 +364,7 @@ def main():
 
     study = optuna.create_study(
         direction='maximize',
-        study_name=study_name,
+        study_name='rf price reversal',
         storage=storage_name,
         load_if_exists=True
     )
