@@ -289,9 +289,10 @@ def main():
         X = X[selected_cols]
         
     print(f"Final features being used: {list(X.columns)}")
-    print(X, y)
-    # AI print the nuber of each category in y AI!
-    print(y.info())
+
+    print("\nTarget variable distribution:")
+    print(y.value_counts())
+
     # 5. Run Backtest
     print("Running walk-forward backtest...")
     model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
