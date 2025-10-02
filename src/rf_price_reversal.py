@@ -95,16 +95,31 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
 
     return features
 
-def create_target_variable(df: pd.DataFrame) -> pd.DataFrame:
+def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_pct_change') -> pd.DataFrame:
     """
     Identifies local tops (1), bottoms (-1), and non-reversal points (0)
-    using the Awesome Oscillator (AO) on price percentage changes,
-    and returns the DataFrame with a 'target' column.
+    using different methods, and returns the DataFrame with a 'target' column.
+
+    Methods:
+    - 'ao_on_price': Awesome Oscillator on actual prices.
+    - 'ao_on_pct_change': Awesome Oscillator on price percentage changes.
+    - 'pct_change_on_ao': Percentage change of Awesome Oscillator on actual prices.
     """
-    # Calculate Awesome Oscillator on percentage change
-    high_pct = df['High'].pct_change().fillna(0)
-    low_pct = df['Low'].pct_change().fillna(0)
-    ao = awesome_oscillator(high_pct, low_pct)
+    if method == 'ao_on_pct_change':
+        # computing the peaks from the awesome oscillator from the pct_change of the values
+        high_pct = df['High'].pct_change().fillna(0)
+        low_pct = df['Low'].pct_change().fillna(0)
+        ao = awesome_oscillator(high_pct, low_pct)
+    elif method == 'ao_on_price':
+        # computing the peaks from the awesome oscillator from the actual price values
+        ao = awesome_oscillator(df['High'], df['Low'])
+    elif method == 'pct_change_on_ao':
+        # computing the peaks from the pct_change of the awesome oscillator from the actual price values
+        ao_price = awesome_oscillator(df['High'], df['Low'])
+        ao = ao_price.pct_change().fillna(0).replace([np.inf, -np.inf], 0)
+    else:
+        raise ValueError(f"Invalid method '{method}' specified for create_target_variable")
+
 
     if ao is None or ao.isnull().all():
         # If AO can't be calculated, label all points as neutral
@@ -262,48 +277,58 @@ def main():
         start_date="2022-01-01T00:00:00Z"
     ).iloc[-2000:]
 
-    # 2. Create Target Variable
-    print("Identifying tops and bottoms to create target variable...")
-    reversal_data = create_target_variable(data.copy())
+    # Define the methods for peak detection
+    methods = {
+        'ao_on_price': "AO on actual price values",
+        'ao_on_pct_change': "AO on percentage change of values",
+        'pct_change_on_ao': "Percentage change of AO on actual price values"
+    }
 
-    # Optional: Plot the candlestick chart with identified reversal points for visualization
-    plot_reversals_on_candlestick(data, reversal_data, sample_size=8000)
+    for method, description in methods.items():
+        print(f"\n\n{'='*20} RUNNING FOR METHOD: {method.upper()} ({description}) {'='*20}")
 
-    if (reversal_data['target'] == 0).all():
-        print("No reversal points (tops/bottoms) were identified. Exiting.")
-        return
+        # 2. Create Target Variable
+        print("Identifying tops and bottoms to create target variable...")
+        reversal_data = create_target_variable(data.copy(), method=method)
 
-    y = reversal_data['target']
+        # Optional: Plot the candlestick chart with identified reversal points for visualization
+        # plot_reversals_on_candlestick(data, reversal_data, sample_size=8000)
 
-    # 3. Create Features for the entire dataset
-    print("Generating technical analysis features...")
-    features_df = create_features(data)
+        if (reversal_data['target'] == 0).all():
+            print("No reversal points (tops/bottoms) were identified. Skipping this method.")
+            continue
+
+        y = reversal_data['target']
+
+        # 3. Create Features for the entire dataset
+        print("Generating technical analysis features...")
+        features_df = create_features(data)
     
-    # Align features with the reversal points
-    X = features_df.loc[reversal_data.index]
+        # Align features with the reversal points
+        X = features_df.loc[reversal_data.index]
     
-    # Drop any columns that might be constant
-    X = X.loc[:, (X != X.iloc[0]).any()]
+        # Drop any columns that might be constant
+        X = X.loc[:, (X != X.iloc[0]).any()]
 
-    # 4. Feature Selection
-    print("Performing feature selection...")
-    selected_cols = select_features(X, y)
+        # 4. Feature Selection
+        print("Performing feature selection...")
+        selected_cols = select_features(X, y)
 
-    if not selected_cols:
-        print("No features met the high correlation criteria. Using all generated features instead.")
-    else:
-        X = X[selected_cols]
+        if not selected_cols:
+            print("No features met the high correlation criteria. Using all generated features instead.")
+        else:
+            X = X[selected_cols]
         
-    print(f"Final features being used: {list(X.columns)}")
+        print(f"Final features being used: {list(X.columns)}")
 
-    print("\nTarget variable distribution:")
-    print(y.value_counts())
+        print("\nTarget variable distribution:")
+        print(y.value_counts())
 
-    # 5. Run Backtest
-    print("Running walk-forward backtest...")
-    class_weights = {-1: 10, 1: 10, 0: 1}
-    model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1, class_weight=class_weights)
-    manual_backtest(X, y, model, test_size=0.3)
+        # 5. Run Backtest
+        print("Running walk-forward backtest...")
+        class_weights = {-1: 10, 1: 10, 0: 1}
+        model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1, class_weight=class_weights)
+        manual_backtest(X, y, model, test_size=0.3)
 
 if __name__ == "__main__":
     main()
