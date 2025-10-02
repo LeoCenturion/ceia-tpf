@@ -228,8 +228,8 @@ def plot_reversals_on_candlestick(data: pd.DataFrame, reversal_points: pd.DataFr
 
     # Create addplots for mplfinance
     addplots = [
-        mpf.make_addplot(top_markers, type='scatter', marker='^', color='green', s=100),
-        mpf.make_addplot(bottom_markers, type='scatter', marker='v', color='red', s=100)
+        mpf.make_addplot(top_markers, type='scatter', marker='^', color='green', markersize=100),
+        mpf.make_addplot(bottom_markers, type='scatter', marker='v', color='red', markersize=100)
     ]
 
     title = 'Candlestick Chart with Tops and Bottoms'
