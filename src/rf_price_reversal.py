@@ -6,7 +6,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.preprocessing import StandardScaler
-import matplotlib.pyplot as plt
+import mplfinance as mpf
 
 from backtest_utils import fetch_historical_data, sma, ewm, std, rsi_indicator
 
@@ -192,19 +192,16 @@ def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3
     return y_pred, y_test
 
 
-def plot_awesome_oscillator(data: pd.DataFrame, reversal_points: pd.DataFrame, sample_size: int = None):
+def plot_reversals_on_candlestick(data: pd.DataFrame, reversal_points: pd.DataFrame, sample_size: int = None):
     """
-    Plots the Awesome Oscillator time series, highlighting the identified tops and bottoms.
+    Plots a candlestick chart with markers for identified tops and bottoms.
 
     Args:
-        data (pd.DataFrame): The original DataFrame with 'High' and 'Low' prices.
-        reversal_points (pd.DataFrame): DataFrame containing the identified tops (target=1) and bottoms (target=0).
+        data (pd.DataFrame): The original DataFrame with 'Open', 'High', 'Low', 'Close' prices.
+        reversal_points (pd.DataFrame): DataFrame containing the identified tops (target=1) and bottoms (target=-1).
         sample_size (int, optional): The number of recent data points to plot. If None, plots the entire series.
     """
-    ao = awesome_oscillator(data['High'], data['Low'])
-
     plot_data = data.copy()
-    plot_data['ao'] = ao
     plot_reversal_points = reversal_points
 
     if sample_size:
@@ -212,27 +209,40 @@ def plot_awesome_oscillator(data: pd.DataFrame, reversal_points: pd.DataFrame, s
         # Filter reversal points to be within the plotted data's index range
         plot_reversal_points = reversal_points[reversal_points.index >= plot_data.index[0]]
 
-    plt.figure(figsize=(15, 7))
-    plt.plot(plot_data.index, plot_data['ao'], label='Awesome Oscillator', color='gray', alpha=0.7)
+    # Create series for plotting markers
     tops = plot_reversal_points[plot_reversal_points['target'] == 1]
     bottoms = plot_reversal_points[plot_reversal_points['target'] == -1]
 
-    # Get AO values at the reversal points
-    ao_at_tops = plot_data.loc[tops.index, 'ao']
-    ao_at_bottoms = plot_data.loc[bottoms.index, 'ao']
+    # Place markers slightly above highs for tops and below lows for bottoms
+    top_markers = pd.Series(np.nan, index=plot_data.index)
+    bottom_markers = pd.Series(np.nan, index=plot_data.index)
 
-    plt.scatter(ao_at_tops.index, ao_at_tops, marker='^', color='green', s=100, label='Tops (target=1)')
-    plt.scatter(ao_at_bottoms.index, ao_at_bottoms, marker='v', color='red', s=100, label='Bottoms (target=0)')
+    top_indices = tops.index.intersection(plot_data.index)
+    bottom_indices = bottoms.index.intersection(plot_data.index)
 
-    title = 'Awesome Oscillator with Tops and Bottoms'
+    # Check if there are any tops/bottoms to plot to avoid errors on empty access
+    if not top_indices.empty:
+        top_markers.loc[top_indices] = plot_data.loc[top_indices, 'High'] * 1.01
+    if not bottom_indices.empty:
+        bottom_markers.loc[bottom_indices] = plot_data.loc[bottom_indices, 'Low'] * 0.99
+
+    # Create addplots for mplfinance
+    addplots = [
+        mpf.make_addplot(top_markers, type='scatter', marker='^', color='green', s=100),
+        mpf.make_addplot(bottom_markers, type='scatter', marker='v', color='red', s=100)
+    ]
+
+    title = 'Candlestick Chart with Tops and Bottoms'
     if sample_size:
         title += f' (Last {sample_size} hours)'
-    plt.title(title)
-    plt.xlabel('Date')
-    plt.ylabel('Awesome Oscillator Value')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+
+    mpf.plot(plot_data, type='candle', style='yahoo',
+             title=title,
+             ylabel='Price ($)',
+             addplot=addplots,
+             figsize=(15, 7),
+             volume=True,
+             panel_ratios=(3, 1))
 
 
 def main():
@@ -250,8 +260,8 @@ def main():
     print("Identifying tops and bottoms to create target variable...")
     reversal_data = create_target_variable(data.copy())
 
-    # Optional: Plot the Awesome Oscillator with identified reversal points for visualization
-    plot_awesome_oscillator(data, reversal_data, sample_size=500)
+    # Optional: Plot the candlestick chart with identified reversal points for visualization
+    plot_reversals_on_candlestick(data, reversal_data, sample_size=500)
     
     if (reversal_data['target'] == 0).all():
         print("No reversal points (tops/bottoms) were identified. Exiting.")
