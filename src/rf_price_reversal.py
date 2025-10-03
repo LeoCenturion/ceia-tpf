@@ -299,7 +299,7 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     max_depth = trial.suggest_int('max_depth', 5, 50, log=True)
     min_samples_split = trial.suggest_int('min_samples_split', 2, 20)
     min_samples_leaf = trial.suggest_int('min_samples_leaf', 1, 20)
-    refit_every = trial.suggest_int('refit_every', 1, 50)
+    refit_every = 24 * 7
 
     # === 2. Run the ML Pipeline ===
     print(f"\n--- Starting Trial {trial.number} ---")
@@ -347,7 +347,7 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     
     return objective_value
 
-
+# AI resume running studies if they exist AI!
 def main():
     """
     Main function to run the Optuna hyperparameter optimization study.
