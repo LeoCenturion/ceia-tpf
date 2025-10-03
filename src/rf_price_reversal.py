@@ -347,11 +347,12 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     
     return objective_value
 
-# AI resume running studies if they exist AI!
 def main():
     """
     Main function to run the Optuna hyperparameter optimization study.
     """
+    N_TRIALS = 50
+
     # 1. Load Data
     print("Loading historical data...")
     data = fetch_historical_data(
@@ -360,25 +361,33 @@ def main():
     )
 
     # 2. Setup and Run Optuna Study
-    study_name = "optuna-study"
-    storage_name = f"sqlite:///{study_name}.db"
+    db_file_name = "optuna-study"
+    study_name_in_db = 'rf price reversal'
+    storage_name = f"sqlite:///{db_file_name}.db"
     
-    print(f"Starting Optuna study: {study_name}. Storage: {storage_name}")
+    print(f"Starting Optuna study: '{study_name_in_db}'. Storage: {storage_name}")
     
     # Use a partial function to pass the loaded data to the objective function
     objective_with_data = partial(objective, data=data)
 
     study = optuna.create_study(
         direction='maximize',
-        study_name='rf price reversal',
+        study_name=study_name_in_db,
         storage=storage_name,
         load_if_exists=True
     )
 
-    try:
-        study.optimize(objective_with_data, n_trials=50, n_jobs=-1)
-    except KeyboardInterrupt:
-        print("Study interrupted by user. Will show best results so far.")
+    completed_trials = len(study.trials)
+    remaining_trials = N_TRIALS - completed_trials
+
+    if remaining_trials > 0:
+        print(f"Study '{study_name_in_db}' has {completed_trials} completed trials. Running for {remaining_trials} more to reach {N_TRIALS}.")
+        try:
+            study.optimize(objective_with_data, n_trials=remaining_trials, n_jobs=-1)
+        except KeyboardInterrupt:
+            print("Study interrupted by user. Will show best results so far.")
+    else:
+        print(f"Study '{study_name_in_db}' has already completed {completed_trials} trials. No more trials to run.")
 
     # 3. Print Study Results
     print("\n--- Optuna Study Best Results ---")
