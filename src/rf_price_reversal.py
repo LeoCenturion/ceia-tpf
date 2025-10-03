@@ -164,7 +164,7 @@ def select_features(X: pd.DataFrame, y: pd.Series, corr_threshold=0.7, p_value_t
     print(f"Selected {len(selected_features)} features out of {len(X.columns)} based on correlation criteria.")
     return selected_features
 
-
+# AI add a refit threshold AI!
 def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3):
     """
     Performs a manual walk-forward backtest with an expanding window.
@@ -287,6 +287,8 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     if peak_method == 'ao_on_price':
         # Threshold is a difference, so values can be smaller than absolute price
         peak_threshold = trial.suggest_float('peak_threshold', 0.0, 100.0)
+    elif peak_method == 'pct_change_on_ao':
+        peak_threshold = trial.suggest_float('peak_threshold', 0.0, 5)
     else:  # For pct_change based methods, the scale is much smaller
         peak_threshold = trial.suggest_float('peak_threshold', 0.0, 0.005)
 
@@ -355,7 +357,7 @@ def main():
     data = fetch_historical_data(
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
         start_date="2022-01-01T00:00:00Z"
-    ).iloc[-2000:]
+    )
 
     # 2. Setup and Run Optuna Study
     study_name = "optuna-study"
