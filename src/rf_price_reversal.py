@@ -164,44 +164,43 @@ def select_features(X: pd.DataFrame, y: pd.Series, corr_threshold=0.7, p_value_t
     print(f"Selected {len(selected_features)} features out of {len(X.columns)} based on correlation criteria.")
     return selected_features
 
-# AI add a refit threshold AI!
-def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3):
+def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3, refit_every: int = 1):
     """
     Performs a manual walk-forward backtest with an expanding window.
-    At each step in the test set, the model is retrained using all historical data
-    up to that point before making a prediction for the next step.
+    The model is refit every `refit_every` steps.
 
     Args:
         X (pd.DataFrame): The feature matrix.
         y (pd.Series): The target vector.
         model: A scikit-learn compatible classifier.
         test_size (float): The proportion of the dataset to be used for testing.
+        refit_every (int): How often (in steps) to refit the model. Default is 1 (every step).
     """
     split_index = int(len(X) * (1 - test_size))
     X_test = X.iloc[split_index:]
     y_test = y.iloc[split_index:]
 
     y_pred = []
+    scaler = StandardScaler()
 
-    print("Starting walk-forward backtest with retraining at each step...")
+    print("Starting walk-forward backtest...")
     # Walk forward
     for i in range(len(X_test)):
         current_split_index = split_index + i
 
-        # Define current training data (expanding window)
-        X_train_current = X.iloc[:current_split_index]
-        y_train_current = y.iloc[:current_split_index]
+        # Periodically refit the model on an expanding window
+        if i % refit_every == 0:
+            print(f"Refitting model at step {i+1}/{len(X_test)}...")
+            X_train_current = X.iloc[:current_split_index]
+            y_train_current = y.iloc[:current_split_index]
+            
+            # Scale training data and retrain model
+            X_train_current_scaled = scaler.fit_transform(X_train_current)
+            model.fit(X_train_current_scaled, y_train_current)
 
-        # Define current test sample
+        # Get current test sample and scale it using the latest scaler
         X_test_current = X.iloc[current_split_index:current_split_index + 1]
-
-        # Scale data
-        scaler = StandardScaler()
-        X_train_current_scaled = scaler.fit_transform(X_train_current)
         X_test_current_scaled = scaler.transform(X_test_current)
-
-        # Retrain model
-        model.fit(X_train_current_scaled, y_train_current)
 
         # Predict
         prediction = model.predict(X_test_current_scaled)
@@ -300,6 +299,7 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     max_depth = trial.suggest_int('max_depth', 5, 50, log=True)
     min_samples_split = trial.suggest_int('min_samples_split', 2, 20)
     min_samples_leaf = trial.suggest_int('min_samples_leaf', 1, 20)
+    refit_every = trial.suggest_int('refit_every', 1, 50)
 
     # === 2. Run the ML Pipeline ===
     print(f"\n--- Starting Trial {trial.number} ---")
@@ -335,7 +335,7 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
         n_jobs=-1,
         class_weight='balanced'
     )
-    _, _, report = manual_backtest(X, y, model, test_size=0.3)
+    _, _, report = manual_backtest(X, y, model, test_size=0.3, refit_every=refit_every)
 
     # === 3. Calculate and Return the Objective Metric ===
     f1_top = report.get('Top (1)', {}).get('f1-score', 0.0)
