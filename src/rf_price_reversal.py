@@ -13,6 +13,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.preprocessing import StandardScaler
 import mplfinance as mpf
+import pandas_ta as ta
 
 from backtest_utils import fetch_historical_data, sma, ewm, std, rsi_indicator
 
@@ -61,68 +62,85 @@ def stochastic_oscillator(high: pd.Series, low: pd.Series, close: pd.Series, n: 
     return pd.DataFrame({'%K': k_percent, '%D': d_percent})
 
 
-# AI add the following features if they're not already
-# average volume
-# fluctuation kcp
-# Volume
-# fluctuation bbp
-# trend macd
-# fluctuation DCP
-# trend ADX
-# trend difference MACD
-# trend difference VORTEX
-# VORTEX trend
-# trend AROON
-# trend CCI
-# momentum RSI
-# trend STC
-# momentum UO
-# momentum TSI
-# momentum STOCH SIGNAL
-# stochastic momentum
-# momentum AO
-# momentum WR
-# momentum ROC
-# above EMA 10,20,40,60
-# Relative stregth index
-# above EMA 15,30,50
-# AI!
-
 def create_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Creates a set of technical analysis features based on percentage changes.
+    Creates a set of technical analysis features based on percentage changes and raw price data.
     """
     features = pd.DataFrame(index=df.index)
 
-    # Price and percentage change
+    # --- Original features based on percentage changes ---
     high_pct = df['High'].pct_change().fillna(0)
     low_pct = df['Low'].pct_change().fillna(0)
     close_pct = df['Close'].pct_change().fillna(0)
     features['pct_change'] = close_pct
+    features['RSI_pct'] = rsi_indicator(close_pct, n=14)
+    stoch_pct = stochastic_oscillator(high_pct, low_pct, close_pct)
+    features['Stoch_K_pct'] = stoch_pct['%K']
+    features['Stoch_D_pct'] = stoch_pct['%D']
+    macd_pct_df = macd(close_pct)
+    features['MACD_pct'] = macd_pct_df['MACD']
+    features['MACD_Signal_pct'] = macd_pct_df['Signal']
+    features['MACD_Hist_pct'] = macd_pct_df['Hist']
+    features['MFI_pct'] = mfi(high_pct, low_pct, close_pct, df['Volume'], n=14)
+    sma20_pct = sma(close_pct, 20)
+    std20_pct = std(close_pct, 20)
+    features['BB_Upper_pct'] = sma20_pct + (std20_pct * 2)
+    features['BB_Lower_pct'] = sma20_pct - (std20_pct * 2)
+    features['BB_Width_pct'] = (features['BB_Upper_pct'] - features['BB_Lower_pct']) / sma20_pct
+
+    # --- New features based on raw price data ---
+
+    # Volume
+    features['Volume'] = df['Volume']
+    features['avg_volume_20'] = sma(df['Volume'], 20)
 
     # Momentum Indicators
-    features['RSI'] = rsi_indicator(close_pct, n=14)
-    stoch = stochastic_oscillator(high_pct, low_pct, close_pct)
-    features['Stoch_K'] = stoch['%K']
-    features['Stoch_D'] = stoch['%D']
+    features['RSI'] = ta.rsi(df['Close'])
+    features['AO'] = awesome_oscillator(df['High'], df['Low'])
+    features['WR'] = ta.willr(df['High'], df['Low'], df['Close'])
+    features['ROC'] = ta.roc(df['Close'])
+    features = pd.concat([features, ta.uo(df['High'], df['Low'], df['Close'])], axis=1)
+    features = pd.concat([features, ta.tsi(df['Close'])], axis=1)
+    stoch_price = stochastic_oscillator(df['High'], df['Low'], df['Close'])
+    features['Stoch_K'] = stoch_price['%K']
+    features['Stoch_D'] = stoch_price['%D']
 
     # Trend Indicators
-    macd_df = macd(close_pct)
-    features['MACD'] = macd_df['MACD']
-    features['MACD_Signal'] = macd_df['Signal']
-    features['MACD_Hist'] = macd_df['Hist']
+    macd_price_df = macd(df['Close'])
+    features['MACD'] = macd_price_df['MACD']
+    features['MACD_Signal'] = macd_price_df['Signal']
+    features['MACD_Hist'] = macd_price_df['Hist']
+    features = pd.concat([features, ta.adx(df['High'], df['Low'], df['Close'])], axis=1)
+    features = pd.concat([features, ta.aroon(df['High'], df['Low'])], axis=1)
+    features['CCI'] = ta.cci(df['High'], df['Low'], df['Close'])
+    features = pd.concat([features, ta.stc(df['Close'])], axis=1)
+    vortex = ta.vortex(df['High'], df['Low'], df['Close'])
+    features = pd.concat([features, vortex], axis=1)
+    if 'VTXP_14' in features.columns and 'VTXM_14' in features.columns:
+        features['VORTEX_diff'] = features['VTXP_14'] - features['VTXM_14']
 
-    # Volume Indicators
-    features['MFI'] = mfi(high_pct, low_pct, close_pct, df['Volume'], n=14)
+    # Fluctuation Indicators
+    bbands = ta.bbands(df['Close'])
+    if bbands is not None and not bbands.empty:
+        features['BBP'] = bbands.get('BBP_20_2.0')
 
-    # Volatility Indicators
-    sma20 = sma(close_pct, 20)
-    std20 = std(close_pct, 20)
-    features['BB_Upper'] = sma20 + (std20 * 2)
-    features['BB_Lower'] = sma20 - (std20 * 2)
-    features['BB_Width'] = (features['BB_Upper'] - features['BB_Lower']) / sma20
+    keltner = ta.kc(df['High'], df['Low'], df['Close'])
+    if keltner is not None and not keltner.empty:
+        kc_range = (keltner['KCU_20_2.0'] - keltner['KCL_20_2.0'])
+        features['KCP'] = (df['Close'] - keltner['KCL_20_2.0']) / kc_range.replace(0, np.nan)
+
+    donchian = ta.donchian(df['High'], df['Low'])
+    if donchian is not None and not donchian.empty:
+        dc_range = (donchian['DCU_20_20'] - donchian['DCL_20_20'])
+        features['DCP'] = (df['Close'] - donchian['DCL_20_20']) / dc_range.replace(0, np.nan)
+
+    # EMA features
+    emas = [10, 15, 20, 30, 40, 50, 60]
+    for e in emas:
+        features[f'above_ema_{e}'] = (df['Close'] > ewm(df['Close'], span=e)).astype(int)
 
     # Fill NaN values that might have been generated
+    features.replace([np.inf, -np.inf], np.nan, inplace=True)
     features.bfill(inplace=True)
     features.ffill(inplace=True)
 
@@ -300,7 +318,7 @@ def plot_reversals_on_candlestick(data: pd.DataFrame, reversal_points: pd.DataFr
              volume=True,
              panel_ratios=(3, 1))
 
-# AI resume running trials
+
 def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     """
     Optuna objective function to tune hyperparameters for the RF price reversal model.
@@ -404,7 +422,18 @@ def main():
         load_if_exists=True
     )
 
-    study.optimize(objective_with_data, n_trials=N_TRIALS, n_jobs=-1)
+    completed_trials = len(study.trials)
+    remaining_trials = N_TRIALS - completed_trials
+
+    if remaining_trials > 0:
+        print(f"Study '{study_name_in_db}' has {completed_trials} completed trials. Running for {remaining_trials} more to reach {N_TRIALS}.")
+        try:
+            study.optimize(objective_with_data, n_trials=remaining_trials, n_jobs=-1)
+        except KeyboardInterrupt:
+            print("Study interrupted by user. Will show best results so far.")
+    else:
+        print(f"Study '{study_name_in_db}' has already completed {completed_trials} trials. No more trials to run.")
+
     # 3. Print Study Results
     print("\n--- Optuna Study Best Results ---")
     print(f"Best trial value (Average F1 Score): {study.best_value}")
