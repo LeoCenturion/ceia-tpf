@@ -253,8 +253,8 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
     features = pd.concat([features, aroon(df['High'], df['Low'])], axis=1)
     features['CCI'] = cci(df['High'], df['Low'], df['Close'])
     features = pd.concat([features, stc(df['Close'])], axis=1)
-    vortex = vortex(df['High'], df['Low'], df['Close'])
-    features = pd.concat([features, vortex], axis=1)
+    vortex_df = vortex(df['High'], df['Low'], df['Close'])
+    features = pd.concat([features, vortex_df], axis=1)
     if 'VTXP_14' in features.columns and 'VTXM_14' in features.columns:
         features['VORTEX_diff'] = features['VTXP_14'] - features['VTXM_14']
 
