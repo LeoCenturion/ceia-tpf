@@ -61,6 +61,33 @@ def stochastic_oscillator(high: pd.Series, low: pd.Series, close: pd.Series, n: 
     return pd.DataFrame({'%K': k_percent, '%D': d_percent})
 
 
+# AI add the following features if they're not already
+# average volume
+# fluctuation kcp
+# Volume
+# fluctuation bbp
+# trend macd
+# fluctuation DCP
+# trend ADX
+# trend difference MACD
+# trend difference VORTEX
+# VORTEX trend
+# trend AROON
+# trend CCI
+# momentum RSI
+# trend STC
+# momentum UO
+# momentum TSI
+# momentum STOCH SIGNAL
+# stochastic momentum
+# momentum AO
+# momentum WR
+# momentum ROC
+# above EMA 10,20,40,60
+# Relative stregth index
+# above EMA 15,30,50
+# AI!
+
 def create_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     Creates a set of technical analysis features based on percentage changes.
@@ -193,7 +220,7 @@ def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3
             print(f"Refitting model at step {i+1}/{len(X_test)}...")
             X_train_current = X.iloc[:current_split_index]
             y_train_current = y.iloc[:current_split_index]
-            
+
             # Scale training data and retrain model
             X_train_current_scaled = scaler.fit_transform(X_train_current)
             model.fit(X_train_current_scaled, y_train_current)
@@ -273,7 +300,7 @@ def plot_reversals_on_candlestick(data: pd.DataFrame, reversal_points: pd.DataFr
              volume=True,
              panel_ratios=(3, 1))
 
-
+# AI resume running trials
 def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     """
     Optuna objective function to tune hyperparameters for the RF price reversal model.
@@ -377,18 +404,7 @@ def main():
         load_if_exists=True
     )
 
-    completed_trials = len(study.trials)
-    remaining_trials = N_TRIALS - completed_trials
-
-    if remaining_trials > 0:
-        print(f"Study '{study_name_in_db}' has {completed_trials} completed trials. Running for {remaining_trials} more to reach {N_TRIALS}.")
-        try:
-            study.optimize(objective_with_data, n_trials=remaining_trials, n_jobs=-1)
-        except KeyboardInterrupt:
-            print("Study interrupted by user. Will show best results so far.")
-    else:
-        print(f"Study '{study_name_in_db}' has already completed {completed_trials} trials. No more trials to run.")
-
+    study.optimize(objective_with_data, n_trials=N_TRIALS, n_jobs=-1)
     # 3. Print Study Results
     print("\n--- Optuna Study Best Results ---")
     print(f"Best trial value (Average F1 Score): {study.best_value}")
