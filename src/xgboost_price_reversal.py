@@ -12,8 +12,9 @@ from sklearn.model_selection import train_test_split
 import xgboost as xgb
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.preprocessing import StandardScaler
-from sklearn.utils.class_weight import compute_sample_weight
+from sklearn.utils.class_weight import compute_class_weight
 import mplfinance as mpf
+import cupy as cp
 
 from backtest_utils import fetch_historical_data, sma, ewm, std, rsi_indicator
 
@@ -385,23 +386,31 @@ def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3
             X_train_current = X.iloc[:current_split_index]
             y_train_current = y.iloc[:current_split_index]
 
-            # Scale training data and retrain model
+            # Scale training data
             X_train_current_scaled = scaler.fit_transform(X_train_current)
-            
+
             # Calculate sample weights for balanced classes
-            sample_weights = compute_sample_weight(
-                class_weight='balanced',
-                y=y_train_current
-            )
-            model.fit(X_train_current_scaled, y_train_current, sample_weight=sample_weights)
+            classes = np.unique(y_train_current)
+            weights = compute_class_weight(class_weight='balanced', classes=classes, y=y_train_current)
+            class_weight_dict = dict(zip(classes, weights))
+            sample_weights = y_train_current.map(class_weight_dict).to_numpy()
+
+            # Move data to GPU and retrain model
+            X_train_gpu = cp.asarray(X_train_current_scaled)
+            y_train_gpu = cp.asarray(y_train_current)
+            sample_weights_gpu = cp.asarray(sample_weights)
+            model.fit(X_train_gpu, y_train_gpu, sample_weight=sample_weights_gpu)
 
         # Get current test sample and scale it using the latest scaler
         X_test_current = X.iloc[current_split_index:current_split_index + 1]
         X_test_current_scaled = scaler.transform(X_test_current)
 
+        # Move data to GPU for prediction
+        X_test_gpu = cp.asarray(X_test_current_scaled)
+
         # Predict
-        prediction = model.predict(X_test_current_scaled)
-        y_pred.append(prediction[0])
+        prediction = model.predict(X_test_gpu)
+        y_pred.append(int(cp.asnumpy(prediction)[0]))
 
         if (i + 1) % 50 == 0 or (i + 1) == len(X_test):
             print(f"Processed {i+1}/{len(X_test)} steps...")
@@ -494,12 +503,12 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     corr_threshold = trial.suggest_float('corr_threshold', 0.1, 0.7)
 
     # Model hyperparameters for XGBoost
+    # Model hyperparameters for XGBoost
     params = {
         'objective': 'multi:softmax',
         'num_class': 3,
         'eval_metric': 'mlogloss',
-        'tree_method': 'hist',  # Use GPU
-        'device': 'cuda',
+        'tree_method': 'gpu_hist',  # Use GPU
         'n_estimators': trial.suggest_int('n_estimators', 50, 400),
         'learning_rate': trial.suggest_float('learning_rate', 1e-3, 0.3, log=True),
         'max_depth': trial.suggest_int('max_depth', 3, 10),
