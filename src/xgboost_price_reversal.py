@@ -359,7 +359,6 @@ def select_features(X: pd.DataFrame, y: pd.Series, corr_threshold=0.7, p_value_t
             continue
 
         corr, p_value = pearsonr(temp_df.iloc[:, 0], temp_df.iloc[:, 1])
-        print(corr, p_value)
         if abs(corr) >= corr_threshold and p_value < p_value_threshold:
             selected_features.append(col)
 
@@ -498,7 +497,7 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     """
     # === 1. Define Hyperparameter Search Space ===
     # Peak detection hyperparameters
-    peak_method = trial.suggest_categorical('peak_method', ['ao_on_price', 'ao_on_pct_change', 'pct_change_on_ao'])
+    peak_method = trial.suggest_categorical('peak_method', ['pct_change_on_ao'])
     peak_distance = trial.suggest_int('peak_distance', 1, 5)
 
     if peak_method == 'ao_on_price':
@@ -557,7 +556,6 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     selected_cols = select_features(X, y, corr_threshold=corr_threshold)
     if selected_cols:
         X = X[selected_cols]
-    print(selected_cols)
     # Run Backtest
     model = xgb.XGBClassifier(**params)
     _, _, report = manual_backtest(X, y_mapped, model, test_size=0.3, refit_every=refit_every)
@@ -587,7 +585,7 @@ def main():
 
     # 2. Setup and Run Optuna Study
     db_file_name = "optuna-study"
-    study_name_in_db = 'xgboost price reversal v0'
+    study_name_in_db = 'xgboost price reversal v1'
     storage_name = f"sqlite:///{db_file_name}.db"
 
     print(f"Starting Optuna study: '{study_name_in_db}'. Storage: {storage_name}")
