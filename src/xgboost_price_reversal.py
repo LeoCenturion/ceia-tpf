@@ -13,6 +13,7 @@ import xgboost as xgb
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.class_weight import compute_class_weight
+import matplotlib.pyplot as plt
 import mplfinance as mpf
 import cupy as cp
 
@@ -603,4 +604,27 @@ def main():
 if __name__ == "__main__":
     main()
 
-# AI make a function plotting features used based on different correlation tresholds, eg 0.1, 0.2,...0.9 AI!
+
+def plot_feature_selection_by_threshold(X: pd.DataFrame, y: pd.Series):
+    """
+    Plots the number of selected features for different correlation thresholds.
+    """
+    thresholds = np.arange(0.1, 1.0, 0.1)
+    num_features = []
+
+    print("\nAnalyzing feature selection across different correlation thresholds...")
+    for threshold in thresholds:
+        # We only care about the count, so p-value threshold can be relaxed for this analysis
+        selected = select_features(X, y, corr_threshold=threshold, p_value_threshold=1.0)
+        num_features.append(len(selected))
+        print(f"Threshold: {threshold:.1f}, Features selected: {len(selected)}")
+
+    plt.figure(figsize=(12, 7))
+    bar_positions = np.arange(len(thresholds))
+    plt.bar(bar_positions, num_features)
+    plt.title('Number of Selected Features vs. Correlation Threshold')
+    plt.xlabel('Pearson Correlation Threshold')
+    plt.ylabel('Number of Features Selected')
+    plt.xticks(bar_positions, [f"{t:.1f}" for t in thresholds])
+    plt.grid(axis='y', linestyle='--')
+    plt.show()
