@@ -14,6 +14,7 @@ from sklearn.metrics import classification_report, accuracy_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.class_weight import compute_class_weight
 import matplotlib.pyplot as plt
+import seaborn as sns
 import mplfinance as mpf
 import cupy as cp
 
@@ -602,29 +603,62 @@ def main():
         print(f"  {key}: {value}")
 
 
-# AI also plot, for each feature, at which trehshold value it gets filtered AI!
 def plot_feature_selection_by_threshold(X: pd.DataFrame, y: pd.Series):
     """
-    Plots the number of selected features for different correlation thresholds.
+    Plots the number of selected features for different correlation thresholds
+    and shows which features are selected at each threshold.
     """
-    thresholds = np.arange(0.1, 1.0, 0.1)
-    num_features = []
+    # 1. Calculate absolute Pearson correlations for all features
+    correlations = {}
+    print("\nCalculating feature correlations...")
+    for col in X.columns:
+        temp_df = pd.concat([X[col], y], axis=1).dropna()
+        if len(temp_df) < 2:
+            correlations[col] = 0
+            continue
+        corr, _ = pearsonr(temp_df.iloc[:, 0], temp_df.iloc[:, 1])
+        correlations[col] = abs(corr)
 
+    corr_df = pd.DataFrame.from_dict(correlations, orient='index', columns=['correlation']).sort_values('correlation', ascending=False)
+
+    # --- Plot 1: Number of features vs. Threshold ---
+    thresholds = np.round(np.arange(0.1, 1.0, 0.1), 1)
+    num_features = []
     print("\nAnalyzing feature selection across different correlation thresholds...")
     for threshold in thresholds:
-        # We only care about the count, so p-value threshold can be relaxed for this analysis
-        selected = select_features(X, y, corr_threshold=threshold, p_value_threshold=1.0)
-        num_features.append(len(selected))
-        print(f"Threshold: {threshold:.1f}, Features selected: {len(selected)}")
+        selected_count = (corr_df['correlation'] >= threshold).sum()
+        num_features.append(selected_count)
+        print(f"Threshold: {threshold:.1f}, Features selected: {selected_count}")
 
     plt.figure(figsize=(12, 7))
     bar_positions = np.arange(len(thresholds))
-    plt.bar(bar_positions, num_features)
+    bars = plt.bar(bar_positions, num_features)
     plt.title('Number of Selected Features vs. Correlation Threshold')
     plt.xlabel('Pearson Correlation Threshold')
     plt.ylabel('Number of Features Selected')
     plt.xticks(bar_positions, [f"{t:.1f}" for t in thresholds])
+    plt.bar_label(bars)
     plt.grid(axis='y', linestyle='--')
+    plt.show()
+
+    # --- Plot 2: Heatmap of feature selection ---
+    # Filter to only show features that are selected by at least the lowest threshold
+    features_to_plot = corr_df[corr_df['correlation'] >= thresholds[0]]
+
+    if features_to_plot.empty:
+        print("No features met the lowest correlation threshold of 0.1. Skipping heatmap.")
+        return
+
+    selection_matrix = pd.DataFrame(index=features_to_plot.index)
+    for t in thresholds:
+        selection_matrix[f'>={t:.1f}'] = (features_to_plot['correlation'] >= t).astype(int)
+
+    plt.figure(figsize=(10, max(8, len(features_to_plot.index) * 0.3)))
+    sns.heatmap(selection_matrix, annot=True, cbar=False, cmap='viridis', linewidths=.5)
+    plt.title('Feature Selection at Different Correlation Thresholds')
+    plt.xlabel('Correlation Threshold')
+    plt.ylabel('Feature')
+    plt.tight_layout()
     plt.show()
 
 if __name__ == "__main__":
