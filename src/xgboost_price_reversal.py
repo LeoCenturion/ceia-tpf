@@ -601,30 +601,8 @@ def main():
     for key, value in study.best_params.items():
         print(f"  {key}: {value}")
 
-if __name__ == "__main__":
-    # main()
-    
-    # --- Code to generate X and y for plot_feature_selection_by_threshold ---
-    print("Preparing data for feature selection analysis plot...")
-    # 1. Load data
-    data = fetch_historical_data(
-        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
-        start_date="2022-01-01T00:00:00Z"
-    )
-    # 2. Create a representative target variable for correlation analysis
-    # The exact method doesn't matter as much as having a target to correlate against.
-    reversal_data = create_target_variable(data.copy(), method='ao_on_price')
-    y = reversal_data['target']
-    
-    # 3. Create features
-    features_df = create_features(data)
-    X = features_df.loc[reversal_data.index]
-    X = X.loc[:, (X != X.iloc[0]).any()]  # Drop constant columns
 
-    # 4. Call the plotting function
-    plot_feature_selection_by_threshold(X, y)
-
-
+# AI also plot, for each feature, at which trehshold value it gets filtered AI!
 def plot_feature_selection_by_threshold(X: pd.DataFrame, y: pd.Series):
     """
     Plots the number of selected features for different correlation thresholds.
@@ -648,3 +626,27 @@ def plot_feature_selection_by_threshold(X: pd.DataFrame, y: pd.Series):
     plt.xticks(bar_positions, [f"{t:.1f}" for t in thresholds])
     plt.grid(axis='y', linestyle='--')
     plt.show()
+
+if __name__ == "__main__":
+    # main()
+    
+    # --- Code to generate X and y for plot_feature_selection_by_threshold ---
+    print("Preparing data for feature selection analysis plot...")
+    # 1. Load data
+    data = fetch_historical_data(
+        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
+        start_date="2022-01-01T00:00:00Z"
+    )
+    # 2. Create a representative target variable for correlation analysis
+    # The exact method doesn't matter as much as having a target to correlate against.
+    reversal_data = create_target_variable(data.copy(), method='ao_on_price')
+    y = reversal_data['target']
+    
+    # 3. Create features
+    features_df = create_features(data)
+    X = features_df.loc[reversal_data.index]
+    X = X.loc[:, (X != X.iloc[0]).any()]  # Drop constant columns
+
+    # 4. Call the plotting function
+    plot_feature_selection_by_threshold(X, y)
+
