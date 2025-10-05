@@ -205,7 +205,6 @@ def donchian_channels(high: pd.Series, low: pd.Series, n: int = 20):
     return pd.DataFrame({f'DCU_{n}_{n}': upper, f'DCL_{n}_{n}': lower})
 
 
-# AI add lagged values for pct_change of open, close, high, low AI!
 def create_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     Creates a set of technical analysis features based on percentage changes and raw price data.
@@ -213,6 +212,7 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
     features = pd.DataFrame(index=df.index)
 
     # --- Original features based on percentage changes ---
+    open_pct = df['Open'].pct_change().fillna(0)
     high_pct = df['High'].pct_change().fillna(0)
     low_pct = df['Low'].pct_change().fillna(0)
     close_pct = df['Close'].pct_change().fillna(0)
@@ -231,6 +231,13 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
     features['BB_Upper_pct'] = sma20_pct + (std20_pct * 2)
     features['BB_Lower_pct'] = sma20_pct - (std20_pct * 2)
     features['BB_Width_pct'] = (features['BB_Upper_pct'] - features['BB_Lower_pct']) / sma20_pct
+
+    # Lagged pct_change features
+    for lag in range(1, 6):
+        features[f'open_pct_lag_{lag}'] = open_pct.shift(lag)
+        features[f'high_pct_lag_{lag}'] = high_pct.shift(lag)
+        features[f'low_pct_lag_{lag}'] = low_pct.shift(lag)
+        features[f'close_pct_lag_{lag}'] = close_pct.shift(lag)
 
     # --- New features based on raw price data ---
 
