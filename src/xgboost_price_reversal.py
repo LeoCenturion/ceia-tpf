@@ -498,7 +498,8 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
         'objective': 'multi:softmax',
         'num_class': 3,
         'eval_metric': 'mlogloss',
-        'tree_method': 'gpu_hist',  # Use GPU
+        'tree_method': 'hist',  # Use GPU
+        'device': 'cuda',
         'n_estimators': trial.suggest_int('n_estimators', 50, 400),
         'learning_rate': trial.suggest_float('learning_rate', 1e-3, 0.3, log=True),
         'max_depth': trial.suggest_int('max_depth', 3, 10),
@@ -556,7 +557,7 @@ def main():
     """
     Main function to run the Optuna hyperparameter optimization study.
     """
-    N_TRIALS = 50
+    N_TRIALS = 1
 
     # 1. Load Data
     print("Loading historical data...")
@@ -567,7 +568,7 @@ def main():
 
     # 2. Setup and Run Optuna Study
     db_file_name = "optuna-study"
-    study_name_in_db = 'xgboost price reversal v1'
+    study_name_in_db = 'xgboost price reversal v0'
     storage_name = f"sqlite:///{db_file_name}.db"
 
     print(f"Starting Optuna study: '{study_name_in_db}'. Storage: {storage_name}")
