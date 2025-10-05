@@ -603,8 +603,26 @@ def main():
 
 if __name__ == "__main__":
     # main()
-    # AI add the missing parameters AI!
-    plot_feature_selection_by_threshold()
+    
+    # --- Code to generate X and y for plot_feature_selection_by_threshold ---
+    print("Preparing data for feature selection analysis plot...")
+    # 1. Load data
+    data = fetch_historical_data(
+        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
+        start_date="2022-01-01T00:00:00Z"
+    )
+    # 2. Create a representative target variable for correlation analysis
+    # The exact method doesn't matter as much as having a target to correlate against.
+    reversal_data = create_target_variable(data.copy(), method='ao_on_price')
+    y = reversal_data['target']
+    
+    # 3. Create features
+    features_df = create_features(data)
+    X = features_df.loc[reversal_data.index]
+    X = X.loc[:, (X != X.iloc[0]).any()]  # Drop constant columns
+
+    # 4. Call the plotting function
+    plot_feature_selection_by_threshold(X, y)
 
 
 def plot_feature_selection_by_threshold(X: pd.DataFrame, y: pd.Series):
