@@ -549,7 +549,7 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     selected_cols = select_features(X, y, corr_threshold=corr_threshold)
     if selected_cols:
         X = X[selected_cols]
-    
+    print(selected_cols)
     # Run Backtest
     model = xgb.XGBClassifier(**params)
     _, _, report = manual_backtest(X, y_mapped, model, test_size=0.3, refit_every=refit_every)
@@ -661,9 +661,7 @@ def plot_feature_selection_by_threshold(X: pd.DataFrame, y: pd.Series):
     plt.tight_layout()
     plt.show()
 
-if __name__ == "__main__":
-    # main()
-    
+def show_plot():
     # --- Code to generate X and y for plot_feature_selection_by_threshold ---
     print("Preparing data for feature selection analysis plot...")
     # 1. Load data
@@ -675,7 +673,7 @@ if __name__ == "__main__":
     # The exact method doesn't matter as much as having a target to correlate against.
     reversal_data = create_target_variable(data.copy(), method='ao_on_price')
     y = reversal_data['target']
-    
+
     # 3. Create features
     features_df = create_features(data)
     X = features_df.loc[reversal_data.index]
@@ -683,4 +681,9 @@ if __name__ == "__main__":
 
     # 4. Call the plotting function
     plot_feature_selection_by_threshold(X, y)
+
+if __name__ == "__main__":
+    main()
+    # AI call manual backtest once with a specific set of parameters AI!
+
 
