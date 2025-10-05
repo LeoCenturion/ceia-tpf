@@ -205,6 +205,7 @@ def donchian_channels(high: pd.Series, low: pd.Series, n: int = 20):
     return pd.DataFrame({f'DCU_{n}_{n}': upper, f'DCL_{n}_{n}': lower})
 
 
+# AI add lagged values for pct_change of open, close, high, low AI!
 def create_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     Creates a set of technical analysis features based on percentage changes and raw price data.
@@ -351,6 +352,7 @@ def select_features(X: pd.DataFrame, y: pd.Series, corr_threshold=0.7, p_value_t
             continue
 
         corr, p_value = pearsonr(temp_df.iloc[:, 0], temp_df.iloc[:, 1])
+        print(corr, p_value)
         if abs(corr) >= corr_threshold and p_value < p_value_threshold:
             selected_features.append(col)
 
@@ -483,14 +485,14 @@ def plot_reversals_on_candlestick(data: pd.DataFrame, reversal_points: pd.DataFr
              panel_ratios=(3, 1))
 
 
-def objective_v0_1(trial: optuna.Trial, data: pd.DataFrame) -> float:
+def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     """
     Optuna objective function to tune hyperparameters for the XGBoost price reversal model.
     """
     # === 1. Define Hyperparameter Search Space ===
     # Peak detection hyperparameters
-    peak_method = trial.suggest_categorical('peak_method', ['pct_change_on_ao'])
-    peak_distance = trial.suggest_int('peak_distance', 4, 10)
+    peak_method = trial.suggest_categorical('peak_method', ['ao_on_price', 'ao_on_pct_change', 'pct_change_on_ao'])
+    peak_distance = trial.suggest_int('peak_distance', 1, 5)
 
     if peak_method == 'ao_on_price':
         # Threshold is a difference, so values can be smaller than absolute price
@@ -513,10 +515,10 @@ def objective_v0_1(trial: optuna.Trial, data: pd.DataFrame) -> float:
         'n_estimators': trial.suggest_int('n_estimators', 50, 400),
         'learning_rate': trial.suggest_float('learning_rate', 1e-3, 0.3, log=True),
         'max_depth': trial.suggest_int('max_depth', 3, 10),
-        'subsample': trial.suggest_float('subsample', 0.5, 0.6),
-        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.9, 1.0),
-        'gamma': trial.suggest_float('gamma', 1e-8, 1e-4, log=True),
-        'min_child_weight': trial.suggest_int('min_child_weight', 7, 20),
+        'subsample': trial.suggest_float('subsample', 0.5, 1.0),
+        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
+        'gamma': trial.suggest_float('gamma', 1e-8, 1.0, log=True),
+        'min_child_weight': trial.suggest_int('min_child_weight', 1, 10),
         'random_state': 42,
         'n_jobs': -1
     }
@@ -578,7 +580,7 @@ def main():
 
     # 2. Setup and Run Optuna Study
     db_file_name = "optuna-study"
-    study_name_in_db = 'xgboost price reversal v0.1'
+    study_name_in_db = 'xgboost price reversal v0'
     storage_name = f"sqlite:///{db_file_name}.db"
 
     print(f"Starting Optuna study: '{study_name_in_db}'. Storage: {storage_name}")
@@ -732,7 +734,8 @@ def run_single_backtest():
     selected_cols = select_features(X, y, corr_threshold=params['corr_threshold'])
     if selected_cols:
         X = X[selected_cols]
-    
+    print(selected_cols)
+
     if X.empty:
         print("Feature set is empty. Cannot run backtest.")
         return
