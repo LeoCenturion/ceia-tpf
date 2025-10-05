@@ -470,7 +470,9 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     """
     # === 1. Define Hyperparameter Search Space ===
     # Peak detection hyperparameters
-    peak_method = trial.suggest_categorical('peak_method', ['ao_on_price', 'ao_on_pct_change', 'pct_change_on_ao'])
+    # peak_method = trial.suggest_categorical('peak_method', ['ao_on_price', 'ao_on_pct_change', 'pct_change_on_ao'])
+    peak_method = trial.suggest_categorical('peak_method', ['ao_on_price', 'ao_on_pct_change'])
+    # peak_method = trial.suggest_categorical('peak_method', [ 'pct_change_on_ao'])
     peak_distance = trial.suggest_int('peak_distance', 1, 5)
 
     if peak_method == 'ao_on_price':
@@ -552,11 +554,11 @@ def main():
 
     # 2. Setup and Run Optuna Study
     db_file_name = "optuna-study"
-    study_name_in_db = 'rf price reversal'
+    study_name_in_db = 'rf price reversal v2.1'
     storage_name = f"sqlite:///{db_file_name}.db"
-    
+
     print(f"Starting Optuna study: '{study_name_in_db}'. Storage: {storage_name}")
-    
+
     # Use a partial function to pass the loaded data to the objective function
     objective_with_data = partial(objective, data=data)
 
@@ -567,18 +569,7 @@ def main():
         load_if_exists=True
     )
 
-    completed_trials = len(study.trials)
-    remaining_trials = N_TRIALS - completed_trials
-
-    if remaining_trials > 0:
-        print(f"Study '{study_name_in_db}' has {completed_trials} completed trials. Running for {remaining_trials} more to reach {N_TRIALS}.")
-        try:
-            study.optimize(objective_with_data, n_trials=remaining_trials, n_jobs=-1)
-        except KeyboardInterrupt:
-            print("Study interrupted by user. Will show best results so far.")
-    else:
-        print(f"Study '{study_name_in_db}' has already completed {completed_trials} trials. No more trials to run.")
-
+    study.optimize(objective_with_data, n_trials=N_TRIALS, n_jobs=-1)
     # 3. Print Study Results
     print("\n--- Optuna Study Best Results ---")
     print(f"Best trial value (Average F1 Score): {study.best_value}")
