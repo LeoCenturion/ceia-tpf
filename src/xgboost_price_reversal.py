@@ -602,7 +602,9 @@ def main():
         print(f"  {key}: {value}")
 
 if __name__ == "__main__":
-    main()
+    # main()
+    # AI add the missing parameters AI!
+    plot_feature_selection_by_threshold()
 
 
 def plot_feature_selection_by_threshold(X: pd.DataFrame, y: pd.Series):
