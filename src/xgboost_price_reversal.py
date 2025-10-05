@@ -566,7 +566,7 @@ def main():
     """
     Main function to run the Optuna hyperparameter optimization study.
     """
-    N_TRIALS = 1
+    N_TRIALS = 50
 
     # 1. Load Data
     print("Loading historical data...")
@@ -602,3 +602,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# AI make a function plotting features used based on different correlation tresholds, eg 0.1, 0.2,...0.9 AI!
