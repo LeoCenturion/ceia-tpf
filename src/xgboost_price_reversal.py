@@ -682,8 +682,87 @@ def show_plot():
     # 4. Call the plotting function
     plot_feature_selection_by_threshold(X, y)
 
+def run_single_backtest():
+    """
+    Runs a single backtest with a specific set of pre-defined parameters.
+    This is useful for analyzing a single run without Optuna.
+    """
+    print("\n--- Running Single Backtest with Specific Parameters ---")
+
+    # 1. Load Data
+    data = fetch_historical_data(
+        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
+        start_date="2022-01-01T00:00:00Z"
+    )
+
+    # 2. Define Parameters
+    params = {
+        'peak_method': 'ao_on_price',
+        'peak_distance': 3,
+        'peak_threshold': 50.0,
+        'corr_threshold': 0.2,
+        'n_estimators': 250,
+        'learning_rate': 0.05,
+        'max_depth': 6,
+        'subsample': 0.85,
+        'colsample_bytree': 0.8,
+        'gamma': 0.2,
+        'min_child_weight': 4,
+        'refit_every': 24 * 7
+    }
+    print("Using parameters:")
+    for key, value in params.items():
+        print(f"  {key}: {value}")
+
+    # 3. Create Target Variable
+    reversal_data = create_target_variable(
+        data.copy(),
+        method=params['peak_method'],
+        peak_distance=params['peak_distance'],
+        peak_threshold=params['peak_threshold']
+    )
+    y = reversal_data['target']
+    y_mapped = y.map({-1: 0, 0: 1, 1: 2})
+
+    # 4. Create Features
+    features_df = create_features(data)
+    X = features_df.loc[reversal_data.index]
+    X = X.loc[:, (X != X.iloc[0]).any()]
+
+    # 5. Feature Selection
+    selected_cols = select_features(X, y, corr_threshold=params['corr_threshold'])
+    if selected_cols:
+        X = X[selected_cols]
+    print(selected_cols)
+
+    if X.empty:
+        print("Feature set is empty. Cannot run backtest.")
+        return
+
+    # 6. Setup and Run Backtest
+    model_params = {
+        'objective': 'multi:softmax',
+        'num_class': 3,
+        'eval_metric': 'mlogloss',
+        'tree_method': 'hist',
+        'device': 'cuda',
+        'n_estimators': params['n_estimators'],
+        'learning_rate': params['learning_rate'],
+        'max_depth': params['max_depth'],
+        'subsample': params['subsample'],
+        'colsample_bytree': params['colsample_bytree'],
+        'gamma': params['gamma'],
+        'min_child_weight': params['min_child_weight'],
+        'random_state': 42,
+        'n_jobs': -1
+    }
+    model = xgb.XGBClassifier(**model_params)
+
+    manual_backtest(X, y_mapped, model, test_size=0.3, refit_every=params['refit_every'])
+
+
 if __name__ == "__main__":
-    main()
-    # AI call manual backtest once with a specific set of parameters AI!
+    # main()  # Uncomment to run the Optuna study
+    run_single_backtest()
 
 
