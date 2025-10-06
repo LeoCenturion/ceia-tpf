@@ -313,11 +313,13 @@ def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_pct_change', p
     if method == 'pct_change_std':
         window = 24 * 7
         close_pct_change = df['Close'].pct_change()
+        # The target is based on the NEXT period's price change.
+        future_pct_change = close_pct_change.shift(-1)
         rolling_std = close_pct_change.rolling(window=window).std()
 
         df['target'] = 0
-        df.loc[close_pct_change >= rolling_std, 'target'] = 1
-        df.loc[close_pct_change <= -rolling_std, 'target'] = -1
+        df.loc[future_pct_change >= rolling_std, 'target'] = 1
+        df.loc[future_pct_change <= -rolling_std, 'target'] = -1
         return df
 
     if method == 'ao_on_pct_change':
