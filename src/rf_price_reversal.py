@@ -299,7 +299,7 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
 
     return features
 
-def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_pct_change', peak_distance: int = 1, peak_threshold: float = 0) -> pd.DataFrame:
+def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_pct_change', peak_distance: int = 1, peak_threshold: float = 0, std_fraction: float = 1.0) -> pd.DataFrame:
     """
     Identifies local tops (1), bottoms (-1), and non-reversal points (0)
     using different methods, and returns the DataFrame with a 'target' column.
@@ -318,8 +318,8 @@ def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_pct_change', p
         rolling_std = close_pct_change.rolling(window=window).std()
 
         df['target'] = 0
-        df.loc[future_pct_change >= rolling_std, 'target'] = 1
-        df.loc[future_pct_change <= -rolling_std, 'target'] = -1
+        df.loc[future_pct_change >= (rolling_std * std_fraction), 'target'] = 1
+        df.loc[future_pct_change <= -(rolling_std * std_fraction), 'target'] = -1
         return df
 
     if method == 'ao_on_pct_change':
@@ -492,17 +492,24 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     # === 1. Define Hyperparameter Search Space ===
     # Peak detection hyperparameters
     # peak_method = trial.suggest_categorical('peak_method', ['ao_on_price', 'ao_on_pct_change', 'pct_change_on_ao'])
-    peak_method = trial.suggest_categorical('peak_method', ['ao_on_price', 'ao_on_pct_change'])
+    peak_method = trial.suggest_categorical('peak_method', ['ao_on_price', 'ao_on_pct_change', 'pct_change_std'])
     # peak_method = trial.suggest_categorical('peak_method', [ 'pct_change_on_ao'])
-    peak_distance = trial.suggest_int('peak_distance', 1, 5)
 
-    if peak_method == 'ao_on_price':
-        # Threshold is a difference, so values can be smaller than absolute price
-        peak_threshold = trial.suggest_float('peak_threshold', 0.0, 100.0)
-    elif peak_method == 'pct_change_on_ao':
-        peak_threshold = trial.suggest_float('peak_threshold', 0.0, 5)
-    else:  # For pct_change based methods, the scale is much smaller
-        peak_threshold = trial.suggest_float('peak_threshold', 0.0, 0.005)
+    std_fraction = 1.0
+    if peak_method == 'pct_change_std':
+        std_fraction = trial.suggest_float('std_fraction', 0.5, 3.0)
+        # These are not used for 'pct_change_std' but need to be defined
+        peak_distance = 1
+        peak_threshold = 0
+    else:
+        peak_distance = trial.suggest_int('peak_distance', 1, 5)
+        if peak_method == 'ao_on_price':
+            # Threshold is a difference, so values can be smaller than absolute price
+            peak_threshold = trial.suggest_float('peak_threshold', 0.0, 100.0)
+        elif peak_method == 'pct_change_on_ao':
+            peak_threshold = trial.suggest_float('peak_threshold', 0.0, 5)
+        else:  # For pct_change based methods, the scale is much smaller
+            peak_threshold = trial.suggest_float('peak_threshold', 0.0, 0.005)
 
     # Feature selection hyperparameter
     corr_threshold = trial.suggest_float('corr_threshold', 0.1, 0.7)
@@ -519,7 +526,13 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     print(f"Params: {trial.params}")
 
     # Create Target Variable
-    reversal_data = create_target_variable(data.copy(), method=peak_method, peak_distance=peak_distance, peak_threshold=peak_threshold)
+    reversal_data = create_target_variable(
+        data.copy(),
+        method=peak_method,
+        peak_distance=peak_distance,
+        peak_threshold=peak_threshold,
+        std_fraction=std_fraction
+    )
 
     # Prune trial if not enough reversal points are found
     if reversal_data['target'].nunique() < 3 or reversal_data['target'].value_counts().get(1, 0) < 5 or reversal_data['target'].value_counts().get(-1, 0) < 5:
