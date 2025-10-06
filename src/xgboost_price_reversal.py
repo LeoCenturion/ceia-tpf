@@ -312,8 +312,18 @@ def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_pct_change', p
     - 'ao_on_price': Awesome Oscillator on actual prices.
     - 'ao_on_pct_change': Awesome Oscillator on price percentage changes.
     - 'pct_change_on_ao': Percentage change of Awesome Oscillator on actual prices.
+    - 'pct_change_std': Target based on closing price pct_change exceeding 1 std dev.
     """
-    # AI add the option to have pct_change of the closing price as target. -1 should be  a decreate of at least 1 standard deviation, +1 an increase of at least 1 standard deviation and 0 otherwise. For the standard deviation compute it based on a window of 24*7 entries AI!
+    if method == 'pct_change_std':
+        window = 24 * 7
+        close_pct_change = df['Close'].pct_change()
+        rolling_std = close_pct_change.rolling(window=window).std()
+
+        df['target'] = 0
+        df.loc[close_pct_change >= rolling_std, 'target'] = 1
+        df.loc[close_pct_change <= -rolling_std, 'target'] = -1
+        return df
+
     if method == 'ao_on_pct_change':
         # computing the peaks from the awesome oscillator from the pct_change of the values
         high_pct = df['High'].pct_change().fillna(0)
