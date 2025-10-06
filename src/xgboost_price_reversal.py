@@ -225,7 +225,8 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
     features['MACD_pct'] = macd_pct_df['MACD']
     features['MACD_Signal_pct'] = macd_pct_df['Signal']
     features['MACD_Hist_pct'] = macd_pct_df['Hist']
-    features['MFI_pct'] = mfi(high_pct, low_pct, close_pct, df['Volume'], n=14)
+    if 'Volume' in df.columns:
+        features['MFI_pct'] = mfi(high_pct, low_pct, close_pct, df['Volume'], n=14)
     sma20_pct = sma(close_pct, 20)
     std20_pct = std(close_pct, 20)
     features['BB_Upper_pct'] = sma20_pct + (std20_pct * 2)
@@ -242,8 +243,9 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
     # --- New features based on raw price data ---
 
     # Volume
-    features['Volume'] = df['Volume']
-    features['avg_volume_20'] = sma(df['Volume'], 20)
+    if 'Volume' in df.columns:
+        features['Volume'] = df['Volume']
+        features['avg_volume_20'] = sma(df['Volume'], 20)
 
     # Momentum Indicators
     features['RSI'] = rsi_indicator(df['Close'], n=14)
