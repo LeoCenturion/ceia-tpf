@@ -314,6 +314,7 @@ def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_pct_change', p
     - 'pct_change_on_ao': Percentage change of Awesome Oscillator on actual prices.
     - 'pct_change_std': Target based on closing price pct_change exceeding 1 std dev.
     """
+    # AI the increase with respect of rolling_std should correspond to the following period AI!
     if method == 'pct_change_std':
         window = 24 * 7
         close_pct_change = df['Close'].pct_change()
