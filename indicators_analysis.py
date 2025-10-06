@@ -19,8 +19,8 @@ sns.set(style="whitegrid")
 # Add src directory to path to allow for module import
 sys.path.append('src')
 try:
-    from xgboost_price_reversal import create_features
-    print("Successfully imported create_features from xgboost_price_reversal.")
+    from rf_price_reversal import create_features
+    print("Successfully imported create_features from rf_price_reversal.")
 except ImportError as e:
     print(f"Error importing create_features: {e}")
     print("Please ensure the script is run from the project root directory.")
