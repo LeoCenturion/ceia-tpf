@@ -77,6 +77,52 @@ plt.title('Cross-Correlation Matrix of Technical Features', fontsize=20)
 plt.show()
 
 #%% [markdown]
+# ### 3.1. Most and Least Correlated Features
+# We can also inspect the correlation matrix numerically to find the pairs of features with the highest and lowest correlations.
+
+#%%
+# Get absolute correlations and remove self-correlations
+abs_corr = correlation_matrix.abs()
+# Set diagonal to NaN to ignore self-correlation of 1
+np.fill_diagonal(abs_corr.values, np.nan)
+
+# Unstack the matrix to get a Series of correlations, then drop NaNs
+corr_pairs = abs_corr.unstack().dropna()
+
+# --- Find and print most correlated pairs ---
+print("--- Top 10 Most Correlated Feature Pairs ---")
+sorted_pairs = corr_pairs.sort_values(ascending=False)
+seen_most = set()
+top_pairs = []
+for index, value in sorted_pairs.items():
+    # Use a sorted tuple to represent the pair to handle duplicates (A,B) vs (B,A)
+    pair = tuple(sorted(index))
+    if pair not in seen_most:
+        top_pairs.append((index, value))
+        seen_most.add(pair)
+    if len(top_pairs) >= 10:
+        break
+for (feat1, feat2), corr in top_pairs:
+    print(f"{feat1:<30} | {feat2:<30} | {corr:.4f}")
+
+
+# --- Find and print least correlated pairs ---
+print("\n--- Top 10 Least Correlated Feature Pairs ---")
+sorted_pairs_asc = corr_pairs.sort_values(ascending=True)
+seen_least = set()
+bottom_pairs = []
+for index, value in sorted_pairs_asc.items():
+    # Use a sorted tuple to represent the pair to handle duplicates (A,B) vs (B,A)
+    pair = tuple(sorted(index))
+    if pair not in seen_least:
+        bottom_pairs.append((index, value))
+        seen_least.add(pair)
+    if len(bottom_pairs) >= 10:
+        break
+for (feat1, feat2), corr in bottom_pairs:
+    print(f"{feat1:<30} | {feat2:<30} | {corr:.4f}")
+
+#%% [markdown]
 # ### Analysis
 # The heatmap above visualizes the Pearson correlation coefficient between each pair of features.
 # - **Red colors** indicate a strong positive correlation (when one feature increases, the other tends to increase).
