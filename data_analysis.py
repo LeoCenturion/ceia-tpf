@@ -297,13 +297,13 @@ print(transition_matrix.to_string(float_format="%.3f"))
 # Plot the transition matrix as a heatmap
 print("\nPlotting the transition probability heatmap...")
 plt.figure(figsize=(12, 10))
-sns.heatmap(transition_matrix, annot=True, cmap='viridis', fmt='.2f', linewidths=.5)
+sns.heatmap(transition_matrix.T, annot=True, cmap='viridis', fmt='.2f', linewidths=.5)
 plt.title('Transition Probability Between Consecutive Run Lengths (-5 to +5)')
-plt.xlabel('To Run Length')
-plt.ylabel('From Run Length')
+plt.xlabel('From Run Length')
+plt.ylabel('To Run Length')
 plt.show()
 
 #%% [markdown]
-# The heatmap shows the probability of moving from a run length on the y-axis to a run length on the x-axis.
+# The heatmap shows the probability of moving from a run length on the x-axis to a run length on the y-axis.
 #
 # A key observation is the high probability along the anti-diagonal, especially for short runs. For example, there's a high likelihood that a run of `+1` is followed by a run of `-1`, and vice-versa. This suggests a strong tendency for the price direction to revert after short periods, which aligns with the previous observation that long runs are rare.
