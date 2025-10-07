@@ -217,3 +217,48 @@ plt.show()
 
 #%% [markdown]
 # The plots show a stark difference. The AO on raw prices reflects longer-term price trends and momentum, with large swings. The AO on percentage change is much more stationary and centered around zero, reflecting the short-term volatility and returns behavior rather than the price level itself.
+
+#%% [markdown]
+# ## 5. Consecutive Runs Analysis
+#
+# Here, we analyze the length of consecutive periods of positive or negative price changes. A "run" is a sequence of one or more hours where the price change has the same sign. For example:
+# - A single hour of gains is a run of `+1`.
+# - Three consecutive hours of gains is a run of `+3`.
+# - Two consecutive hours of losses is a run of `-2`.
+#
+# This analysis can help identify if there is momentum or mean-reversion behavior in the short term.
+
+#%%
+print("Analyzing consecutive runs of positive and negative price changes...")
+
+# Determine the sign of the price change, treating 0 as neutral
+signs = np.sign(df['close_pct_change'])
+# We replace 0s with the previous sign to not break a run
+signs = signs.replace(0, np.nan).ffill().fillna(0)
+
+# Identify blocks of consecutive signs
+blocks = signs.diff().ne(0).cumsum()
+
+# Calculate the length of each run and multiply by its sign
+runs = signs.groupby(blocks).apply(lambda x: x.size * x.iloc[0] if x.iloc[0] != 0 else 0)
+
+# Filter out any zero-runs that might have occurred at the beginning
+runs = runs[runs != 0]
+
+print("Consecutive runs calculated. Descriptive statistics:")
+print(runs.describe())
+
+#%%
+# Plot a histogram of the runs
+print("\nPlotting the histogram of consecutive runs...")
+plt.figure(figsize=(14, 7))
+sns.histplot(runs, discrete=True, stat="count", shrink=0.8)
+plt.title('Histogram of Consecutive Hourly Price Change Runs')
+plt.xlabel('Run Length (Negative = Losses, Positive = Gains)')
+plt.ylabel('Frequency (Count of Runs)')
+plt.xticks(np.arange(int(runs.min()), int(runs.max()) + 1, 1))
+plt.grid(True, which="both", ls="--")
+plt.show()
+
+#%% [markdown]
+# The histogram shows that short runs (of length 1, 2, or 3) are very common, while long streaks of consecutive gains or losses are increasingly rare. This is consistent with the behavior of a volatile asset where the direction can change frequently.
