@@ -262,3 +262,48 @@ plt.show()
 
 #%% [markdown]
 # The histogram shows that short runs (of length 1, 2, or 3) are very common, while long streaks of consecutive gains or losses are increasingly rare. This is consistent with the behavior of a volatile asset where the direction can change frequently.
+
+#%% [markdown]
+# ### 5.1. Run Transition Probability Analysis
+#
+# Now, we'll analyze the probability of transitioning from a run of one length to another. For example, what is the likelihood that a 1-hour run of gains is followed by a 1-hour run of losses? This can be modeled as a Markov chain, and we can compute the transition matrix.
+#
+# We will focus on transitions between runs of length -5 to +5.
+
+#%%
+print("Calculating run transition probabilities...")
+
+# Create a DataFrame of consecutive run pairs
+transitions = pd.DataFrame({'from': runs, 'to': runs.shift(-1)}).dropna()
+transitions = transitions.astype(int)
+
+# Create a transition count matrix using crosstab
+transition_counts = pd.crosstab(transitions['from'], transitions['to'])
+
+# Calculate transition probabilities by dividing each row by its sum
+transition_probabilities = transition_counts.div(transition_counts.sum(axis=1), axis=0)
+
+# Filter and reindex to focus on the -5 to +5 range, filling missing transitions with 0
+run_range = range(-5, 6)
+# Remove 0 from the range as it's not a valid run length in our data
+run_range = [i for i in run_range if i != 0]
+
+transition_matrix = transition_probabilities.reindex(index=run_range, columns=run_range, fill_value=0)
+
+print("Transition Matrix (-5 to +5):")
+print(transition_matrix.to_string(float_format="%.3f"))
+
+#%%
+# Plot the transition matrix as a heatmap
+print("\nPlotting the transition probability heatmap...")
+plt.figure(figsize=(12, 10))
+sns.heatmap(transition_matrix, annot=True, cmap='viridis', fmt='.2f', linewidths=.5)
+plt.title('Transition Probability Between Consecutive Run Lengths (-5 to +5)')
+plt.xlabel('To Run Length')
+plt.ylabel('From Run Length')
+plt.show()
+
+#%% [markdown]
+# The heatmap shows the probability of moving from a run length on the y-axis to a run length on the x-axis.
+#
+# A key observation is the high probability along the anti-diagonal, especially for short runs. For example, there's a high likelihood that a run of `+1` is followed by a run of `-1`, and vice-versa. This suggests a strong tendency for the price direction to revert after short periods, which aligns with the previous observation that long runs are rare.
