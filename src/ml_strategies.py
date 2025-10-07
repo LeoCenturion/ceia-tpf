@@ -649,6 +649,7 @@ class XGBoostPriceReversalStrategy(Strategy):
 
     @classmethod
     def get_optuna_params(cls, trial):
+        # AI make the refit period a parameter AI!
         return {
             "peak_distance": trial.suggest_int('peak_distance', 1, 5),
             "peak_threshold": trial.suggest_float('peak_threshold', 0.0, 5.0),
