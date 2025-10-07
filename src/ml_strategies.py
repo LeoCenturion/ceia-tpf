@@ -649,10 +649,12 @@ class XGBoostPriceReversalStrategy(Strategy):
 
     @classmethod
     def get_optuna_params(cls, trial):
+        # AI set the following parameters
+        # [peak_method: pct_change_on_ao, peak_distance: 4, peak_threshold: 0.3088073570333899, corr_threshold: 0.24234536219482808, n_estimators: 154, learning_rate: 0.1187900234174778, max_depth: 10, subsample: 0.5591095634844386, colsample_bytree: 0.8383126666102035, gamma: 0.11692201750072992, min_child_weight: 6] AI!
         return {
-            "refit_period": trial.suggest_int("refit_period", 24 * 3, 24 * 14, step=24),
+            "refit_period": trial.suggest_int("refit_period", 24 * 3, 24 * 7, step=24),
             "peak_distance": trial.suggest_int('peak_distance', 1, 5),
-            "peak_threshold": trial.suggest_float('peak_threshold', 0.0, 5.0),
+            "peak_threshold": trial.suggest_float('peak_threshold', 0.0, 1.0),
             "corr_threshold": trial.suggest_float('corr_threshold', 0.1, 0.7),
             "n_estimators": trial.suggest_int('n_estimators', 50, 400),
             "learning_rate": trial.suggest_float('learning_rate', 1e-3, 0.3, log=True),
