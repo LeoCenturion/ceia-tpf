@@ -6,6 +6,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 
 from backtest_utils import (
+    run_optimizations,
     sma,
     rsi_indicator,
     std,
@@ -179,7 +180,7 @@ def main():
         "SVCStrategy": SVCStrategy,
         "RandomForestClassifierStrategy": RandomForestClassifierStrategy,
     }
-    run_classification_optimizations(
+    run_optimizations(
         strategies=strategies,
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
         start_date="2022-01-01T00:00:00Z",
