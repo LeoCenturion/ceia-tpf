@@ -294,6 +294,12 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
     for e in emas:
         features[f'above_ema_{e}'] = (df['Close'] > ewm(df['Close'], span=e)).astype(int)
 
+    # Consecutive run feature
+    signs = np.sign(close_pct)
+    signs = signs.replace(0, np.nan).ffill().fillna(0).astype(int)
+    blocks = signs.diff().ne(0).cumsum()
+    features['run'] = signs.groupby(blocks).cumsum()
+
     # Fill NaN values that might have been generated
     features.replace([np.inf, -np.inf], np.nan, inplace=True)
     features.bfill(inplace=True)
