@@ -307,3 +307,56 @@ plt.show()
 # The heatmap shows the probability of moving from a run length on the x-axis to a run length on the y-axis.
 #
 # A key observation is the high probability along the anti-diagonal, especially for short runs. For example, there's a high likelihood that a run of `+1` is followed by a run of `-1`, and vice-versa. This suggests a strong tendency for the price direction to revert after short periods, which aligns with the previous observation that long runs are rare.
+
+#%% [markdown]
+# ### 5.2. Conditional Probability of Run Continuation
+#
+# Here we analyze the probability that a run of a certain length will continue for at least one more period. For example, given that we have observed two consecutive hours of price increases (a run of +2), what is the probability that the next hour will also be an increase, extending the run to +3?
+#
+# This is calculated for positive and negative runs separately. The probability is:
+# `P(Run extends to N+1 | Run has reached length N) = (Total number of runs with length >= N+1) / (Total number of runs with length >= N)`
+
+#%%
+print("Calculating conditional probabilities of run continuation...")
+
+positive_runs = runs[runs > 0]
+negative_runs = runs[runs < 0]
+
+continuation_probs = {
+    'Positive': [],
+    'Negative': []
+}
+run_lengths_to_check = range(1, 6)
+
+for n in run_lengths_to_check:
+    # Positive runs
+    runs_ge_n = (positive_runs >= n).sum()
+    runs_ge_n_plus_1 = (positive_runs >= n + 1).sum()
+    prob_pos = runs_ge_n_plus_1 / runs_ge_n if runs_ge_n > 0 else 0
+    continuation_probs['Positive'].append(prob_pos)
+
+    # Negative runs
+    runs_le_n = (negative_runs <= -n).sum()
+    runs_le_n_plus_1 = (negative_runs <= -(n + 1)).sum()
+    prob_neg = runs_le_n_plus_1 / runs_le_n if runs_le_n > 0 else 0
+    continuation_probs['Negative'].append(prob_neg)
+
+prob_df = pd.DataFrame(continuation_probs, index=[f'{i} -> {i+1}' for i in run_lengths_to_check])
+prob_df.index.name = 'Run Extension'
+
+print("Conditional Probabilities of Run Continuation:")
+print(prob_df.to_string(float_format="%.3f"))
+
+#%%
+# Plot the continuation probabilities
+print("\nPlotting the run continuation probabilities...")
+prob_df.plot(kind='bar', figsize=(14, 7), rot=0)
+plt.title('Conditional Probability of a Run Continuing')
+plt.xlabel('Run Length Extension (From N to N+1)')
+plt.ylabel('Probability')
+plt.grid(axis='y', linestyle='--')
+plt.legend(title='Run Type')
+plt.show()
+
+#%% [markdown]
+# The bar chart shows the probability that a run of length N will extend to N+1. For both positive and negative runs, the probability of continuation is consistently below 0.5 and generally decreases as the run gets longer. This reinforces the idea of mean reversion in the hourly price changes; the longer a directional streak continues, the more likely it is to break.
