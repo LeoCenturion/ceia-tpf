@@ -10,7 +10,6 @@ import cupy as cp
 # --- Part 1: Data Simulation and Volume Bar Creation ---
 # The paper uses high-frequency data to construct volume bars.
 # We'll simulate 1-minute data to demonstrate the process.
-# AI use the backtesting code like in xgboost_price_reversals.py AI!
 
 def create_mock_data(days=100):
     """Creates a mock DataFrame of 1-minute BTC price data."""
@@ -262,55 +261,6 @@ def train_and_evaluate_xgboost(df):
     return model, test_df
 
 
-# --- Part 4: Backtesting the Strategy ---
-
-
-def run_backtest(test_df):
-    """
-    Runs a simple backtest based on the model's predictions.
-    The strategy is to buy on a predicted '1' and sell on the next bar's close.
-    (Section 3.5 Portfolio construction)
-    """
-    print("Step 6: Running backtest on the trading strategy...")
-    initial_capital = 100000
-    capital = initial_capital
-    portfolio_history = []
-
-    # We need the next bar's close price to calculate profit, so we add it here
-    test_df["next_close_price"] = test_df["close_price"].shift(-1)
-
-    for i, row in test_df.iterrows():
-        # A signal of 1 means we buy at the current bar's close and sell at the next bar's close
-        if row["prediction"] == 1 and not pd.isna(row["next_close_price"]):
-            buy_price = row["close_price"]
-            sell_price = row["next_close_price"]
-
-            # Simple return calculation
-            trade_return = (sell_price / buy_price) - 1
-            capital *= 1 + trade_return
-
-        portfolio_history.append(capital)
-
-    # Calculate performance metrics
-    final_portfolio_value = portfolio_history[-1]
-    total_return = (final_portfolio_value / initial_capital - 1) * 100
-
-    returns_series = (
-        pd.Series(portfolio_history, index=test_df.index).pct_change().dropna()
-    )
-    # Assuming daily bars for annualization factor, adjust if frequency is different
-    # Since bar duration varies, a precise annualization is complex. We'll use a common sqrt(252).
-    sharpe_ratio = (
-        (returns_series.mean() / returns_series.std()) * np.sqrt(252)
-        if returns_series.std() > 0
-        else 0
-    )
-
-    print("Backtest Results:")
-    print(f"Initial Portfolio Value: ${initial_capital:,.2f}")
-    print(f"Final Portfolio Value:   ${final_portfolio_value:,.2f}")
-    print(f"Total Cumulative Return: {total_return:.2f}%")
-    print(f"Sharpe Ratio (approx.):  {sharpe_ratio:.2f}")
 
 
 # --- Main Execution Workflow ---
@@ -327,8 +277,5 @@ if __name__ == "__main__":
     # 4. Engineer features
     final_df = create_features(labeled_bars)
 
-    # 5. Train model
-    trained_model, test_results_df = train_and_evaluate_xgboost(final_df)
-
-    # 6. Run backtest
-    run_backtest(test_results_df)
+    # 5. Train model and evaluate
+    train_and_evaluate_xgboost(final_df)
