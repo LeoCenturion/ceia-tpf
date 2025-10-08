@@ -1,39 +1,20 @@
 import pandas as pd
 import numpy as np
 import xgboost as xgb
-from sklearn.model_selection import TimeSeriesSplit
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from scipy.stats import pearsonr
+import optuna
+from functools import partial
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.utils.class_weight import compute_class_weight
 import cupy as cp
 
+from backtest_utils import fetch_historical_data
+
+
 # --- Part 1: Data Simulation and Volume Bar Creation ---
 # The paper uses high-frequency data to construct volume bars.
 # We'll simulate 1-minute data to demonstrate the process.
-# AI refactor this file to be like xgboost_price_reversal.py
-# Don't modify the way features or labels are done AI!
-def create_mock_data(days=100):
-    """Creates a mock DataFrame of 1-minute BTC price data."""
-    print("Step 1: Creating mock high-frequency (1-minute) data...")
-    date_rng = pd.to_datetime(
-        pd.date_range(start="2022-01-01", periods=days * 24 * 60, freq="T")
-    )
-    data = pd.DataFrame(date_rng, columns=["timestamp"])
-
-    # Simulate a random walk for price
-    price_movements = np.random.randn(len(data)) / 1000 + 0.00001
-    data["close"] = 20000 * (1 + price_movements).cumprod()
-
-    # Simulate volume, with some periods of higher activity
-    data["volume"] = np.random.randint(5, 50, size=len(data))
-    high_activity_spikes = np.random.choice(
-        data.index, size=int(len(data) * 0.1), replace=False
-    )
-    data.loc[high_activity_spikes, "volume"] *= 5  # Make some periods more active
-
-    data.set_index("timestamp", inplace=True)
-    print("Mock data created.\n")
-    return data
 
 
 def aggregate_to_volume_bars(df, volume_threshold=50000):
@@ -144,6 +125,25 @@ def create_features(df):
     return df
 
 
+def select_features(X: pd.DataFrame, y: pd.Series, corr_threshold=0.7, p_value_threshold=0.1) -> list:
+    """
+    Selects features based on Pearson correlation and p-value.
+    """
+    selected_features = []
+    for col in X.columns:
+        # Drop rows with NaN in either column for correlation calculation
+        temp_df = pd.concat([X[col], y], axis=1).dropna()
+        if len(temp_df) < 2:
+            continue
+
+        corr, p_value = pearsonr(temp_df.iloc[:, 0], temp_df.iloc[:, 1])
+        if abs(corr) >= corr_threshold and p_value < p_value_threshold:
+            selected_features.append(col)
+
+    print(f"Selected {len(selected_features)} features out of {len(X.columns)} based on correlation criteria.")
+    return selected_features
+
+
 # --- Part 3: Model Training and Evaluation ---
 
 
@@ -214,69 +214,136 @@ def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3
     print("\n--- Backtest Classification Report ---")
     target_names = ['non-top (0)', 'top (1)']
     labels = [0, 1]
-    print(classification_report(y_test, y_pred, labels=labels, target_names=target_names, zero_division=0))
+    report_str = classification_report(y_test, y_pred, labels=labels, target_names=target_names, zero_division=0)
+    print(report_str)
+    report_dict = classification_report(y_test, y_pred, labels=labels, target_names=target_names, zero_division=0, output_dict=True)
 
     accuracy = accuracy_score(y_test, y_pred)
     print(f"Backtest Accuracy: {accuracy:.2f}")
 
-    return y_pred, y_test
+    return y_pred, y_test, report_dict
 
 
-def train_and_evaluate_xgboost(df):
+def objective(trial: optuna.Trial, minute_data: pd.DataFrame) -> float:
     """
-    Trains an XGBoost classifier and evaluates its performance using a walk-forward backtest.
+    Optuna objective function to tune hyperparameters for the Palazzo price reversal model.
     """
-    print("Step 5: Training and Evaluating XGBoost Model...")
-    features = [col for col in df.columns if "feature_" in col]
-    target = "label"
+    # === 1. Define Hyperparameter Search Space ===
+    # Data aggregation and labeling hyperparameters
+    volume_threshold = trial.suggest_int('volume_threshold', 10000, 100000)
+    tau = trial.suggest_float('tau', 0.1, 0.6)
 
-    X = df[features]
-    y = df[target]
+    # Feature selection hyperparameter
+    corr_threshold = trial.suggest_float('corr_threshold', 0.01, 0.5)
+    p_value_threshold = trial.suggest_float('p_value_threshold', 0.01, 0.2)
 
-    # The paper uses GridSearchCV. For simplicity, we'll use the final optimized parameters
-    # from Table 4.8 in the dissertation.
-    xgb_params = {
+
+    # Model hyperparameters for XGBoost
+    params = {
         "objective": "binary:logistic",
         "eval_metric": "auc",
-        "n_estimators": 500,
-        "max_depth": 7,
-        "learning_rate": 0.05,  # A slightly more conservative rate than 0.55
-        "gamma": 0.92,
-        "reg_lambda": 3.73,
-        "min_child_weight": 1.39,
-        "use_label_encoder": False,
-        "seed": 42,
         "tree_method": "hist",
         "device": "cuda",
+        'n_estimators': trial.suggest_int('n_estimators', 50, 400),
+        'learning_rate': trial.suggest_float('learning_rate', 1e-3, 0.3, log=True),
+        'max_depth': trial.suggest_int('max_depth', 3, 10),
+        'subsample': trial.suggest_float('subsample', 0.5, 1.0),
+        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
+        'gamma': trial.suggest_float('gamma', 1e-8, 1.0, log=True),
+        'min_child_weight': trial.suggest_int('min_child_weight', 1, 10),
+        "seed": 42,
     }
+    refit_every = 24
 
-    model = xgb.XGBClassifier(**xgb_params)
+    # === 2. Run the ML Pipeline ===
+    print(f"\n--- Starting Trial {trial.number} ---")
+    print(f"Params: {trial.params}")
 
-    y_pred, y_test = manual_backtest(X, y, model, test_size=0.3, refit_every=24)
-
-    # Save the test set and predictions for the backtest
-    test_df = df.loc[y_test.index].copy()
-    test_df["prediction"] = y_pred
-
-    print("Training and evaluation complete.\n")
-    return model, test_df
-
-
-
-
-# --- Main Execution Workflow ---
-if __name__ == "__main__":
-    # 1. Simulate raw data
-    raw_minute_data = create_mock_data(days=150)
-
-    # 2. Aggregate into volume bars
-    volume_bars = aggregate_to_volume_bars(raw_minute_data, volume_threshold=50000)
-
-    # 3. Create target labels
-    labeled_bars = create_labels(volume_bars, tau=0.35)
-
-    # 4. Engineer features
+    # Aggregate into volume bars
+    volume_bars = aggregate_to_volume_bars(minute_data, volume_threshold=volume_threshold)
+    
+    # Create target labels
+    labeled_bars = create_labels(volume_bars.copy(), tau=tau)
+    
+    # Engineer features
     final_df = create_features(labeled_bars)
+    
+    if final_df.empty:
+        print("No data after feature engineering. Pruning trial.")
+        raise optuna.exceptions.TrialPruned()
 
-    # 5. Train model and evaluate
-    train_and_evaluate_xgboost(final_df)
+    y = final_df['label']
+    features = [col for col in final_df.columns if "feature_" in col]
+    X = final_df[features]
+
+    # Prune trial if not enough positive samples are found
+    if y.sum() < 10:
+        print("Not enough positive samples found with these parameters. Pruning trial.")
+        raise optuna.exceptions.TrialPruned()
+        
+    # Feature Selection
+    selected_cols = select_features(X, y, corr_threshold=corr_threshold, p_value_threshold=p_value_threshold)
+    if not selected_cols:
+        print("No features selected. Pruning trial.")
+        raise optuna.exceptions.TrialPruned()
+        
+    X = X[selected_cols]
+    
+    # Run Backtest
+    model = xgb.XGBClassifier(**params)
+    _, _, report = manual_backtest(X, y, model, test_size=0.3, refit_every=refit_every)
+
+    # === 3. Calculate and Return the Objective Metric ===
+    f1_top = report.get('top (1)', {}).get('f1-score', 0.0)
+    
+    print(f"Trial {trial.number} finished. F1 (Top): {f1_top:.4f}")
+    
+    return f1_top
+
+
+def main():
+    """
+    Main function to run the Optuna hyperparameter optimization study.
+    """
+    N_TRIALS = 50
+
+    # 1. Load high-frequency data
+    print("Loading 1-minute historical data...")
+    minute_data = fetch_historical_data(
+        symbol="BTC/USDT",
+        timeframe="1m",
+        start_date="2022-01-01T00:00:00Z"
+    )
+    # The aggregate_to_volume_bars function expects 'close' and 'volume' columns.
+    # fetch_historical_data returns 'Close' and 'Volume', so we rename them.
+    minute_data.rename(columns={'Close': 'close', 'Volume': 'volume'}, inplace=True)
+    
+    # 2. Setup and Run Optuna Study
+    db_file_name = "optuna-study-palazzo"
+    study_name_in_db = 'xgboost_price_reversal_palazzo_v2'
+    storage_name = f"sqlite:///{db_file_name}.db"
+
+    print(f"Starting Optuna study: '{study_name_in_db}'. Storage: {storage_name}")
+
+    # Use a partial function to pass the loaded data to the objective function
+    objective_with_data = partial(objective, minute_data=minute_data)
+
+    study = optuna.create_study(
+        direction='maximize',
+        study_name=study_name_in_db,
+        storage=storage_name,
+        load_if_exists=True
+    )
+
+    study.optimize(objective_with_data, n_trials=N_TRIALS)
+    
+    # 3. Print Study Results
+    print("\n--- Optuna Study Best Results ---")
+    print(f"Best trial value (F1 Score): {study.best_value}")
+    print("Best parameters found:")
+    for key, value in study.best_params.items():
+        print(f"  {key}: {value}")
+
+
+if __name__ == "__main__":
+    main()
