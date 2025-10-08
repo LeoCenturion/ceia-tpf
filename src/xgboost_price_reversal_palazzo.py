@@ -10,7 +10,8 @@ import cupy as cp
 # --- Part 1: Data Simulation and Volume Bar Creation ---
 # The paper uses high-frequency data to construct volume bars.
 # We'll simulate 1-minute data to demonstrate the process.
-
+# AI refactor this file to be like xgboost_price_reversal.py
+# Don't modify the way features or labels are done AI!
 def create_mock_data(days=100):
     """Creates a mock DataFrame of 1-minute BTC price data."""
     print("Step 1: Creating mock high-frequency (1-minute) data...")
