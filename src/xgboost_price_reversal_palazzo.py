@@ -17,7 +17,7 @@ from backtest_utils import fetch_historical_data
 # We'll simulate 1-minute data to demonstrate the process.
 
 
-def aggregate_to_volume_bars(df, volume_threshold=50000):
+def aggregate_to_volume_bars(df, volume_threshold=0):
     """
     Aggregates time-series data into volume bars based on a volume threshold.
     This follows the core concept of the dissertation (Section 3.3).
@@ -29,8 +29,9 @@ def aggregate_to_volume_bars(df, volume_threshold=50000):
 
     for index, row in df.iterrows():
         current_bar_data.append(row)
+        # AI the volume value is in BTC. Multiply volume by the btc price  AI!
         cumulative_volume += row["volume"]
-
+        print(cumulative_volume)
         if cumulative_volume >= volume_threshold:
             bar_df = pd.DataFrame(current_bar_data)
 
@@ -235,7 +236,7 @@ def objective(trial: optuna.Trial, minute_data: pd.DataFrame) -> float:
     """
     # === 1. Define Hyperparameter Search Space ===
     # Data aggregation and labeling hyperparameters
-    volume_threshold = trial.suggest_int('volume_threshold', 10000, 100000)
+    volume_threshold = trial.suggest_int('volume_threshold', 0, 0)
     tau = trial.suggest_float('tau', 0.1, 0.6)
 
     # Feature selection hyperparameter
@@ -326,7 +327,7 @@ def main():
     # The aggregate_to_volume_bars function expects 'close' and 'volume' columns.
     # fetch_historical_data returns 'Close' and 'Volume', so we rename them.
     minute_data.rename(columns={'Close': 'close', 'Volume': 'volume'}, inplace=True)
-    
+
     # 2. Setup and Run Optuna Study
     db_file_name = "optuna-study"
     study_name_in_db = 'xgboost_price_reversal_palazzo_v1'
