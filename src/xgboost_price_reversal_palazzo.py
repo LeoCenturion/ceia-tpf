@@ -348,12 +348,13 @@ def main():
     
     # 3. Print Study Results
     print("\n--- Optuna Study Best Results ---")
-    if study.best_trial:
-        print(f"Best trial value (F1 Score): {study.best_value}")
+    try:
+        best_trial = study.best_trial
+        print(f"Best trial value (F1 Score): {best_trial.value}")
         print("Best parameters found:")
-        for key, value in study.best_params.items():
+        for key, value in best_trial.params.items():
             print(f"  {key}: {value}")
-    else:
+    except ValueError:
         print("No successful trials were completed.")
 
 

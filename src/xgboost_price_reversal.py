@@ -637,10 +637,14 @@ def main():
     study.optimize(objective_with_data, n_trials=N_TRIALS, n_jobs=-1)
     # 3. Print Study Results
     print("\n--- Optuna Study Best Results ---")
-    print(f"Best trial value (Average F1 Score): {study.best_value}")
-    print("Best parameters found:")
-    for key, value in study.best_params.items():
-        print(f"  {key}: {value}")
+    try:
+        best_trial = study.best_trial
+        print(f"Best trial value (Average F1 Score): {best_trial.value}")
+        print("Best parameters found:")
+        for key, value in best_trial.params.items():
+            print(f"  {key}: {value}")
+    except ValueError:
+        print("No successful trials were completed.")
 
 
 def plot_feature_selection_by_threshold(X: pd.DataFrame, y: pd.Series):
