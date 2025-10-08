@@ -289,6 +289,12 @@ def objective(trial: optuna.Trial, minute_data: pd.DataFrame) -> float:
     if y.sum() < 10:
         print("Not enough positive samples found with these parameters. Pruning trial.")
         raise optuna.exceptions.TrialPruned()
+
+    # Prune trial if initial training set is not representative
+    split_index = int(len(X) * (1 - 0.3)) # Corresponds to test_size in manual_backtest
+    if y.iloc[:split_index].nunique() < 2:
+        print("Initial training set does not contain both classes. Pruning trial.")
+        raise optuna.exceptions.TrialPruned()
         
     # Feature Selection
     # selected_cols = select_features(X, y, corr_threshold=corr_threshold, p_value_threshold=p_value_threshold)

@@ -578,6 +578,12 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
 
     y = reversal_data['target']
     
+    # Prune trial if initial training set is not representative
+    split_index = int(len(reversal_data) * (1 - 0.3)) # Corresponds to test_size in manual_backtest
+    if y.iloc[:split_index].nunique() < 3:
+        print("Initial training set does not contain all 3 classes. Pruning trial.")
+        raise optuna.exceptions.TrialPruned()
+    
     # Remap labels for XGBoost, which requires labels in [0, num_class-1]
     y_mapped = y.map({-1: 0, 0: 1, 1: 2})
 
