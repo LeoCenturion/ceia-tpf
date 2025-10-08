@@ -63,6 +63,11 @@ def aggregate_to_volume_bars(df, volume_threshold=50000):
             cumulative_volume = 0
 
     volume_bars_df = pd.DataFrame(bars)
+
+    if volume_bars_df.empty:
+        print("Warning: No volume bars created. Threshold might be too high for the dataset.")
+        return volume_bars_df
+
     # Calculate bar returns (rv), which will be used for labeling
     volume_bars_df["bar_return"] = (
         volume_bars_df["close_price"] / volume_bars_df["open_price"]
@@ -261,6 +266,10 @@ def objective(trial: optuna.Trial, minute_data: pd.DataFrame) -> float:
 
     # Aggregate into volume bars
     volume_bars = aggregate_to_volume_bars(minute_data, volume_threshold=volume_threshold)
+
+    if volume_bars.empty:
+        print("No volume bars created. Pruning trial.")
+        raise optuna.exceptions.TrialPruned()
     
     # Create target labels
     labeled_bars = create_labels(volume_bars.copy(), tau=tau)
