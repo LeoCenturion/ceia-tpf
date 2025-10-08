@@ -29,8 +29,7 @@ def aggregate_to_volume_bars(df, volume_threshold=0):
 
     for index, row in df.iterrows():
         current_bar_data.append(row)
-        # AI the volume value is in BTC. Multiply volume by the btc price  AI!
-        cumulative_volume += row["volume"]
+        cumulative_volume += row["volume"] * row["close"]
         print(cumulative_volume)
         if cumulative_volume >= volume_threshold:
             bar_df = pd.DataFrame(current_bar_data)
