@@ -4,7 +4,8 @@ import xgboost as xgb
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import accuracy_score, classification_report
-# AI adapt this file like xgboost_price_reversal.py AI!
+# AI adapt this file to use the same manual_backtest function as in  xgboost_price_reversal.py
+# Don't change the way features or labels are processed AI!
 
 # --- Part 1: Data Simulation and Volume Bar Creation ---
 # The paper uses high-frequency data to construct volume bars.
