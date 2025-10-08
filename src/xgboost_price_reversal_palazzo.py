@@ -2,10 +2,10 @@ import pandas as pd
 import numpy as np
 import xgboost as xgb
 from sklearn.model_selection import TimeSeriesSplit
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.metrics import accuracy_score, classification_report
-# AI adapt this file to use the same manual_backtest function as in  xgboost_price_reversal.py
-# Don't change the way features or labels are processed AI!
+from sklearn.utils.class_weight import compute_class_weight
+import cupy as cp
 
 # --- Part 1: Data Simulation and Volume Bar Creation ---
 # The paper uses high-frequency data to construct volume bars.
@@ -147,9 +147,84 @@ def create_features(df):
 # --- Part 3: Model Training and Evaluation ---
 
 
+def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3, refit_every: int = 1):
+    """
+    Performs a manual walk-forward backtest with an expanding window.
+    The model is refit every `refit_every` steps.
+
+    Args:
+        X (pd.DataFrame): The feature matrix.
+        y (pd.Series): The target vector.
+        model: A scikit-learn compatible classifier.
+        test_size (float): The proportion of the dataset to be used for testing.
+        refit_every (int): How often (in steps) to refit the model. Default is 1 (every step).
+    """
+    split_index = int(len(X) * (1 - test_size))
+    X_test = X.iloc[split_index:]
+    y_test = y.iloc[split_index:]
+
+    y_pred = []
+    scaler = StandardScaler()
+
+    print("Starting walk-forward backtest...")
+    # Walk forward
+    for i in range(len(X_test)):
+        current_split_index = split_index + i
+
+        # Periodically refit the model on an expanding window
+        if i % refit_every == 0:
+            print(f"Refitting model at step {i+1}/{len(X_test)}...")
+            X_train_current = X.iloc[:current_split_index]
+            y_train_current = y.iloc[:current_split_index]
+
+            # Scale training data
+            X_train_current_scaled = scaler.fit_transform(X_train_current)
+
+            # Calculate sample weights for balanced classes
+            classes = np.unique(y_train_current)
+            sample_weights_gpu = None
+            if len(classes) > 1:
+                weights = compute_class_weight(class_weight='balanced', classes=classes, y=y_train_current)
+                class_weight_dict = dict(zip(classes, weights))
+                sample_weights = y_train_current.map(class_weight_dict).to_numpy()
+                sample_weights_gpu = cp.asarray(sample_weights)
+
+
+            # Move data to GPU and retrain model
+            X_train_gpu = cp.asarray(X_train_current_scaled)
+            y_train_gpu = cp.asarray(y_train_current)
+            
+            model.fit(X_train_gpu, y_train_gpu, sample_weight=sample_weights_gpu)
+
+        # Get current test sample and scale it using the latest scaler
+        X_test_current = X.iloc[current_split_index:current_split_index + 1]
+        X_test_current_scaled = scaler.transform(X_test_current)
+
+        # Move data to GPU for prediction
+        X_test_gpu = cp.asarray(X_test_current_scaled)
+
+        # Predict
+        prediction = model.predict(X_test_gpu)
+        y_pred.append(int(cp.asnumpy(prediction)[0]))
+
+        if (i + 1) % 50 == 0 or (i + 1) == len(X_test):
+            print(f"Processed {i+1}/{len(X_test)} steps...")
+
+    # Evaluate
+    print("\n--- Backtest Classification Report ---")
+    target_names = ['non-top (0)', 'top (1)']
+    labels = [0, 1]
+    print(classification_report(y_test, y_pred, labels=labels, target_names=target_names, zero_division=0))
+
+    accuracy = accuracy_score(y_test, y_pred)
+    print(f"Backtest Accuracy: {accuracy:.2f}")
+
+    return y_pred, y_test
+
+
 def train_and_evaluate_xgboost(df):
     """
-    Trains an XGBoost classifier and evaluates its performance.
+    Trains an XGBoost classifier and evaluates its performance using a walk-forward backtest.
     """
     print("Step 5: Training and Evaluating XGBoost Model...")
     features = [col for col in df.columns if "feature_" in col]
@@ -157,16 +232,6 @@ def train_and_evaluate_xgboost(df):
 
     X = df[features]
     y = df[target]
-
-    # Split data into training and testing sets (70/30 split as in paper)
-    split_index = int(len(X) * 0.7)
-    X_train, X_test = X[:split_index], X[split_index:]
-    y_train, y_test = y[:split_index], y[split_index:]
-
-    # Scale features using MinMaxScaler as per the paper (Section 3.3.3)
-    scaler = MinMaxScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
 
     # The paper uses GridSearchCV. For simplicity, we'll use the final optimized parameters
     # from Table 4.8 in the dissertation.
@@ -181,26 +246,17 @@ def train_and_evaluate_xgboost(df):
         "min_child_weight": 1.39,
         "use_label_encoder": False,
         "seed": 42,
+        "tree_method": "hist",
+        "device": "cuda",
     }
 
-    # Handle class imbalance for training data as mentioned in the paper
-    # The paper undersamples; an easier approach is to use scale_pos_weight
-    scale_pos_weight = y_train.value_counts()[0] / y_train.value_counts()[1]
+    model = xgb.XGBClassifier(**xgb_params)
 
-    model = xgb.XGBClassifier(**xgb_params, scale_pos_weight=scale_pos_weight)
-
-    model.fit(X_train_scaled, y_train, verbose=False)
-
-    # Make predictions on the test set
-    predictions = model.predict(X_test_scaled)
-
-    print("Model Evaluation on Test Set:")
-    print(f"Accuracy: {accuracy_score(y_test, predictions):.4f}")
-    print(classification_report(y_test, predictions))
+    y_pred, y_test = manual_backtest(X, y, model, test_size=0.3, refit_every=24)
 
     # Save the test set and predictions for the backtest
-    test_df = df.iloc[split_index:].copy()
-    test_df["prediction"] = predictions
+    test_df = df.loc[y_test.index].copy()
+    test_df["prediction"] = y_pred
 
     print("Training and evaluation complete.\n")
     return model, test_df
