@@ -305,14 +305,14 @@ def main():
     """
     Main function to run the Optuna hyperparameter optimization study.
     """
-    N_TRIALS = 50
+    N_TRIALS = 1
 
     # 1. Load high-frequency data
     print("Loading 1-minute historical data...")
     minute_data = fetch_historical_data(
         symbol="BTC/USDT",
         timeframe="1m",
-        start_date="2022-01-01T00:00:00Z"
+        start_date="2024-01-01T00:00:00Z"
     )
     # The aggregate_to_volume_bars function expects 'close' and 'volume' columns.
     # fetch_historical_data returns 'Close' and 'Volume', so we rename them.
@@ -320,7 +320,7 @@ def main():
     
     # 2. Setup and Run Optuna Study
     db_file_name = "optuna-study-palazzo"
-    study_name_in_db = 'xgboost_price_reversal_palazzo_v2'
+    study_name_in_db = 'xgboost_price_reversal_palazzo_v1'
     storage_name = f"sqlite:///{db_file_name}.db"
 
     print(f"Starting Optuna study: '{study_name_in_db}'. Storage: {storage_name}")
