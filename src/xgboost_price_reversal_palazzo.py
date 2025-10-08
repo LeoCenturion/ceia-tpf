@@ -291,12 +291,12 @@ def objective(trial: optuna.Trial, minute_data: pd.DataFrame) -> float:
         raise optuna.exceptions.TrialPruned()
         
     # Feature Selection
-    selected_cols = select_features(X, y, corr_threshold=corr_threshold, p_value_threshold=p_value_threshold)
-    if not selected_cols:
-        print("No features selected. Pruning trial.")
-        raise optuna.exceptions.TrialPruned()
+    # selected_cols = select_features(X, y, corr_threshold=corr_threshold, p_value_threshold=p_value_threshold)
+    # if not selected_cols:
+    #     print("No features selected. Pruning trial.")
+    #     raise optuna.exceptions.TrialPruned()
         
-    X = X[selected_cols]
+    # X = X[selected_cols]
     
     # Run Backtest
     model = xgb.XGBClassifier(**params)
