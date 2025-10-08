@@ -328,7 +328,7 @@ def main():
     minute_data.rename(columns={'Close': 'close', 'Volume': 'volume'}, inplace=True)
     
     # 2. Setup and Run Optuna Study
-    db_file_name = "optuna-study-palazzo"
+    db_file_name = "optuna-study"
     study_name_in_db = 'xgboost_price_reversal_palazzo_v1'
     storage_name = f"sqlite:///{db_file_name}.db"
 

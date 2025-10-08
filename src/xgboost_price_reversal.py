@@ -518,7 +518,7 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     """
     # === 1. Define Hyperparameter Search Space ===
     # Peak detection hyperparameters
-    peak_method = trial.suggest_categorical('peak_method', ['pct_change_std'])
+    peak_method = trial.suggest_categorical('peak_method', ['pct_change_on_ao'])
 
     std_fraction = 1.0
     if peak_method == 'pct_change_std':
@@ -619,7 +619,7 @@ def main():
 
     # 2. Setup and Run Optuna Study
     db_file_name = "optuna-study"
-    study_name_in_db = 'xgboost price std reversal v1'
+    study_name_in_db = 'xgboost price std reversal v2'
     storage_name = f"sqlite:///{db_file_name}.db"
 
     print(f"Starting Optuna study: '{study_name_in_db}'. Storage: {storage_name}")
