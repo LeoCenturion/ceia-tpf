@@ -30,8 +30,11 @@ def fetch_historical_data(
     """
     if data_path:
         df = pd.read_csv(data_path)
+        print(f'read csv {df}')
         df.rename(columns={"date": "timestamp", "Volume BTC": "volume"}, inplace=True)
-        df["timestamp"] = pd.to_datetime(df["unix"], unit="ms")
+        # AI timestamps are not accurate, for example  1759276500000000 1970-01-21 08:41:16.500 AI!
+        df["timestamp"] = pd.to_datetime(df["unix"], unit="ns")
+        print(f'after rename {df}')
         df.set_index("timestamp", inplace=True)
 
         if start_date:
@@ -386,7 +389,6 @@ def run_optimizations(strategies, data_path, start_date, tracking_uri, experimen
         timeframe=timeframe
     )
     data = adjust_data_to_ubtc(data)
-    print(data)
     # Get the actual start and end dates from the data
     actual_start_date = data.index.min().strftime('%Y-%m-%d %H:%M:%S')
     actual_end_date = data.index.max().strftime('%Y-%m-%d %H:%M:%S')
