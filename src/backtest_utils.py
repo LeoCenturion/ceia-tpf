@@ -31,6 +31,7 @@ def fetch_historical_data(
     if data_path:
         df = pd.read_csv(data_path)
         df.rename(columns={"date": "timestamp", "Volume BTC": "volume"}, inplace=True)
+        # AI use the 'unix' column instead which has a unix timestamp AI!
         df["timestamp"] = pd.to_datetime(df["timestamp"])
         df.set_index("timestamp", inplace=True)
 
@@ -366,7 +367,7 @@ def optimize_classification_strategy(data, strategy, study_name, n_trials=100, n
         return None
 
 
-def run_optimizations(strategies, data_path, start_date, tracking_uri, experiment_name, n_trials_per_strategy=10, n_jobs=1):
+def run_optimizations(strategies, data_path, start_date, tracking_uri, experiment_name, n_trials_per_strategy=10, n_jobs=1,timeframe='1h'):
     """
     Run optimization for a set of strategies.
 
@@ -382,10 +383,11 @@ def run_optimizations(strategies, data_path, start_date, tracking_uri, experimen
 
     data = fetch_historical_data(
         data_path=data_path,
-        start_date=start_date
+        start_date=start_date,
+        timeframe=timeframe
     )
     data = adjust_data_to_ubtc(data)
-
+    print(data)
     # Get the actual start and end dates from the data
     actual_start_date = data.index.min().strftime('%Y-%m-%d %H:%M:%S')
     actual_end_date = data.index.max().strftime('%Y-%m-%d %H:%M:%S')
