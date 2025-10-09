@@ -162,15 +162,17 @@ class XGBoostPriceReversalPalazzoStrategy(Strategy):
 
             X_train = self.scaler.fit_transform(X_train_raw)
 
+            # Handle class imbalance
+            scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum() if (y_train == 1).sum() > 0 else 1
+
             self.model = xgb.XGBClassifier(
                 objective="binary:logistic", eval_metric="logloss", tree_method="hist",
                 device="cuda", n_estimators=self.n_estimators, learning_rate=self.learning_rate,
                 max_depth=self.max_depth, subsample=self.subsample, colsample_bytree=self.colsample_bytree,
                 gamma=self.gamma, min_child_weight=self.min_child_weight, seed=42,
+                scale_pos_weight=scale_pos_weight,
             )
-            # Handle class imbalance
-            scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum() if (y_train == 1).sum() > 0 else 1
-            self.model.fit(X_train, y_train, scale_pos_weight=scale_pos_weight)
+            self.model.fit(X_train, y_train)
 
         # Make prediction if model is trained
         if self.model:
