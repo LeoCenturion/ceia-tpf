@@ -35,9 +35,14 @@ def fetch_historical_data(
         df.set_index("timestamp", inplace=True)
 
         if start_date:
-            start_date = pd.to_datetime(start_date).tz_localize(None)
+            start_date = pd.to_datetime(start_date)
+            if start_date.tzinfo is not None:
+                start_date = start_date.tz_convert(None)
             df = df[df.index >= start_date]
         if end_date:
+            end_date = pd.to_datetime(end_date)
+            if end_date.tzinfo is not None:
+                end_date = end_date.tz_convert(None)
             df = df[df.index <= end_date]
 
     else:
