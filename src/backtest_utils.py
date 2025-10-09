@@ -31,8 +31,7 @@ def fetch_historical_data(
     if data_path:
         df = pd.read_csv(data_path)
         df.rename(columns={"date": "timestamp", "Volume BTC": "volume"}, inplace=True)
-        # AI use the 'unix' column instead which has a unix timestamp AI!
-        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        df["timestamp"] = pd.to_datetime(df["unix"], unit="ms")
         df.set_index("timestamp", inplace=True)
 
         if start_date:
