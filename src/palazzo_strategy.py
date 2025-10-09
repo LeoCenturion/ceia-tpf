@@ -214,7 +214,8 @@ def main():
         start_date="2025-09-01T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",
         experiment_name="Palazzo Strategy",
-        n_trials_per_strategy=50,
+        timeframe='1m',
+        n_trials_per_strategy=1,
         n_jobs=1  # Use a single job for GPU-based training to avoid conflicts
     )
 
