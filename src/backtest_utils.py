@@ -32,8 +32,7 @@ def fetch_historical_data(
         df = pd.read_csv(data_path)
         print(f'read csv {df}')
         df.rename(columns={"date": "timestamp", "Volume BTC": "volume"}, inplace=True)
-        # AI timestamps are not accurate, for example  1759276500000000 1970-01-21 08:41:16.500 AI!
-        df["timestamp"] = pd.to_datetime(df["unix"], unit="ns")
+        df["timestamp"] = pd.to_datetime(df["unix"], unit="us")
         print(f'after rename {df}')
         df.set_index("timestamp", inplace=True)
 
