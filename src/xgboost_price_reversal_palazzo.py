@@ -17,7 +17,7 @@ from backtest_utils import fetch_historical_data
 # We'll simulate 1-minute data to demonstrate the process.
 
 
-def aggregate_to_volume_bars(df, volume_threshold=0):
+def aggregate_to_volume_bars(df, volume_threshold=50000):
     """
     Aggregates time-series data into volume bars based on a volume threshold.
     This follows the core concept of the dissertation (Section 3.3).
@@ -29,8 +29,7 @@ def aggregate_to_volume_bars(df, volume_threshold=0):
 
     for index, row in df.iterrows():
         current_bar_data.append(row)
-        cumulative_volume += row["volume"] * row["close"]
-        print(cumulative_volume)
+        cumulative_volume += row["volume"]
         if cumulative_volume >= volume_threshold:
             bar_df = pd.DataFrame(current_bar_data)
 
@@ -93,6 +92,7 @@ def create_labels(df, tau=0.35):
     # Conditions for label = 1 ('top')
     # Condition 1: Next bar's return must be positive.
     cond1 = df["next_bar_return"] >= 0
+    
     # Condition 2: Next bar's return must exceed current return + volatility threshold.
     cond2 = df["next_bar_return"] >= (df["bar_return"] + df["intra_bar_std"] * tau)
 
@@ -101,7 +101,7 @@ def create_labels(df, tau=0.35):
     # Clean up columns used only for labeling
     df.dropna(subset=["next_bar_return"], inplace=True)
     df.drop(columns=["next_bar_return"], inplace=True)
-
+    # print(len(df))
     print(
         f"Labeling complete. Class distribution:\n{df['label'].value_counts(normalize=True)}\n"
     )
@@ -114,6 +114,7 @@ def create_features(df):
     we will simulate a few for demonstration (Section 3.3.3).
     """
     print("Step 4: Creating features...")
+    # AI add the features used in xgboost_price_reversal.py AI!
     df["feature_return_lag_1"] = df["bar_return"].shift(1)
     df["feature_volatility_lag_1"] = df["intra_bar_std"].shift(1)
     df["feature_rolling_mean_return_5"] = (
@@ -235,8 +236,8 @@ def objective(trial: optuna.Trial, minute_data: pd.DataFrame) -> float:
     """
     # === 1. Define Hyperparameter Search Space ===
     # Data aggregation and labeling hyperparameters
-    volume_threshold = trial.suggest_int('volume_threshold', 0, 0)
-    tau = trial.suggest_float('tau', 0.1, 0.6)
+    volume_threshold = trial.suggest_int('volume_threshold', 25000, 75000)
+    tau = trial.suggest_float('tau', 0.7, 1.3)
 
     # Feature selection hyperparameter
     corr_threshold = trial.suggest_float('corr_threshold', 0.01, 0.5)
@@ -251,7 +252,7 @@ def objective(trial: optuna.Trial, minute_data: pd.DataFrame) -> float:
         "device": "cuda",
         'n_estimators': trial.suggest_int('n_estimators', 50, 400),
         'learning_rate': trial.suggest_float('learning_rate', 1e-3, 0.3, log=True),
-        'max_depth': trial.suggest_int('max_depth', 3, 10),
+        'max_depth': trial.suggest_int('max_depth', 3, 20),
         'subsample': trial.suggest_float('subsample', 0.5, 1.0),
         'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
         'gamma': trial.suggest_float('gamma', 1e-8, 1.0, log=True),
@@ -320,19 +321,20 @@ def main():
     """
     Main function to run the Optuna hyperparameter optimization study.
     """
-    N_TRIALS = 1
+    N_TRIALS = 50
 
     # 1. Load high-frequency data
     print("Loading 1-minute historical data...")
     minute_data = fetch_historical_data(
         symbol="BTC/USDT",
         timeframe="1m",
-        start_date="2024-01-01T00:00:00Z"
+        # start_date="2025-09-01T00:00:00Z",
+        data_path='/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT-1m-2025-09.csv'
     )
     # The aggregate_to_volume_bars function expects 'close' and 'volume' columns.
     # fetch_historical_data returns 'Close' and 'Volume', so we rename them.
     minute_data.rename(columns={'Close': 'close', 'Volume': 'volume'}, inplace=True)
-
+    # print(minute_data)
     # 2. Setup and Run Optuna Study
     db_file_name = "optuna-study"
     study_name_in_db = 'xgboost_price_reversal_palazzo_v1'
@@ -342,7 +344,6 @@ def main():
 
     # Use a partial function to pass the loaded data to the objective function
     objective_with_data = partial(objective, minute_data=minute_data)
-
     study = optuna.create_study(
         direction='maximize',
         study_name=study_name_in_db,
@@ -350,7 +351,7 @@ def main():
         load_if_exists=True
     )
 
-    study.optimize(objective_with_data, n_trials=N_TRIALS)
+    study.optimize(objective_with_data, n_trials=N_TRIALS,n_jobs=-1)
     
     # 3. Print Study Results
     print("\n--- Optuna Study Best Results ---")
