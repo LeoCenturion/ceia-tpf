@@ -611,6 +611,14 @@ def objective(trial: optuna.Trial, minute_data: pd.DataFrame) -> float:
         print("Initial training set does not contain both classes. Pruning trial.")
         raise optuna.exceptions.TrialPruned()
         
+    # Suggest a training window size for the backtest
+    # The lower bound is half the initial training set size, upper bound is the full size.
+    min_window = max(10, int(split_index * 0.5)) # Ensure a minimum of 10
+    if min_window >= split_index:
+        train_window_size = split_index
+    else:
+        train_window_size = trial.suggest_int('train_window_size', min_window, split_index)
+
     # Feature Selection
     # selected_cols = select_features(X, y, corr_threshold=corr_threshold, p_value_threshold=p_value_threshold)
     # if not selected_cols:
@@ -621,7 +629,7 @@ def objective(trial: optuna.Trial, minute_data: pd.DataFrame) -> float:
     
     # Run Backtest
     model = xgb.XGBClassifier(**params)
-    _, _, report = manual_backtest(X, y, model, test_size=0.3, refit_every=refit_every)
+    _, _, report = manual_backtest(X, y, model, test_size=0.3, refit_every=refit_every, train_window_size=train_window_size)
 
     # === 3. Calculate and Return the Objective Metric ===
     f1_top = report.get('top (1)', {}).get('f1-score', 0.0)
