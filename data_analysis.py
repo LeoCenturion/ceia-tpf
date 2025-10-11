@@ -272,7 +272,6 @@ plt.show()
 
 #%%
 print("Calculating run transition probabilities...")
-# AI compute the sharp ratio and other indicators from the whole data AI!
 # Create a DataFrame of consecutive run pairs
 transitions = pd.DataFrame({'from': runs, 'to': runs.shift(-1)}).dropna()
 transitions = transitions.astype(int)
@@ -360,3 +359,46 @@ plt.show()
 
 #%% [markdown]
 # The bar chart shows the probability that a run of length N will extend to N+1. For both positive and negative runs, the probability of continuation is consistently below 0.5 and generally decreases as the run gets longer. This reinforces the idea of mean reversion in the hourly price changes; the longer a directional streak continues, the more likely it is to break.
+
+#%% [markdown]
+# ## 6. Buy and Hold Performance Metrics
+#
+# This section calculates standard performance metrics for a simple "buy and hold" strategy over the entire dataset. This provides a baseline against which any active trading strategy can be compared.
+
+#%%
+print("Calculating Buy and Hold performance metrics...")
+
+# --- 1. Calculate Daily Returns ---
+# Resample hourly data to daily data to get daily returns
+daily_close = df['close'].resample('D').last()
+daily_returns = daily_close.pct_change().dropna()
+
+# --- 2. Define Parameters ---
+risk_free_rate = 0.0
+annualization_factor = 365 # Using 365 for crypto markets
+
+# --- 3. Calculate Metrics ---
+# Total Return
+total_return = (df['close'].iloc[-1] / df['close'].iloc[0]) - 1
+
+# Annualized Volatility
+annualized_volatility = daily_returns.std() * np.sqrt(annualization_factor)
+
+# Sharpe Ratio
+if annualized_volatility > 0:
+    sharpe_ratio = (daily_returns.mean() * annualization_factor - risk_free_rate) / annualized_volatility
+else:
+    sharpe_ratio = 0
+
+# Max Drawdown
+cumulative_returns = (1 + daily_returns).cumprod()
+peak = cumulative_returns.expanding(min_periods=1).max()
+drawdown = (cumulative_returns / peak) - 1
+max_drawdown = drawdown.min()
+
+# --- 4. Print Results ---
+print("\n--- Buy and Hold Performance Summary ---")
+print(f"Total Return: {total_return:.2%}")
+print(f"Annualized Volatility: {annualized_volatility:.2%}")
+print(f"Sharpe Ratio: {sharpe_ratio:.2f}")
+print(f"Maximum Drawdown: {max_drawdown:.2%}")
