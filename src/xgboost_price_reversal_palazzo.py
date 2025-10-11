@@ -462,8 +462,7 @@ def select_features(X: pd.DataFrame, y: pd.Series, corr_threshold=0.7, p_value_t
 # --- Part 3: Model Training and Evaluation ---
 
 
-def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3, refit_every: int = 1):
-    #AI make the window size parameterized AI!
+def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3, refit_every: int = 1, train_window_size: int = None):
     """
     Performs a manual walk-forward backtest with a sliding window.
     The model is refit every `refit_every` steps.
@@ -474,11 +473,14 @@ def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3
         model: A scikit-learn compatible classifier.
         test_size (float): The proportion of the dataset to be used for testing.
         refit_every (int): How often (in steps) to refit the model. Default is 1 (every step).
+        train_window_size (int, optional): The size of the sliding training window.
+                                           If None, defaults to the initial training set size.
     """
     split_index = int(len(X) * (1 - test_size))
     X_test = X.iloc[split_index:]
     y_test = y.iloc[split_index:]
-    train_window_size = split_index  # The size of our sliding window
+    if train_window_size is None:
+        train_window_size = split_index  # The size of our sliding window
 
     y_pred = []
     scaler = StandardScaler()
