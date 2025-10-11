@@ -462,10 +462,9 @@ def select_features(X: pd.DataFrame, y: pd.Series, corr_threshold=0.7, p_value_t
 # --- Part 3: Model Training and Evaluation ---
 
 
-def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3, refit_every: int = 1)
-#AI change this backtest to have a sliding window of a fixed size AI!
+def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3, refit_every: int = 1):
     """
-    Performs a manual walk-forward backtest with an expanding window.
+    Performs a manual walk-forward backtest with a sliding window.
     The model is refit every `refit_every` steps.
 
     Args:
@@ -478,6 +477,7 @@ def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3
     split_index = int(len(X) * (1 - test_size))
     X_test = X.iloc[split_index:]
     y_test = y.iloc[split_index:]
+    train_window_size = split_index  # The size of our sliding window
 
     y_pred = []
     scaler = StandardScaler()
@@ -487,11 +487,14 @@ def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3
     for i in range(len(X_test)):
         current_split_index = split_index + i
 
-        # Periodically refit the model on an expanding window
+        # Periodically refit the model on a sliding window
         if i % refit_every == 0:
             print(f"Refitting model at step {i+1}/{len(X_test)}...")
-            X_train_current = X.iloc[:current_split_index]
-            y_train_current = y.iloc[:current_split_index]
+            
+            # Define the sliding window for training
+            start_index = max(0, current_split_index - train_window_size)
+            X_train_current = X.iloc[start_index:current_split_index]
+            y_train_current = y.iloc[start_index:current_split_index]
 
             # Scale training data
             X_train_current_scaled = scaler.fit_transform(X_train_current)
