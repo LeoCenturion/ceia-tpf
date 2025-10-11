@@ -32,7 +32,8 @@ def fetch_historical_data(
         df = pd.read_csv(data_path)
         print(f'read csv {df}')
         df.rename(columns={"date": "timestamp", "Volume BTC": "volume"}, inplace=True)
-        df["timestamp"] = pd.to_datetime(df["unix"], unit="us")
+        # AI unit should depend on timeframe, for 1h unit=ms, for timeframe 1m unit=us  AI!
+        df["timestamp"] = pd.to_datetime(df["unix"], unit="ms")
         print(f'after rename {df}')
         df.set_index("timestamp", inplace=True)
 
@@ -139,90 +140,6 @@ def sanitize_metric_name(name):
     """Sanitize metric name to be MLflow compliant."""
     return re.sub(r'[^a-zA-Z0-9_\-.\s:/]', '', name)
 
-
-def optimize_strategy_random_chunks(
-    data, strategy, study_name, n_trials=100, n_chunks=20, chunk_size=300, n_jobs=8
-):
-    """
-    Optimize strategy hyperparameters using Optuna by backtesting on random data chunks.
-    For each trial, it averages the stats over several random chunks and logs artifacts for each chunk.
-    """
-    parent_run = mlflow.active_run()
-    parent_run_id = parent_run.info.run_id if parent_run else None
-
-    def objective(trial):
-        params = strategy.get_optuna_params(trial)
-        stats_list = []
-        np.random.seed(42)  # For reproducibility of chunks across trials
-
-        run_name = f"{study_name}-" + "-".join([f"{k}={v}" for k, v in params.items()])
-        tags = {"mlflow.parentRunId": parent_run_id} if parent_run_id else {}
-        with mlflow.start_run(run_name=run_name, tags=tags, nested=True) as run:
-            mlflow.log_params(params)
-
-            for i in range(n_chunks):
-                max_start_idx = len(data) - chunk_size
-                if max_start_idx <= 0:
-                    print("Data is smaller than chunk size, cannot create random chunks.")
-                    break
-
-                start_idx = np.random.randint(0, max_start_idx)
-                end_idx = start_idx + chunk_size
-                chunk_data = data.iloc[start_idx:end_idx]
-
-                bt = Backtest(chunk_data, strategy, cash=10000, commission=0.01)
-                stats = bt.run(**params)
-                if stats is not None:
-                    stats_list.append(stats)
-                    # Log artifacts for each chunk, organizing them in subdirectories
-                    plot_filename = f"backtest_plot_trial_{trial.number}_chunk_{i}.html"
-                    trades_filename = f"trades_trial_{trial.number}_chunk_{i}.csv"
-
-                    bt.plot(filename=plot_filename, open_browser=False)
-                    if os.path.exists(plot_filename):
-                        mlflow.log_artifact(plot_filename, artifact_path=f"chunk_{i}")
-
-                    trades_df = stats['_trades']
-                    if not trades_df.empty:
-                        trades_df.to_csv(trades_filename, index=False)
-                        mlflow.log_artifact(trades_filename, artifact_path=f"chunk_{i}")
-
-                    # Clean up local files
-                    if os.path.exists(plot_filename):
-                        os.remove(plot_filename)
-                    if os.path.exists(trades_filename):
-                        os.remove(trades_filename)
-
-            if not stats_list:
-                return 0
-
-            # Average the stats
-            stats_df = pd.DataFrame(stats_list)
-            for col in stats_df.columns:
-                if pd.api.types.is_timedelta64_dtype(stats_df[col]):
-                    stats_df[col] = stats_df[col].dt.total_seconds()
-
-            numeric_stats_df = stats_df.select_dtypes(include=np.number)
-            averaged_stats = numeric_stats_df.mean().to_dict()
-
-            # Log averaged stats to MLflow
-            for key, value in averaged_stats.items():
-                sanitized_key = sanitize_metric_name(key)
-                mlflow.log_metric(sanitized_key, value)
-
-            sharpe_ratio = averaged_stats.get("Sharpe Ratio", 0)
-            if sharpe_ratio is None or np.isnan(sharpe_ratio):
-                return 0.0
-            return sharpe_ratio
-
-    study = optuna.create_study(
-        study_name=study_name,
-        direction="maximize",
-        storage="sqlite:///optuna-study.db",
-        load_if_exists=True,
-    )
-    study.optimize(objective, n_trials=n_trials, show_progress_bar=True, n_jobs=n_jobs)
-    return study.best_params
 
 
 def optimize_strategy(data, strategy, study_name, n_trials=100, n_jobs=8):
@@ -435,38 +352,3 @@ def run_classification_optimizations(strategies, data_path, start_date, tracking
             optimize_classification_strategy(data, strategy, n_trials=n_trials_per_strategy, study_name=f'{experiment_name}-{name}', n_jobs=n_jobs)
             print(f"Optimization for {name} complete.")
 
-def run_optimizations_random_chunks(strategies, data_path, start_date, tracking_uri, experiment_name, n_trials_per_strategy=10, n_chunks=15, chunk_size = 200, n_jobs=1):
-    """
-    Run optimization for a set of strategies.
-
-    :param strategies: Dictionary of strategy names to strategy classes.
-    :param data_path: Path to the historical data CSV file.
-    :param start_date: Start date for the data.
-    :param tracking_uri: MLflow tracking URI.
-    :param experiment_name: MLflow experiment name.
-    :param n_trials_per_strategy: Number of Optuna trials for each strategy.
-    """
-    mlflow.set_tracking_uri(tracking_uri)
-    mlflow.set_experiment(experiment_name)
-
-    data = fetch_historical_data(
-        data_path=data_path,
-        start_date=start_date
-    )
-    data = adjust_data_to_ubtc(data)
-    data.sort_index(inplace=True)
-
-    # Get the actual start and end dates from the data
-    actual_start_date = data.index.min().strftime('%Y-%m-%d %H:%M:%S')
-    actual_end_date = data.index.max().strftime('%Y-%m-%d %H:%M:%S')
-
-    for name, strategy in strategies.items():
-        # This outer run is for grouping the optimization trials
-        with mlflow.start_run(run_name=f"Optimize_{name}"):
-            mlflow.log_param("start_date", actual_start_date)
-            mlflow.log_param("end_date", actual_end_date)
-            mlflow.log_param("training_window_size", chunk_size)
-            mlflow.log_param("n_random_chunks", n_chunks)
-            print(f"Optimizing {name}...")
-            optimize_strategy_random_chunks(data, strategy, n_trials=n_trials_per_strategy, study_name=f'{experiment_name}-{name}',n_chunks=n_chunks,chunk_size=chunk_size, n_jobs=n_jobs)
-            print(f"Optimization for {name} complete.")
