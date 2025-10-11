@@ -14,7 +14,6 @@ OUTPUT_FILE_PATH = os.path.join(DATA_DIR, OUTPUT_FILE_NAME)
 COLUMNS = ['unix','date','symbol','open','high','low','close','Volume BTC','Volume USDT','buyTakerAmount','buyTakerQuantity','tradeCount','weightedAverage']
 
 # --- Processing Functions ---
-# AI apply the preprocessing done in fetch_historical_data AI!
 def load_single_csv(filepath):
     """Carga un solo CSV, omite la fila de encabezado redundante y prepara la columna de fecha."""
     # 1. Cargar el CSV: Se usa skiprows=1 para saltar la fila de encabezado del archivo original
@@ -24,7 +23,9 @@ def load_single_csv(filepath):
     df.columns = COLUMNS
     
     # 3. Convertir la columna 'date' a datetime y establecer como índice
-    df['date'] = pd.to_datetime(df['date'])
+    # Use 'unix' timestamp to create the 'date' column for a reliable index,
+    # mirroring the logic from fetch_historical_data.
+    df['date'] = pd.to_datetime(df['unix'], unit='us')
     return df.set_index('date')
 
 # --- Main Execution ---
