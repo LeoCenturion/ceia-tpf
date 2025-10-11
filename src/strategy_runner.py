@@ -195,6 +195,38 @@ class MultiIndicatorStrategy(Strategy):
         }
 
 
+#AI add a new swing trading strategy as follows
+# 1. Record the high
+# of the bar as the last swing high, SH. Following this
+# swing high, we are in a downswing. Record the low
+# of the day as the low of the current swing, CL.
+# 2. On the next day, first test if the downswing
+# continues. If the Low < CL, then CL = Low.
+# 3. Now test if the downswing reverses. If the High - CL
+# > swing filter, then we have a new upswing. Let the
+# new swing low SL = CL and set CH = High.
+# FIGURE 5.2 Corresponding swing chart of gold
+# using a 2.5% swing filter.
+# 4. On the next day, test if the upswing continues. If the
+# High > CH, then CH = High.
+# 5. Now test if the upswing reverses. If the CH - Low >
+# swing filter, then we have a new downswing.
+# 6. Go to step 2.
+# Swing filter  = p * Price_i where p is a fraction
+#Rules for Swing Trading
+# Each swing represents a price trend. There are two sets
+# of rules commonly used to enter positions in the trend
+# direction:
+# 1. (Conservative) Buy when the high of the current
+# upswing exceeds the high of the previous upswing
+# (two columns back). Sell when the low of the current
+# downswing falls below the low of the previous
+# downswing.
+# 2. (Aggressive) Buy as soon as a new upswing is
+# recognized. Sell when a new downswing is
+# recognized. Both of these occur the first time there is
+# a reversal greater than the swing filter.
+# AI!
 def main():
     """Main function to run the optimization with default parameters."""
     strategies = {
