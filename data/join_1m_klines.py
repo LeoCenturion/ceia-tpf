@@ -11,6 +11,7 @@ OUTPUT_FILE_NAME = "BTCUSDT_consolidated_klines.csv"
 OUTPUT_FILE_PATH = os.path.join(DATA_DIR, OUTPUT_FILE_NAME)
 
 # Define el encabezado esperado (usado para asignar nombres a las columnas)
+#AI columns are Open time 	Open 	High 	Low 	Close 	Volume 	Close time 	Quote asset volume 	Number of trades 	Taker buy base asset volume 	Taker buy quote asset volume 	Ignore AI!
 COLUMNS = ['unix','date','symbol','open','high','low','close','Volume BTC','Volume USDT','buyTakerAmount','buyTakerQuantity','tradeCount','weightedAverage']
 
 # --- Processing Functions ---
