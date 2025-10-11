@@ -195,38 +195,96 @@ class MultiIndicatorStrategy(Strategy):
         }
 
 
-#AI add a new swing trading strategy as follows
-# 1. Record the high
-# of the bar as the last swing high, SH. Following this
-# swing high, we are in a downswing. Record the low
-# of the day as the low of the current swing, CL.
-# 2. On the next day, first test if the downswing
-# continues. If the Low < CL, then CL = Low.
-# 3. Now test if the downswing reverses. If the High - CL
-# > swing filter, then we have a new upswing. Let the
-# new swing low SL = CL and set CH = High.
-# FIGURE 5.2 Corresponding swing chart of gold
-# using a 2.5% swing filter.
-# 4. On the next day, test if the upswing continues. If the
-# High > CH, then CH = High.
-# 5. Now test if the upswing reverses. If the CH - Low >
-# swing filter, then we have a new downswing.
-# 6. Go to step 2.
-# Swing filter  = p * Price_i where p is a fraction
-#Rules for Swing Trading
-# Each swing represents a price trend. There are two sets
-# of rules commonly used to enter positions in the trend
-# direction:
-# 1. (Conservative) Buy when the high of the current
-# upswing exceeds the high of the previous upswing
-# (two columns back). Sell when the low of the current
-# downswing falls below the low of the previous
-# downswing.
-# 2. (Aggressive) Buy as soon as a new upswing is
-# recognized. Sell when a new downswing is
-# recognized. Both of these occur the first time there is
-# a reversal greater than the swing filter.
-# AI!
+class SwingTrading(Strategy):
+    swing_filter_p = 0.025
+    trade_mode = 'aggressive'  # 'aggressive' or 'conservative'
+
+    def init(self):
+        self.swing_direction = 0  # 1 for up, -1 for down
+        self.current_high = 0.
+        self.current_low = float('inf')
+        self.swing_highs = []
+        self.swing_lows = []
+
+        # For conservative mode, to prevent re-entry in same swing
+        self.entry_signal_triggered = False
+
+    def next(self):
+        if len(self.data) < 2:
+            return
+
+        # Initialize on first valid bar
+        if self.swing_direction == 0:
+            if self.data.High[-1] > self.data.High[-2]:
+                self.swing_direction = 1
+                self.swing_lows.append(self.data.Low[-2])
+                self.current_high = self.data.High[-1]
+            elif self.data.Low[-1] < self.data.Low[-2]:
+                self.swing_direction = -1
+                self.swing_highs.append(self.data.High[-2])
+                self.current_low = self.data.Low[-1]
+            return
+
+        swing_filter = self.swing_filter_p * self.data.Close[-1]
+
+        # --- DOWNSWING LOGIC ---
+        if self.swing_direction == -1:
+            # 2. Test if downswing continues
+            if self.data.Low[-1] < self.current_low:
+                self.current_low = self.data.Low[-1]
+                # Conservative sell logic: check for breakdown
+                if (self.trade_mode == 'conservative' and
+                        len(self.swing_lows) >= 2 and
+                        not self.entry_signal_triggered and
+                        self.current_low < self.swing_lows[-2]):
+                    self.sell()
+                    self.entry_signal_triggered = True
+
+            # 3. Test if downswing reverses to upswing
+            if self.data.High[-1] - self.current_low > swing_filter:
+                self.swing_direction = 1
+                self.swing_lows.append(self.current_low)
+                self.current_high = self.data.High[-1]
+                self.entry_signal_triggered = False  # reset for new swing
+
+                if self.position.is_short:
+                    self.position.close()
+                if self.trade_mode == 'aggressive':
+                    self.buy()
+
+        # --- UPSWING LOGIC ---
+        elif self.swing_direction == 1:
+            # 4. Test if upswing continues
+            if self.data.High[-1] > self.current_high:
+                self.current_high = self.data.High[-1]
+                # Conservative buy logic: check for breakout
+                if (self.trade_mode == 'conservative' and
+                        len(self.swing_highs) >= 2 and
+                        not self.entry_signal_triggered and
+                        self.current_high > self.swing_highs[-2]):
+                    self.buy()
+                    self.entry_signal_triggered = True
+
+            # 5. Test if upswing reverses to downswing
+            if self.current_high - self.data.Low[-1] > swing_filter:
+                self.swing_direction = -1
+                self.swing_highs.append(self.current_high)
+                self.current_low = self.data.Low[-1]
+                self.entry_signal_triggered = False  # reset for new swing
+
+                if self.position.is_long:
+                    self.position.close()
+                if self.trade_mode == 'aggressive':
+                    self.sell()
+
+    @classmethod
+    def get_optuna_params(cls, trial):
+        return {
+            'swing_filter_p': trial.suggest_float('swing_filter_p', 0.01, 0.1),
+            'trade_mode': trial.suggest_categorical('trade_mode', ['aggressive', 'conservative']),
+        }
+
+
 def main():
     """Main function to run the optimization with default parameters."""
     strategies = {
@@ -234,7 +292,8 @@ def main():
         "BollingerBands": BollingerBands,
         "MACD": MACD,
         "RSIDivergence": RSIDivergence,
-        "MultiIndicatorStrategy": MultiIndicatorStrategy
+        "MultiIndicatorStrategy": MultiIndicatorStrategy,
+        "SwingTrading": SwingTrading
     }
     run_optimizations(
         strategies=strategies,
