@@ -463,6 +463,7 @@ def select_features(X: pd.DataFrame, y: pd.Series, corr_threshold=0.7, p_value_t
 
 
 def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3, refit_every: int = 1):
+    #AI make the window size parameterized AI!
     """
     Performs a manual walk-forward backtest with a sliding window.
     The model is refit every `refit_every` steps.
