@@ -272,7 +272,7 @@ plt.show()
 
 #%%
 print("Calculating run transition probabilities...")
-
+# AI compute the sharp ratio and other indicators from the whole data AI!
 # Create a DataFrame of consecutive run pairs
 transitions = pd.DataFrame({'from': runs, 'to': runs.shift(-1)}).dropna()
 transitions = transitions.astype(int)
