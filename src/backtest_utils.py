@@ -32,8 +32,8 @@ def fetch_historical_data(
         df = pd.read_csv(data_path)
         print(f'read csv {df}')
         df.rename(columns={"date": "timestamp", "Volume BTC": "volume"}, inplace=True)
-        # AI unit should depend on timeframe, for 1h unit=ms, for timeframe 1m unit=us  AI!
-        df["timestamp"] = pd.to_datetime(df["unix"], unit="ms")
+        unit = 'ms' if timeframe == '1h' else 'us'
+        df["timestamp"] = pd.to_datetime(df["unix"], unit=unit)
         print(f'after rename {df}')
         df.set_index("timestamp", inplace=True)
 
