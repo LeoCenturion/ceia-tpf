@@ -189,6 +189,7 @@ class XGBoostPriceReversalPalazzoStrategy(Strategy):
 
     @classmethod
     def get_optuna_params(cls, trial):
+        #AI apply these values  [volume_threshold: 37798, tau: 1.2688331479071624, corr_threshold: 0.14251221347181778, p_value_threshold: 0.17765096009692888, n_estimators: 281, learning_rate: 0.0010163133112639452, max_depth: 7, subsample: 0.8486986034061127, colsample_bytree: 0.7033426743185334, gamma: 2.035537039974458e-05, min_child_weight: 10] AI!
         return {
             'volume_threshold': trial.suggest_int('volume_threshold', 47535, 47535),
             'tau': trial.suggest_float('tau', 0.9715605245462489, 0.9715605245462489),
