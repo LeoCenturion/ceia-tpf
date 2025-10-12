@@ -25,6 +25,7 @@ def load_single_csv(filepath):
     # 3. Convertir la columna 'date' a datetime y establecer como índice
     # Use 'unix' timestamp to create the 'date' column for a reliable index,
     # mirroring the logic from fetch_historical_data.
+    #AI Try to autodetect the unit based on the 'unix' field length AI!
     df['date'] = pd.to_datetime(df['unix'], unit='us')
     return df.set_index('date')
 
