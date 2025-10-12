@@ -280,7 +280,7 @@ class SwingTrading(Strategy):
     @classmethod
     def get_optuna_params(cls, trial):
         return {
-            'swing_filter_p': trial.suggest_float('swing_filter_p', 0.01, 0.1),
+            'swing_filter_p': trial.suggest_float('swing_filter_p', 0.01, 0.2),
             'trade_mode': trial.suggest_categorical('trade_mode', ['aggressive', 'conservative']),
         }
 
@@ -288,11 +288,11 @@ class SwingTrading(Strategy):
 def main():
     """Main function to run the optimization with default parameters."""
     strategies = {
-        "MaCrossover": MaCrossover,
-        "BollingerBands": BollingerBands,
-        "MACD": MACD,
-        "RSIDivergence": RSIDivergence,
-        "MultiIndicatorStrategy": MultiIndicatorStrategy,
+        # "MaCrossover": MaCrossover,
+        # "BollingerBands": BollingerBands,
+        # "MACD": MACD,
+        # "RSIDivergence": RSIDivergence,
+        # "MultiIndicatorStrategy": MultiIndicatorStrategy,
         "SwingTrading": SwingTrading
     }
     run_optimizations(
@@ -301,7 +301,7 @@ def main():
         start_date="2022-01-01T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",
         experiment_name="Trading Strategies",
-        n_trials_per_strategy=12,
+        n_trials_per_strategy=60,
         n_jobs=12
 
     )

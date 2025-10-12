@@ -17,7 +17,6 @@ from backtest_utils import (
     rsi_indicator,
     std,
     momentum_indicator,
-    run_classification_optimizations,
 )
 
 
@@ -593,13 +592,8 @@ class XGBoostPriceReversalStrategy(Strategy):
             features_train_df = self.features_df.iloc[start_idx:end_idx]
             y_train_series = self.target_series.iloc[start_idx:end_idx]
 
-            # Feature selection
-            self.selected_cols = select_features(features_train_df, y_train_series.map({0: -1, 1: 0, 2: 1}), corr_threshold=self.corr_threshold)
-            if not self.selected_cols:
-                self.model = None
-                return
 
-            X_train_raw = features_train_df[self.selected_cols].values
+            X_train_raw = features_train_df.values
             y_train = y_train_series.values
 
             # Scale and fit
@@ -630,9 +624,9 @@ class XGBoostPriceReversalStrategy(Strategy):
             self.model.fit(X_train, y_train, sample_weight=sample_weights)
 
         # Make prediction and trade if the model is trained
-        if self.model and self.selected_cols:
+        if self.model:
             current_features_all = self.features_df.iloc[len(self.data) - 1]
-            current_features_selected = current_features_all[self.selected_cols].values.reshape(1, -1)
+            current_features_selected = current_features_all.values.reshape(1, -1)
 
             scaled_features = self.scaler.transform(current_features_selected)
             prediction = self.model.predict(scaled_features)[0]
@@ -668,17 +662,15 @@ class XGBoostPriceReversalStrategy(Strategy):
 def main():
     """Main function to run optimization for ML classification strategies."""
     strategies = {
-        "SVCStrategy": SVCStrategy,
-        "RandomForestClassifierStrategy": RandomForestClassifierStrategy,
         "XGBoostPriceReversalStrategy": XGBoostPriceReversalStrategy,
     }
-    run_classification_optimizations(
+    run_optimizations(
         strategies=strategies,
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
         start_date="2022-01-01T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",
         experiment_name="ML Classification Strategies",
-        n_trials_per_strategy=10,
+        n_trials_per_strategy=1,
         n_jobs=4
     )
 

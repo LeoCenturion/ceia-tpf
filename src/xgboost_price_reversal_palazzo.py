@@ -8,7 +8,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.utils.class_weight import compute_class_weight
 import cupy as cp
-
+import math
 from backtest_utils import fetch_historical_data, sma, ewm, std, rsi_indicator
 
 
@@ -462,7 +462,7 @@ def select_features(X: pd.DataFrame, y: pd.Series, corr_threshold=0.7, p_value_t
 # --- Part 3: Model Training and Evaluation ---
 
 
-def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3, refit_every: int = 1, train_window_size: int = None):
+def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3, refit_every: int = 1, train_window_size: int = 0):
     """
     Performs a manual walk-forward backtest with a sliding window.
     The model is refit every `refit_every` steps.
@@ -479,8 +479,8 @@ def manual_backtest(X: pd.DataFrame, y: pd.Series, model, test_size: float = 0.3
     split_index = int(len(X) * (1 - test_size))
     X_test = X.iloc[split_index:]
     y_test = y.iloc[split_index:]
-    if train_window_size is None:
-        train_window_size = split_index  # The size of our sliding window
+    if train_window_size == 0:
+        train_window_size = len(X)  # expanding window
 
     y_pred = []
     scaler = StandardScaler()
@@ -612,14 +612,6 @@ def objective(trial: optuna.Trial, minute_data: pd.DataFrame) -> float:
     if y.iloc[:split_index].nunique() < 2:
         print("Initial training set does not contain both classes. Pruning trial.")
         raise optuna.exceptions.TrialPruned()
-        
-    # Suggest a training window size for the backtest
-    # The lower bound is half the initial training set size, upper bound is the full size.
-    min_window = max(10, int(split_index * 0.5)) # Ensure a minimum of 10
-    if min_window >= split_index:
-        train_window_size = split_index
-    else:
-        train_window_size = trial.suggest_int('train_window_size', min_window, split_index)
 
     # Feature Selection
     # selected_cols = select_features(X, y, corr_threshold=corr_threshold, p_value_threshold=p_value_threshold)
@@ -631,7 +623,7 @@ def objective(trial: optuna.Trial, minute_data: pd.DataFrame) -> float:
     
     # Run Backtest
     model = xgb.XGBClassifier(**params)
-    _, _, report = manual_backtest(X, y, model, test_size=0.3, refit_every=refit_every, train_window_size=train_window_size)
+    _, _, report = manual_backtest(X, y, model, test_size=0.3, refit_every=refit_every, train_window_size=4500)
 
     # === 3. Calculate and Return the Objective Metric ===
     f1_top = report.get('top (1)', {}).get('f1-score', 0.0)
@@ -645,7 +637,7 @@ def main():
     """
     Main function to run the Optuna hyperparameter optimization study.
     """
-    N_TRIALS = 1
+    N_TRIALS = 30
 
     # 1. Load high-frequency data
     print("Loading 1-minute historical data...")
@@ -653,7 +645,7 @@ def main():
         symbol="BTC/USDT",
         timeframe="1m",
         # start_date="2025-09-01T00:00:00Z",
-        data_path='/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT-1m-2025-09.csv'
+        data_path='/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv'
     )
     # The aggregate_to_volume_bars function expects 'close' and 'volume' columns.
     # fetch_historical_data returns 'Close' and 'Volume', so we rename them.
@@ -661,7 +653,7 @@ def main():
     # print(minute_data)
     # 2. Setup and Run Optuna Study
     db_file_name = "optuna-study"
-    study_name_in_db = 'xgboost_price_reversal_palazzo_v1'
+    study_name_in_db = 'xgboost_price_reversal_palazzo_v2'
     storage_name = f"sqlite:///{db_file_name}.db"
 
     print(f"Starting Optuna study: '{study_name_in_db}'. Storage: {storage_name}")

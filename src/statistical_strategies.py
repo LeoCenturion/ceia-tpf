@@ -14,7 +14,6 @@ except ImportError:
     arch_model = None
 from backtest_utils import (
     run_optimizations,
-    run_optimizations_random_chunks,
     fetch_historical_data,
     adjust_data_to_ubtc,
 )
@@ -309,61 +308,6 @@ def main():
         n_trials_per_strategy=10,
     )
 
-def backtest_random_chunks(
-        strategy,
-        chunk_size = 100,
-        num_chunks_to_test = 30
-):
-    # Run a single backtest for SARIMAStrategy
-    print("Running single backtest for ARIMAStrategy...")
-    data = fetch_historical_data(
-        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
-        start_date="2022-01-01T00:00:00Z",
-    )
-    data = adjust_data_to_ubtc(data)
-    data.sort_index(inplace=True)
-    print(f"data len {len(data)}")
-
-      # Limiting to 5 chunks to keep the test reasonably short
-    stats_list = []
-    np.random.seed(42)  # For reproducible
-    print(f"Splitting data into {num_chunks_to_test} random chunks of {chunk_size} hours and averaging backtest stats...")
-    for i in range(num_chunks_to_test):
-        max_start_idx = len(data) - chunk_size
-        if max_start_idx <= 0:
-            print("Data is smaller than chunk size, cannot create random chunks.")
-            break
-
-        start_idx = np.random.randint(0, max_start_idx)
-        end_idx = start_idx + chunk_size
-
-        chunk_data = data.iloc[start_idx:end_idx]
-        print(f"\n--- Backtesting on Chunk {i+1}/{num_chunks_to_test} (Index: {start_idx}-{end_idx}) ---")
-
-        bt = Backtest(chunk_data, strategy, cash=10_000, commission=0.002)
-        try:
-            stats = bt.run()
-            stats_list.append(stats)
-            print(f"Chunk {i+1} Stats:\n{stats[['Return [%]', '# Trades', 'Win Rate [%]']]}")
-        except Exception as e:
-            print(f"Backtest on chunk {i+1} failed: {e}")
-
-    if stats_list:
-        stats_df = pd.DataFrame(stats_list)
-
-        # Convert timedelta columns to total seconds before averaging
-        for col in stats_df.columns:
-            if pd.api.types.is_timedelta64_dtype(stats_df[col]):
-                stats_df[col] = stats_df[col].dt.total_seconds()
-
-        # Select only numeric columns for averaging
-        numeric_stats_df = stats_df.select_dtypes(include=np.number)
-        averaged_stats = numeric_stats_df.mean()
-
-        print("\n\n--- Averaged Backtest Stats ---")
-        print(averaged_stats)
-    else:
-        print("\nNo backtests were successfully completed.")
 
 class ARIMAXGARCHStrategy(Strategy):
     # ARIMAX params
