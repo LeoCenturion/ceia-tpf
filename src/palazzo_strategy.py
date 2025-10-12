@@ -90,15 +90,15 @@ def create_features(df):
 
 class XGBoostPriceReversalPalazzoStrategy(Strategy):
     # Default Hyperparameters (to be tuned by Optuna)
-    volume_threshold = 47535
-    tau = 0.9715605245462489
-    n_estimators = 159
-    learning_rate = 0.2746636157645839
-    max_depth = 20
-    subsample = 0.5244322029875628
-    colsample_bytree = 0.8838133314197973
-    gamma = 1.5002971182849662e-07
-    min_child_weight = 1
+    volume_threshold = 37798
+    tau = 1.2688331479071624
+    n_estimators = 281
+    learning_rate = 0.0010163133112639452
+    max_depth = 7
+    subsample = 0.8486986034061127
+    colsample_bytree = 0.7033426743185334
+    gamma = 2.035537039974458e-05
+    min_child_weight = 10
 
     # Strategy Parameters
     refit_period = 100  # Refit every 100 volume bars
@@ -189,17 +189,16 @@ class XGBoostPriceReversalPalazzoStrategy(Strategy):
 
     @classmethod
     def get_optuna_params(cls, trial):
-        #AI apply these values  [volume_threshold: 37798, tau: 1.2688331479071624, corr_threshold: 0.14251221347181778, p_value_threshold: 0.17765096009692888, n_estimators: 281, learning_rate: 0.0010163133112639452, max_depth: 7, subsample: 0.8486986034061127, colsample_bytree: 0.7033426743185334, gamma: 2.035537039974458e-05, min_child_weight: 10] AI!
         return {
-            'volume_threshold': trial.suggest_int('volume_threshold', 47535, 47535),
-            'tau': trial.suggest_float('tau', 0.9715605245462489, 0.9715605245462489),
-            'n_estimators': trial.suggest_int('n_estimators', 159, 159),
-            'learning_rate': trial.suggest_float('learning_rate', 0.2746636157645839, 0.2746636157645839),
-            'max_depth': trial.suggest_int('max_depth', 20, 20),
-            'subsample': trial.suggest_float('subsample', 0.5244322029875628, 0.5244322029875628),
-            'colsample_bytree': trial.suggest_float('colsample_bytree', 0.8838133314197973, 0.8838133314197973),
-            'gamma': trial.suggest_float('gamma', 1.5002971182849662e-07, 1.5002971182849662e-07),
-            'min_child_weight': trial.suggest_int('min_child_weight', 1, 1),
+            'volume_threshold': trial.suggest_int('volume_threshold', 37798, 37798),
+            'tau': trial.suggest_float('tau', 1.2688331479071624, 1.2688331479071624),
+            'n_estimators': trial.suggest_int('n_estimators', 281, 281),
+            'learning_rate': trial.suggest_float('learning_rate', 0.0010163133112639452, 0.0010163133112639452),
+            'max_depth': trial.suggest_int('max_depth', 7, 7),
+            'subsample': trial.suggest_float('subsample', 0.8486986034061127, 0.8486986034061127),
+            'colsample_bytree': trial.suggest_float('colsample_bytree', 0.7033426743185334, 0.7033426743185334),
+            'gamma': trial.suggest_float('gamma', 2.035537039974458e-05, 2.035537039974458e-05),
+            'min_child_weight': trial.suggest_int('min_child_weight', 10, 10),
             'refit_period': trial.suggest_int('refit_period', 50, 200, step=25),
             'lookback_length': trial.suggest_int('lookback_length', 200, 1000, step=100),
         }
