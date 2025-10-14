@@ -125,7 +125,7 @@ def manual_backtest_forecast(volume_bars: pd.DataFrame, model, tokenizer, contex
 
 # --- Part 3: Optuna Optimization ---
 
-def objective(trial: optuna.Trial, minute_data: pd.DataFrame, model, tokenizer) -> float:
+def objective(trial: optuna.Trial, hourly_data: pd.DataFrame, model, tokenizer) -> float:
     """
     Optuna objective function to tune hyperparameters for the Chronos strategy.
     """
@@ -138,7 +138,7 @@ def objective(trial: optuna.Trial, minute_data: pd.DataFrame, model, tokenizer) 
     print(f"Params: {trial.params}")
     
     # Run pipeline
-    volume_bars = aggregate_to_volume_bars(minute_data.copy(), volume_threshold=volume_threshold)
+    volume_bars = aggregate_to_volume_bars(hourly_data.copy(), volume_threshold=volume_threshold)
     
     if len(volume_bars) < context_length + 100:
         print("Not enough volume bars created for a meaningful backtest. Pruning trial.")
@@ -172,13 +172,9 @@ def main():
     model = ChronosForCausalLM.from_pretrained(MODEL_NAME)
     
     # 2. Load Data
-    print("Loading 1-minute historical data...")
-    # AI use hourly data AI! 
-    minute_data = fetch_historical_data(
-        timeframe="1m",
-        data_path='/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv'
-    )
-    minute_data.rename(columns={'Close': 'close', 'Volume': 'volume'}, inplace=True)
+    print("Loading 1-hour historical data...")
+    hourly_data = fetch_historical_data(timeframe="1h")
+    hourly_data.rename(columns={'Close': 'close', 'Volume': 'volume'}, inplace=True)
     
     # 3. Setup and Run Optuna Study
     db_file_name = "optuna-study"
@@ -186,7 +182,7 @@ def main():
     storage_name = f"sqlite:///{db_file_name}.db"
     print(f"Starting Optuna study: '{study_name_in_db}'. Storage: {storage_name}")
 
-    objective_with_data = partial(objective, minute_data=minute_data, model=model, tokenizer=tokenizer)
+    objective_with_data = partial(objective, hourly_data=hourly_data, model=model, tokenizer=tokenizer)
     
     study = optuna.create_study(
         direction='maximize',
