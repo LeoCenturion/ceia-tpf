@@ -47,7 +47,8 @@ def main():
         target="target",
         freq="1h"
     )
-
+    # AI can you print the layers of the model AI!
+    print(predictor)
     print("\nFitting Chronos model...")
     predictor.fit(
         train_ts_df,
