@@ -173,6 +173,7 @@ def main():
     
     # 2. Load Data
     print("Loading 1-minute historical data...")
+    # AI use hourly data AI! 
     minute_data = fetch_historical_data(
         timeframe="1m",
         data_path='/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv'
