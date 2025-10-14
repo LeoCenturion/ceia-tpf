@@ -11,8 +11,20 @@ from sklearn.metrics import classification_report
 from backtest_utils import fetch_historical_data, sma
 # Note: The model "amazon/chronos-bolt-base" was not found.
 # Assuming a typo and using "amazon/chronos-t5-base" instead.
+# # AI use gluon as follows:
+# from autogluon.timeseries import TimeSeriesPredictor, TimeSeriesDataFrame
 
+# df = TimeSeriesDataFrame("https://autogluon.s3.amazonaws.com/datasets/timeseries/m4_hourly/train.csv")
 
+# predictor = TimeSeriesPredictor(prediction_length=48).fit(
+#     df,
+#     hyperparameters={
+#         "Chronos": {"model_path": "amazon/chronos-bolt-base"},
+#     },
+# )
+
+# predictions = predictor.predict(df)
+# ...AI!
 def awesome_oscillator(high: pd.Series, low: pd.Series, fast_period: int = 5, slow_period: int = 34) -> pd.Series:
     """Calculates the Awesome Oscillator."""
     median_price = (high + low) / 2
