@@ -13,6 +13,7 @@ def main():
     print("Loading historical data...")
     data = fetch_historical_data(
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
+        timeframe= "1h",
         start_date="2022-01-01T00:00:00Z"
     )
 
@@ -43,7 +44,8 @@ def main():
     predictor = TimeSeriesPredictor(
         prediction_length=prediction_length,
         eval_metric="MASE",
-        target="target"
+        target="target",
+        freq="1h"
     )
 
     print("\nFitting Chronos model...")
