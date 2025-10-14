@@ -32,8 +32,10 @@ def fetch_historical_data(
         df = pd.read_csv(data_path)
         print(f'read csv {df}')
         df.rename(columns={"date": "timestamp", "Volume BTC": "volume"}, inplace=True)
-        unit = 'ms' if timeframe == '1h' else 'us'
-        df["timestamp"] = pd.to_datetime(df["unix"], unit=unit)
+        # s_timestamp = str(int(df['unix'].iloc[0]))
+        # unit = 'us' if len(s_timestamp) > 13 else 'ms'
+        # df["timestamp"] = pd.to_datetime(df["unix"], unit=unit)
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
         print(f'after rename {df}')
         df.set_index("timestamp", inplace=True)
 

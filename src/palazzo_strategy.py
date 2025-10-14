@@ -148,7 +148,9 @@ class XGBoostPriceReversalPalazzoStrategy(Strategy):
             self.in_trade = False
 
         # Periodically refit the model
-        if bar_idx >= self.lookback_length and (bar_idx - self.lookback_length) % self.refit_period == 0:
+        # print(f"bar_id {bar_idx}; loopback_length {self.lookback_length}; % = {(bar_idx - self.lookback_length) % self.refit_period}")
+        if (bar_idx - self.lookback_length) % self.refit_period == 0:
+            # print("retraining")
             end_idx = bar_idx
             start_idx = max(0, end_idx - self.lookback_length)
             train_df = self.processed_data.iloc[start_idx:end_idx]
@@ -176,13 +178,14 @@ class XGBoostPriceReversalPalazzoStrategy(Strategy):
 
         # Make prediction if model is trained
         if self.model:
+            
             current_features_df = self.processed_data.iloc[[bar_idx]]
             features = [col for col in current_features_df.columns if "feature_" in col]
             X_current_raw = current_features_df[features]
 
             scaled_features = self.scaler.transform(X_current_raw)
             prediction = self.model.predict(scaled_features)[0]
-
+            # print(f'predicted {prediction}')
             if prediction == 1 and not self.position:
                 self.buy()
                 self.in_trade = True
@@ -199,8 +202,8 @@ class XGBoostPriceReversalPalazzoStrategy(Strategy):
             'colsample_bytree': trial.suggest_float('colsample_bytree', 0.7033426743185334, 0.7033426743185334),
             'gamma': trial.suggest_float('gamma', 2.035537039974458e-05, 2.035537039974458e-05),
             'min_child_weight': trial.suggest_int('min_child_weight', 10, 10),
-            'refit_period': trial.suggest_int('refit_period', 50, 200, step=25),
-            'lookback_length': trial.suggest_int('lookback_length', 200, 1000, step=100),
+            'refit_period': trial.suggest_int('refit_period', 24, 24, step=25),
+            'lookback_length': trial.suggest_int('lookback_length', 4500, 4500, step=100),
         }
 
 
@@ -212,10 +215,10 @@ def main():
     # This strategy requires high-frequency data (e.g., 1-minute) to build volume bars.
     run_optimizations(
         strategies=strategies,
-        data_path='/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT-1m-2025-09.csv',
-        start_date="2025-09-01T00:00:00Z",
+        data_path='/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv',
+        start_date="2020-01-01T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",
-        experiment_name="Palazzo Strategy",
+        experiment_name="Palazzo Strategy v1",
         timeframe='1m',
         n_trials_per_strategy=1,
         n_jobs=1  # Use a single job for GPU-based training to avoid conflicts
