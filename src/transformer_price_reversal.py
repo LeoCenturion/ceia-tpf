@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
 import torch
-from transformers import AutoTokenizer, ChronosForCausalLM
+from transformers import AutoTokenizer
+from transformers.models.chronos import ChronosForCausalLM
 import optuna
 from functools import partial
 from scipy.signal import find_peaks
