@@ -4,123 +4,137 @@ import torch
 from transformers import AutoTokenizer, ChronosForCausalLM
 import optuna
 from functools import partial
+from scipy.signal import find_peaks
+from sklearn.metrics import classification_report
 
-from backtest_utils import fetch_historical_data
-# AI Don't use volume bars, the data is hourly and the target should be the same as in xgboost_price_reversal.py AI! 
+from backtest_utils import fetch_historical_data, sma
 # Note: The model "amazon/chronos-bolt-base" was not found.
 # Assuming a typo and using "amazon/chronos-t5-base" instead.
 
 
-# --- Part 1: Volume Bar Aggregation (from xgboost_price_reversal_palazzo.py) ---
+def awesome_oscillator(high: pd.Series, low: pd.Series, fast_period: int = 5, slow_period: int = 34) -> pd.Series:
+    """Calculates the Awesome Oscillator."""
+    median_price = (high + low) / 2
+    ao = sma(median_price, fast_period) - sma(median_price, slow_period)
+    return ao
 
-def aggregate_to_volume_bars(df, volume_threshold=50000):
+
+def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_pct_change', peak_distance: int = 1, peak_threshold: float = 0, std_fraction: float = 1.0) -> pd.DataFrame:
     """
-    Aggregates time-series data into volume bars based on a volume threshold.
+    Identifies local tops (1), bottoms (-1), and non-reversal points (0)
+    using different methods, and returns the DataFrame with a 'target' column.
+
+    Methods:
+    - 'ao_on_price': Awesome Oscillator on actual prices.
+    - 'ao_on_pct_change': Awesome Oscillator on price percentage changes.
+    - 'pct_change_on_ao': Percentage change of Awesome Oscillator on actual prices.
+    - 'pct_change_std': Target based on closing price pct_change exceeding 1 std dev.
     """
-    print(f"Aggregating data into volume bars of {volume_threshold} units...")
-    bars = []
-    current_bar_data = []
-    cumulative_volume = 0
+    if method == 'pct_change_std':
+        window = 24 * 7
+        close_pct_change = df['Close'].pct_change()
+        # The target is based on the NEXT period's price change.
+        future_pct_change = close_pct_change.shift(-1)
+        rolling_std = close_pct_change.rolling(window=window).std()
 
-    for index, row in df.iterrows():
-        current_bar_data.append(row)
-        cumulative_volume += row["volume"]
-        if cumulative_volume >= volume_threshold:
-            bar_df = pd.DataFrame(current_bar_data)
+        df['target'] = 0
+        df.loc[future_pct_change >= (rolling_std * std_fraction), 'target'] = 1
+        df.loc[future_pct_change <= -(rolling_std * std_fraction), 'target'] = -1
+        return df
 
-            open_time = bar_df.index[0]
-            close_time = bar_df.index[-1]
-            open_price = bar_df["Open"].iloc[0]
-            close_price = bar_df["close"].iloc[-1]
-
-            bars.append(
-                {
-                    "open_time": open_time,
-                    "close_time": close_time,
-                    "open_price": open_price,
-                    "close_price": close_price,
-                    "total_volume": cumulative_volume,
-                }
-            )
-            current_bar_data = []
-            cumulative_volume = 0
-
-    volume_bars_df = pd.DataFrame(bars)
-
-    if volume_bars_df.empty:
-        print("Warning: No volume bars created. Threshold might be too high.")
+    if method == 'ao_on_pct_change':
+        # computing the peaks from the awesome oscillator from the pct_change of the values
+        high_pct = df['High'].pct_change().fillna(0)
+        low_pct = df['Low'].pct_change().fillna(0)
+        ao = awesome_oscillator(high_pct, low_pct)
+    elif method == 'ao_on_price':
+        # computing the peaks from the awesome oscillator from the actual price values
+        ao = awesome_oscillator(df['High'], df['Low'])
+    elif method == 'pct_change_on_ao':
+        # computing the peaks from the pct_change of the awesome oscillator from the actual price values
+        ao_price = awesome_oscillator(df['High'], df['Low'])
+        ao = ao_price.pct_change().fillna(0).replace([np.inf, -np.inf], 0)
     else:
-        print(f"Aggregation complete. {len(volume_bars_df)} volume bars created.\n")
-    return volume_bars_df
+        raise ValueError(f"Invalid method '{method}' specified for create_target_variable")
+
+
+    if ao is None or ao.isnull().all():
+        # If AO can't be calculated, label all points as neutral
+        df['target'] = 0
+        return df
+
+    # Find peaks (tops) and troughs (bottoms) in the AO
+    peaks, _ = find_peaks(ao, distance=peak_distance, threshold=peak_threshold)
+    troughs, _ = find_peaks(-ao, distance=peak_distance, threshold=peak_threshold)
+
+    # Create the target column, default to 0 (neutral)
+    df['target'] = 0
+    df.loc[df.index[peaks], 'target'] = 1  # Tops
+    df.loc[df.index[troughs], 'target'] = -1 # Bottoms
+
+    return df
 
 
 # --- Part 2: Model Backtesting ---
 
-def manual_backtest_forecast(volume_bars: pd.DataFrame, model, tokenizer, context_length: int, trade_threshold: float, test_size: float = 0.3):
+def manual_backtest(df: pd.DataFrame, model, tokenizer, context_length: int, trade_threshold: float, test_size: float = 0.3):
     """
-    Performs a manual walk-forward backtest using a forecasting model.
+    Performs a walk-forward backtest and evaluates reversal predictions.
     """
-    split_index = int(len(volume_bars) * (1 - test_size))
-    test_data = volume_bars.iloc[split_index:]
-
+    split_index = int(len(df) * (1 - test_size))
+    test_data = df.iloc[split_index:]
+    y_test = df['target'].iloc[split_index:]
+    y_pred = []
+    
     if len(test_data) < 2:
-        return 0.0, 0.0, 0.0
+        return classification_report(y_test, y_pred, labels=[-1, 0, 1], target_names=['Bottom', 'Neutral', 'Top'], zero_division=0, output_dict=True)
 
-    capital = 100_000.0
-    portfolio_history = [capital]
-    is_long = False
+    was_long = False
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model.to(device)
 
     print("Starting walk-forward backtest...")
-    for i in range(len(test_data) - 1):
-        # Calculate PnL for the bar that just closed (from i to i+1)
-        if is_long:
-            entry_price = test_data['close_price'].iloc[i]
-            exit_price = test_data['close_price'].iloc[i + 1]
-            capital *= (exit_price / entry_price)
-        portfolio_history.append(capital)
-
-        # Decide on position for the *next* bar (from i+1 to i+2)
-        # Decision is based on data up to and including bar `i`
+    for i in range(len(test_data)):
+        # Decide on position for the *next* bar (from i to i+1)
+        # Decision is based on data up to and including bar `i-1`
         current_data_index = split_index + i
-        context_end_idx = current_data_index + 1
+        context_end_idx = current_data_index
         context_start_idx = max(0, context_end_idx - context_length)
 
-        context_series = volume_bars['close_price'].iloc[context_start_idx:context_end_idx]
-        context = torch.tensor(context_series.values, dtype=torch.float32).unsqueeze(0).to(device)
-
-        with torch.no_grad():
-            forecast = model.forecast(context, prediction_length=1)
+        context_series = df['Close'].iloc[context_start_idx:context_end_idx]
         
-        predicted_price = forecast[0, 0, 0].item()
-        current_price = context_series.iloc[-1]
-
-        if predicted_price > current_price * (1 + trade_threshold):
-            is_long = True
+        if len(context_series) < context_length:
+            # Not enough data for a prediction, assume neutral
+            predicted_signal = 0
         else:
-            is_long = False
+            context = torch.tensor(context_series.values, dtype=torch.float32).unsqueeze(0).to(device)
+            with torch.no_grad():
+                forecast = model.forecast(context, prediction_length=1)
+            
+            predicted_price = forecast[0, 0, 0].item()
+            current_price = context_series.iloc[-1]
+            
+            is_long = predicted_price > current_price * (1 + trade_threshold)
+
+            # Generate reversal signal
+            if is_long and not was_long:
+                predicted_signal = -1  # Buy signal -> predicts a bottom
+            elif not is_long and was_long:
+                predicted_signal = 1   # Sell signal -> predicts a top
+            else:
+                predicted_signal = 0   # No change in position
+            
+            was_long = is_long
         
-        if (i + 1) % 100 == 0 or (i + 1) == len(test_data) - 1:
-            print(f"Processed {i+1}/{len(test_data) - 1} steps...")
-
-    # Calculate performance metrics
-    total_return = (portfolio_history[-1] / portfolio_history[0]) - 1
-    returns = pd.Series(portfolio_history).pct_change().dropna()
-
-    if returns.std() > 0:
-        # Simple, non-annualized Sharpe Ratio for comparison
-        sharpe_ratio = returns.mean() / returns.std()
-    else:
-        sharpe_ratio = 0.0
+        y_pred.append(predicted_signal)
+        
+        if (i + 1) % 100 == 0 or (i + 1) == len(test_data):
+            print(f"Processed {i+1}/{len(test_data)} steps...")
     
-    pv_series = pd.Series(portfolio_history)
-    peak = pv_series.expanding(min_periods=1).max()
-    drawdown = (pv_series / peak) - 1
-    max_drawdown = drawdown.min()
-
-    print(f"Backtest complete. Final Return: {total_return:.2%}, Sharpe Ratio: {sharpe_ratio:.2f}")
-    return sharpe_ratio, total_return, max_drawdown
+    print("\n--- Backtest Classification Report ---")
+    report = classification_report(y_test, y_pred, labels=[-1, 0, 1], target_names=['Bottom', 'Neutral', 'Top'], zero_division=0, output_dict=True)
+    print(classification_report(y_test, y_pred, labels=[-1, 0, 1], target_names=['Bottom', 'Neutral', 'Top'], zero_division=0))
+    return report
 
 
 # --- Part 3: Optuna Optimization ---
@@ -129,34 +143,57 @@ def objective(trial: optuna.Trial, hourly_data: pd.DataFrame, model, tokenizer) 
     """
     Optuna objective function to tune hyperparameters for the Chronos strategy.
     """
-    # Define hyperparameters
-    volume_threshold = trial.suggest_int('volume_threshold', 25000, 100000)
+    # --- 1. Define Hyperparameter Search Space ---
+    # Peak detection hyperparameters
+    peak_method = trial.suggest_categorical('peak_method', ['ao_on_price', 'pct_change_on_ao'])
+    peak_distance = trial.suggest_int('peak_distance', 1, 5)
+    if peak_method == 'ao_on_price':
+        peak_threshold = trial.suggest_float('peak_threshold', 0.0, 100.0)
+    else: # pct_change_on_ao
+        peak_threshold = trial.suggest_float('peak_threshold', 0.0, 5)
+
+    # Backtesting hyperparameters
     context_length = trial.suggest_int('context_length', 60, 300, step=30)
     trade_threshold = trial.suggest_float('trade_threshold', 0.0005, 0.01, log=True)
     
     print(f"\n--- Starting Trial {trial.number} ---")
     print(f"Params: {trial.params}")
     
-    # Run pipeline
-    volume_bars = aggregate_to_volume_bars(hourly_data.copy(), volume_threshold=volume_threshold)
-    
-    if len(volume_bars) < context_length + 100:
-        print("Not enough volume bars created for a meaningful backtest. Pruning trial.")
+    # --- 2. Run the ML Pipeline ---
+    # Create Target Variable
+    reversal_data = create_target_variable(
+        hourly_data.copy(),
+        method=peak_method,
+        peak_distance=peak_distance,
+        peak_threshold=peak_threshold
+    )
+
+    # Prune trial if not enough reversal points are found
+    if reversal_data['target'].nunique() < 3 or reversal_data['target'].value_counts().get(1, 0) < 5 or reversal_data['target'].value_counts().get(-1, 0) < 5:
+        print("Not enough reversal points found with these parameters. Pruning trial.")
         raise optuna.exceptions.TrialPruned()
 
-    sharpe, total_return, max_dd = manual_backtest_forecast(
-        volume_bars,
+    # Run Backtest
+    report = manual_backtest(
+        reversal_data,
         model,
         tokenizer,
         context_length=context_length,
         trade_threshold=trade_threshold
     )
     
-    trial.set_user_attr("total_return", total_return)
-    trial.set_user_attr("max_drawdown", max_dd)
+    # === 3. Calculate and Return the Objective Metric ===
+    f1_top = report.get('Top', {}).get('f1-score', 0.0)
+    f1_bottom = report.get('Bottom', {}).get('f1-score', 0.0)
+    
+    # We want to maximize the average F1 score for identifying tops and bottoms
+    objective_value = (f1_top + f1_bottom) / 2
+    
+    trial.set_user_attr("f1_top", f1_top)
+    trial.set_user_attr("f1_bottom", f1_bottom)
 
-    # Return Sharpe Ratio as the metric to maximize
-    return sharpe if not np.isnan(sharpe) else 0.0
+    print(f"Trial {trial.number} finished. Avg F1 (Top/Bottom): {objective_value:.4f}")
+    return objective_value
 
 
 def main():
@@ -198,13 +235,13 @@ def main():
     print("\n--- Optuna Study Best Results ---")
     try:
         best_trial = study.best_trial
-        print(f"Best trial value (Sharpe Ratio): {best_trial.value}")
+        print(f"Best trial value (Average F1 Score): {best_trial.value}")
         print("Best parameters found:")
         for key, value in best_trial.params.items():
             print(f"  {key}: {value}")
         print("Associated metrics:")
-        print(f"  Total Return: {best_trial.user_attrs.get('total_return', 'N/A'):.2%}")
-        print(f"  Max Drawdown: {best_trial.user_attrs.get('max_drawdown', 'N/A'):.2%}")
+        print(f"  F1 Score (Top): {best_trial.user_attrs.get('f1_top', 'N/A'):.4f}")
+        print(f"  F1 Score (Bottom): {best_trial.user_attrs.get('f1_bottom', 'N/A'):.4f}")
     except ValueError:
         print("No successful trials were completed.")
 
