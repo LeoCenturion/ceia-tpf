@@ -47,7 +47,6 @@ def main():
         target="target",
         freq="1h"
     )
-    # AI can you print the layers of the model AI!
     print(predictor)
     print("\nFitting Chronos model...")
     predictor.fit(
@@ -57,6 +56,22 @@ def main():
         },
         time_limit=600  # 10-minute time limit for fitting
     )
+
+    # Print the layers of the fitted model
+    try:
+        best_model_name = predictor.get_model_best()
+        if 'Chronos' in best_model_name:
+            trainer = predictor._trainer
+            autogluon_model = trainer.load_model(best_model_name)
+            # The underlying PyTorch/HF model is stored in the `model` attribute
+            pytorch_model = autogluon_model.model
+            print("\n--- Chronos Model Layers ---")
+            print(pytorch_model)
+            print("--------------------------\n")
+        else:
+            print(f"\nBest model is '{best_model_name}', not Chronos. Cannot print layers.\n")
+    except Exception as e:
+        print(f"\nCould not print model layers: {e}\n")
 
     # 4. Generate forecast
     print("\nGenerating forecast...")
