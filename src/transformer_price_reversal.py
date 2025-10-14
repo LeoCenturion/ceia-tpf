@@ -63,13 +63,14 @@ def main():
 
     # 5. Evaluate and plot results
     # The `score` method evaluates predictions against the ground truth.
-    # We need to format the test data into a TimeSeriesDataFrame.
-    test_ts_df = TimeSeriesDataFrame.from_data_frame(
-        test_data,
+    # We pass the entire dataset to `evaluate`, and AutoGluon automatically
+    # uses the last `prediction_length` time steps as the validation set.
+    full_ts_df = TimeSeriesDataFrame.from_data_frame(
+        data_ag,
         id_column="item_id",
         timestamp_column="timestamp"
     )
-    evaluation = predictor.evaluate(test_ts_df)
+    evaluation = predictor.evaluate(full_ts_df)
     print("\nForecast Evaluation (on validation data):")
     print(evaluation)
 
