@@ -1,30 +1,14 @@
 import pandas as pd
 import numpy as np
-import torch
-from transformers import AutoTokenizer
-from transformers.models.chronos import ChronosForCausalLM
 import optuna
 from functools import partial
 from scipy.signal import find_peaks
 from sklearn.metrics import classification_report
+from autogluon.timeseries import TimeSeriesPredictor, TimeSeriesDataFrame
 
 from backtest_utils import fetch_historical_data, sma
 # Note: The model "amazon/chronos-bolt-base" was not found.
-# Assuming a typo and using "amazon/chronos-t5-base" instead.
-# # AI use gluon as follows:
-# from autogluon.timeseries import TimeSeriesPredictor, TimeSeriesDataFrame
-
-# df = TimeSeriesDataFrame("https://autogluon.s3.amazonaws.com/datasets/timeseries/m4_hourly/train.csv")
-
-# predictor = TimeSeriesPredictor(prediction_length=48).fit(
-#     df,
-#     hyperparameters={
-#         "Chronos": {"model_path": "amazon/chronos-bolt-base"},
-#     },
-# )
-
-# predictions = predictor.predict(df)
-# ...AI!
+# Using "amazon/chronos-t5-base" via AutoGluon instead.
 def awesome_oscillator(high: pd.Series, low: pd.Series, fast_period: int = 5, slow_period: int = 34) -> pd.Series:
     """Calculates the Awesome Oscillator."""
     median_price = (high + low) / 2
@@ -90,42 +74,61 @@ def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_pct_change', p
 
 # --- Part 2: Model Backtesting ---
 
-def manual_backtest(df: pd.DataFrame, model, tokenizer, context_length: int, trade_threshold: float, test_size: float = 0.3):
+def manual_backtest(df: pd.DataFrame, model_params: dict, trade_threshold: float, test_size: float = 0.3, refit_every: int = 24 * 7):
     """
-    Performs a walk-forward backtest and evaluates reversal predictions.
+    Performs a walk-forward backtest using AutoGluon TimeSeriesPredictor.
     """
     split_index = int(len(df) * (1 - test_size))
     test_data = df.iloc[split_index:]
     y_test = df['target'].iloc[split_index:]
     y_pred = []
-    
+
     if len(test_data) < 2:
         return classification_report(y_test, y_pred, labels=[-1, 0, 1], target_names=['Bottom', 'Neutral', 'Top'], zero_division=0, output_dict=True)
 
     was_long = False
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model.to(device)
-
+    predictor = None
+    
     print("Starting walk-forward backtest...")
     for i in range(len(test_data)):
-        # Decide on position for the *next* bar (from i to i+1)
-        # Decision is based on data up to and including bar `i-1`
-        current_data_index = split_index + i
-        context_end_idx = current_data_index
-        context_start_idx = max(0, context_end_idx - context_length)
-
-        context_series = df['Close'].iloc[context_start_idx:context_end_idx]
+        current_split_index = split_index + i
         
-        if len(context_series) < context_length:
-            # Not enough data for a prediction, assume neutral
-            predicted_signal = 0
-        else:
-            context = torch.tensor(context_series.values, dtype=torch.float32).unsqueeze(0).to(device)
-            with torch.no_grad():
-                forecast = model.forecast(context, prediction_length=1)
+        # Periodically refit the model on an expanding window
+        if i % refit_every == 0:
+            print(f"Refitting model at step {i+1}/{len(test_data)}...")
+            train_data = df.iloc[:current_split_index]
             
-            predicted_price = forecast[0, 0, 0].item()
-            current_price = context_series.iloc[-1]
+            # Prepare data for AutoGluon
+            train_data_ag = train_data[['Close']].copy()
+            train_data_ag.reset_index(inplace=True)
+            train_data_ag.rename(columns={'index': 'timestamp', 'Close': 'target'}, inplace=True)
+            train_data_ag['item_id'] = 'BTC'
+            train_ts_df = TimeSeriesDataFrame.from_data_frame(train_data_ag, id_column="item_id", timestamp_column="timestamp")
+            
+            predictor = TimeSeriesPredictor(
+                prediction_length=1,
+                eval_metric="MASE",
+                target="target"
+            )
+            predictor.fit(
+                train_ts_df,
+                hyperparameters={"Chronos": model_params},
+                time_limit=300 # 5 minute timeout for fitting
+            )
+
+        # Predict the next step
+        if predictor is not None:
+            # Predict requires the training data to know where to start forecasting from
+            current_train_data = df.iloc[:current_split_index]
+            current_train_ag = current_train_data[['Close']].copy()
+            current_train_ag.reset_index(inplace=True)
+            current_train_ag.rename(columns={'index': 'timestamp', 'Close': 'target'}, inplace=True)
+            current_train_ag['item_id'] = 'BTC'
+            current_ts_df = TimeSeriesDataFrame.from_data_frame(current_train_ag, id_column="item_id", timestamp_column="timestamp")
+
+            forecast = predictor.predict(current_ts_df)
+            predicted_price = forecast['mean'].iloc[0]
+            current_price = current_train_data['Close'].iloc[-1]
             
             is_long = predicted_price > current_price * (1 + trade_threshold)
 
@@ -138,12 +141,14 @@ def manual_backtest(df: pd.DataFrame, model, tokenizer, context_length: int, tra
                 predicted_signal = 0   # No change in position
             
             was_long = is_long
-        
+        else:
+            predicted_signal = 0 # Cannot predict if model not trained
+
         y_pred.append(predicted_signal)
         
         if (i + 1) % 100 == 0 or (i + 1) == len(test_data):
             print(f"Processed {i+1}/{len(test_data)} steps...")
-    
+
     print("\n--- Backtest Classification Report ---")
     report = classification_report(y_test, y_pred, labels=[-1, 0, 1], target_names=['Bottom', 'Neutral', 'Top'], zero_division=0, output_dict=True)
     print(classification_report(y_test, y_pred, labels=[-1, 0, 1], target_names=['Bottom', 'Neutral', 'Top'], zero_division=0))
@@ -152,7 +157,7 @@ def manual_backtest(df: pd.DataFrame, model, tokenizer, context_length: int, tra
 
 # --- Part 3: Optuna Optimization ---
 
-def objective(trial: optuna.Trial, hourly_data: pd.DataFrame, model, tokenizer) -> float:
+def objective(trial: optuna.Trial, hourly_data: pd.DataFrame, model_name: str) -> float:
     """
     Optuna objective function to tune hyperparameters for the Chronos strategy.
     """
@@ -165,8 +170,10 @@ def objective(trial: optuna.Trial, hourly_data: pd.DataFrame, model, tokenizer) 
     else: # pct_change_on_ao
         peak_threshold = trial.suggest_float('peak_threshold', 0.0, 5)
 
-    # Backtesting hyperparameters
+    # Chronos model hyperparameters
     context_length = trial.suggest_int('context_length', 60, 300, step=30)
+    
+    # Backtesting hyperparameters
     trade_threshold = trial.suggest_float('trade_threshold', 0.0005, 0.01, log=True)
     
     print(f"\n--- Starting Trial {trial.number} ---")
@@ -186,12 +193,16 @@ def objective(trial: optuna.Trial, hourly_data: pd.DataFrame, model, tokenizer) 
         print("Not enough reversal points found with these parameters. Pruning trial.")
         raise optuna.exceptions.TrialPruned()
 
+    # Setup Chronos parameters for AutoGluon
+    model_params = {
+        'model_path': model_name,
+        'context_length': context_length,
+    }
+
     # Run Backtest
     report = manual_backtest(
         reversal_data,
-        model,
-        tokenizer,
-        context_length=context_length,
+        model_params=model_params,
         trade_threshold=trade_threshold
     )
     
@@ -214,26 +225,22 @@ def main():
     Main function to run the Optuna hyperparameter optimization study.
     """
     N_TRIALS = 30
-    MODEL_NAME = "amazon/chronos-t5-base"
-
-    # 1. Load Model
-    print(f"Loading transformer model: {MODEL_NAME}...")
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-    model = ChronosForCausalLM.from_pretrained(MODEL_NAME)
+    MODEL_NAME = "amazon/chronos-t5-base" # Use 't5' for better performance
     
-    # 2. Load Data
+    # 1. Load Data
     print("Loading 1-hour historical data...")
     data = fetch_historical_data(
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
         start_date="2022-01-01T00:00:00Z"
     )
-    # 3. Setup and Run Optuna Study
+    
+    # 2. Setup and Run Optuna Study
     db_file_name = "optuna-study"
-    study_name_in_db = 'chronos_bolt_base_v1'
+    study_name_in_db = 'chronos_autogluon_v1'
     storage_name = f"sqlite:///{db_file_name}.db"
     print(f"Starting Optuna study: '{study_name_in_db}'. Storage: {storage_name}")
 
-    objective_with_data = partial(objective, hourly_data=data, model=model, tokenizer=tokenizer)
+    objective_with_data = partial(objective, hourly_data=data, model_name=MODEL_NAME)
     
     study = optuna.create_study(
         direction='maximize',
@@ -244,7 +251,7 @@ def main():
     # n_jobs=1 is recommended for GPU-based models to avoid memory conflicts
     study.optimize(objective_with_data, n_trials=N_TRIALS, n_jobs=1)
     
-    # 4. Print Study Results
+    # 3. Print Study Results
     print("\n--- Optuna Study Best Results ---")
     try:
         best_trial = study.best_trial
