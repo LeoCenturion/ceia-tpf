@@ -6,7 +6,7 @@ import optuna
 from functools import partial
 
 from backtest_utils import fetch_historical_data
-
+# AI Don't use volume bars, the data is hourly and the target should be the same as in xgboost_price_reversal.py AI! 
 # Note: The model "amazon/chronos-bolt-base" was not found.
 # Assuming a typo and using "amazon/chronos-t5-base" instead.
 
@@ -173,16 +173,17 @@ def main():
     
     # 2. Load Data
     print("Loading 1-hour historical data...")
-    hourly_data = fetch_historical_data(timeframe="1h")
-    hourly_data.rename(columns={'Close': 'close', 'Volume': 'volume'}, inplace=True)
-    
+    data = fetch_historical_data(
+        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
+        start_date="2022-01-01T00:00:00Z"
+    )
     # 3. Setup and Run Optuna Study
     db_file_name = "optuna-study"
-    study_name_in_db = 'chronos_forecasting_strategy_v1'
+    study_name_in_db = 'chronos_bolt_base_v1'
     storage_name = f"sqlite:///{db_file_name}.db"
     print(f"Starting Optuna study: '{study_name_in_db}'. Storage: {storage_name}")
 
-    objective_with_data = partial(objective, hourly_data=hourly_data, model=model, tokenizer=tokenizer)
+    objective_with_data = partial(objective, hourly_data=data, model=model, tokenizer=tokenizer)
     
     study = optuna.create_study(
         direction='maximize',
