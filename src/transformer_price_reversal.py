@@ -4,6 +4,7 @@ from scipy.signal import find_peaks
 from autogluon.multimodal import MultiModalPredictor
 import optuna
 from functools import partial
+from sklearn.metrics import classification_report
 
 from backtest_utils import fetch_historical_data, sma, ewm, std, rsi_indicator
 
@@ -133,8 +134,67 @@ def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_price', peak_d
     df.loc[df.index[troughs], 'target'] = -1
     return df
 
+
+def manual_backtest_autogluon(
+    df: pd.DataFrame,
+    hyperparameters: dict,
+    test_size: float = 0.3,
+    refit_every: int = 24 * 7
+):
+    """
+    Performs a walk-forward backtest for an AutoGluon MultiModalPredictor.
+    The model is refit every `refit_every` steps on an expanding window.
+    """
+    split_index = int(len(df) * (1 - test_size))
+    test_data = df.iloc[split_index:]
+    y_test = test_data['target']
+    y_pred = []
+    predictor = None
+
+    print("Starting walk-forward backtest...")
+    for i in range(len(test_data)):
+        current_split_index = split_index + i
+        
+        if i % refit_every == 0:
+            print(f"Refitting model at step {i+1}/{len(test_data)}...")
+            train_data_current = df.iloc[:current_split_index]
+
+            predictor = MultiModalPredictor(
+                label='target',
+                problem_type='multiclass',
+                eval_metric='f1_macro'
+            )
+            # Suppress verbose logs from AutoGluon during backtest fitting
+            predictor.fit(
+                train_data_current,
+                hyperparameters=hyperparameters,
+                time_limit=600,
+                verbosity=2
+            )
+
+        if predictor:
+            X_test_current = test_data.drop(columns=['target']).iloc[i:i+1]
+            prediction = predictor.predict(X_test_current)
+            y_pred.append(prediction.iloc[0])
+        else:
+            # Should not happen, but as a fallback, predict neutral
+            y_pred.append(1)
+
+        if (i + 1) % 50 == 0 or (i + 1) == len(test_data):
+            print(f"Processed {i+1}/{len(test_data)} steps...")
+    
+    labels = [0, 1, 2]
+    target_names = ['Bottom (-1)', 'Neutral (0)', 'Top (1)']
+    
+    print("\n--- Backtest Classification Report ---")
+    report_str = classification_report(y_test, y_pred, labels=labels, target_names=target_names, zero_division=0)
+    print(report_str)
+    report_dict = classification_report(y_test, y_pred, labels=labels, target_names=target_names, zero_division=0, output_dict=True)
+    
+    return report_dict
+
+
 def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
-    #AI implement a manual backtest like in xgboost_price_reversal.py AI!
     """
     Optuna objective function to tune hyperparameters for the FT-Transformer price reversal model.
     """
