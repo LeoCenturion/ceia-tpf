@@ -132,6 +132,7 @@ def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_price', peak_d
     return df
 
 def main():
+    # AI prepare an optuna experiment like in xgboost_price_reversal.py AI!
     """
     Main function to run a classification task using AutoGluon's MultiModalPredictor
     with an FT-Transformer model.
