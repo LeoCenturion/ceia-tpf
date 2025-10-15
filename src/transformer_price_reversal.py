@@ -211,6 +211,9 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     lr = trial.suggest_float('lr', 1e-5, 1e-3, log=True)
     weight_decay = trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True)
 
+    # Backtesting hyperparameter
+    refit_every = 24 * 7
+
     # === 2. Run the ML Pipeline ===
     print(f"\n--- Starting Trial {trial.number} ---")
     print(f"Params: {trial.params}")
@@ -222,7 +225,7 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
         peak_distance=peak_distance,
         peak_threshold=peak_threshold
     )
-
+    
     # Prune trial if not enough reversal points are found
     if reversal_data['target'].nunique() < 3 or reversal_data['target'].value_counts().get(1, 0) < 5 or reversal_data['target'].value_counts().get(-1, 0) < 5:
         print("Not enough reversal points found with these parameters. Pruning trial.")
@@ -232,49 +235,45 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     features_df = create_features(data)
     final_df = pd.concat([features_df, reversal_data['target']], axis=1).dropna()
     final_df['target'] = final_df['target'].map({-1: 0, 0: 1, 1: 2}).astype('category')
-
-    # Split data
-    train_end_index = int(len(final_df) * 0.7)
-    train_data = final_df.iloc[:train_end_index]
-    test_data = final_df.iloc[train_end_index:]
-
-    # Prune if training data is not representative
-    if train_data['target'].nunique() < 3:
+    
+    # Prune trial if initial training set is not representative
+    split_index = int(len(final_df) * (1 - 0.3)) # Corresponds to test_size in manual_backtest
+    if final_df.iloc[:split_index]['target'].nunique() < 3:
         print("Initial training set does not contain all 3 classes. Pruning trial.")
         raise optuna.exceptions.TrialPruned()
-
-    # Setup Predictor
-    predictor = MultiModalPredictor(
-        label='target',
-        problem_type='multiclass',
-        eval_metric='f1_macro'
-    )
+    
+    hyperparameters = {
+        'model.names': ['ft_transformer'],
+        'model.ft_transformer.num_blocks': num_blocks,
+        'model.ft_transformer.hidden_size': hidden_size,
+        'model.ft_transformer.token_dim': hidden_size,
+        'model.ft_transformer.ffn_hidden_size': hidden_size * 2,
+        'optim.lr': lr,
+        'optim.weight_decay': weight_decay,
+        'env.per_gpu_batch_size': 128
+    }
 
     try:
-        predictor.fit(
-            train_data,
-            hyperparameters={
-                'model.names': ['ft_transformer'],
-                'model.ft_transformer.num_blocks': num_blocks,
-                'model.ft_transformer.hidden_size': hidden_size,
-                'model.ft_transformer.token_dim': hidden_size,
-                'model.ft_transformer.ffn_hidden_size': hidden_size * 2,
-                'optim.lr': lr,
-                'optim.weight_decay': weight_decay,
-                'env.per_gpu_batch_size': 128
-            },
-            time_limit=600
+        # Run Backtest
+        report = manual_backtest_autogluon(
+            final_df,
+            hyperparameters=hyperparameters,
+            test_size=0.3,
+            refit_every=refit_every
         )
 
-        # Evaluate
-        scores = predictor.evaluate(test_data)
-        objective_value = scores.get('f1_macro', 0.0)
+        # === 3. Calculate and Return the Objective Metric ===
+        f1_top = report.get('Top (1)', {}).get('f1-score', 0.0)
+        f1_bottom = report.get('Bottom (-1)', {}).get('f1-score', 0.0)
+        
+        # We want to maximize the average F1 score for identifying tops and bottoms
+        objective_value = (f1_top + f1_bottom) / 2
 
     except Exception as e:
         print(f"Trial {trial.number} failed with an exception: {e}")
         objective_value = 0.0  # Penalize failed trials
 
-    print(f"Trial {trial.number} finished. F1 Macro: {objective_value:.4f}")
+    print(f"Trial {trial.number} finished. Avg F1 (Top/Bottom): {objective_value:.4f}")
     return objective_value
 
 def main():
