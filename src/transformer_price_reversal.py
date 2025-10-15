@@ -106,13 +106,16 @@ def bollinger_bands(close: pd.Series, n: int = 20, std_dev: float = 2.0):
     bbp = (close - lower) / (upper - lower).replace(0, 1e-9)
     return pd.DataFrame({f'BBP_{n}_{std_dev}': bbp, f'BBU_{n}_{std_dev}': upper, f'BBL_{n}_{std_dev}': lower})
 
-#AI use ao_on_pct_change AI!
 def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_price', peak_distance: int = 1, peak_threshold: float = 0) -> pd.DataFrame:
     """
     Identifies local tops (1), bottoms (-1), and non-reversal points (0).
     """
     if method == 'ao_on_price':
         ao = awesome_oscillator(df['High'], df['Low'])
+    elif method == 'ao_on_pct_change':
+        high_pct = df['High'].pct_change().fillna(0)
+        low_pct = df['Low'].pct_change().fillna(0)
+        ao = awesome_oscillator(high_pct, low_pct)
     else:
         raise ValueError(f"Invalid method '{method}' specified for create_target_variable")
 
@@ -143,7 +146,7 @@ def main():
 
     # 2. Create Target Variable
     print("Creating target variable (price reversals)...")
-    reversal_data = create_target_variable(data.copy(), method='ao_on_price', peak_distance=4, peak_threshold=50)
+    reversal_data = create_target_variable(data.copy(), method='ao_on_pct_change', peak_distance=4, peak_threshold=0.0001)
 
     # 3. Create Features
     print("Creating features...")
