@@ -134,6 +134,7 @@ def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_price', peak_d
     return df
 
 def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
+    #AI implement a manual backtest like in xgboost_price_reversal.py AI!
     """
     Optuna objective function to tune hyperparameters for the FT-Transformer price reversal model.
     """
@@ -161,7 +162,7 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
         peak_distance=peak_distance,
         peak_threshold=peak_threshold
     )
-    
+
     # Prune trial if not enough reversal points are found
     if reversal_data['target'].nunique() < 3 or reversal_data['target'].value_counts().get(1, 0) < 5 or reversal_data['target'].value_counts().get(-1, 0) < 5:
         print("Not enough reversal points found with these parameters. Pruning trial.")
@@ -220,7 +221,7 @@ def main():
     """
     Main function to run the Optuna hyperparameter optimization study.
     """
-    N_TRIALS = 30
+    N_TRIALS = 10
 
     # 1. Load Data
     print("Loading historical data...")
@@ -232,7 +233,7 @@ def main():
 
     # 2. Setup and Run Optuna Study
     db_file_name = "optuna-study"
-    study_name_in_db = 'ft_transformer_reversal_v1'
+    study_name_in_db = 'transformer_reversal_v0.1'
     storage_name = f"sqlite:///{db_file_name}.db"
 
     print(f"Starting Optuna study: '{study_name_in_db}'. Storage: {storage_name}")
