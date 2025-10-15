@@ -1,114 +1,194 @@
 import pandas as pd
-from autogluon.timeseries import TimeSeriesPredictor, TimeSeriesDataFrame
-import matplotlib.pyplot as plt
+import numpy as np
+from scipy.signal import find_peaks
+from autogluon.multimodal import MultiModalPredictor
 
-from backtest_utils import fetch_historical_data
+from backtest_utils import fetch_historical_data, sma, ewm, std, rsi_indicator
 
+
+def awesome_oscillator(high: pd.Series, low: pd.Series, fast_period: int = 5, slow_period: int = 34) -> pd.Series:
+    """Calculates the Awesome Oscillator."""
+    median_price = (high + low) / 2
+    ao = sma(median_price, fast_period) - sma(median_price, slow_period)
+    return ao
+
+
+def macd(close: pd.Series, fast_period: int = 12, slow_period: int = 26, signal_period: int = 9) -> pd.DataFrame:
+    """Calculates MACD, Signal Line, and Histogram."""
+    ema_fast = ewm(close, span=fast_period)
+    ema_slow = ewm(close, span=slow_period)
+    macd_line = ema_fast - ema_slow
+    signal_line = ewm(macd_line, span=signal_period)
+    histogram = macd_line - signal_line
+    return pd.DataFrame({'MACD': macd_line, 'Signal': signal_line, 'Hist': histogram})
+
+
+def mfi(high: pd.Series, low: pd.Series, close: pd.Series, volume: pd.Series, n: int = 14) -> pd.Series:
+    """Calculates the Money Flow Index."""
+    typical_price = (high + low + close) / 3
+    money_flow = typical_price * volume
+    
+    positive_flow = pd.Series(np.where(typical_price > typical_price.shift(1), money_flow, 0), index=typical_price.index)
+    negative_flow = pd.Series(np.where(typical_price < typical_price.shift(1), money_flow, 0), index=typical_price.index)
+
+    positive_mf = positive_flow.rolling(window=n, min_periods=0).sum()
+    negative_mf = negative_flow.rolling(window=n, min_periods=0).sum()
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        money_ratio = positive_mf / negative_mf
+        mfi = 100 - (100 / (1 + money_ratio))
+    mfi.replace([np.inf, -np.inf], 100, inplace=True)
+    return mfi
+
+
+def stochastic_oscillator(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14, d_n: int = 3) -> pd.DataFrame:
+    """Calculates the Stochastic Oscillator (%K and %D)."""
+    low_n = low.rolling(window=n).min()
+    high_n = high.rolling(window=n).max()
+    k_percent = 100 * ((close - low_n) / (high_n - low_n).replace(0, 1e-9))
+    d_percent = sma(k_percent, d_n)
+    return pd.DataFrame({'%K': k_percent, '%D': d_percent})
+
+
+def true_range(high: pd.Series, low: pd.Series, close: pd.Series) -> pd.Series:
+    h_minus_l = high - low
+    h_minus_pc = abs(high - close.shift(1))
+    l_minus_pc = abs(low - close.shift(1))
+    tr = pd.concat([h_minus_l, h_minus_pc, l_minus_pc], axis=1).max(axis=1)
+    return tr
+
+def atr(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14) -> pd.Series:
+    tr = true_range(high, low, close)
+    return ewm(tr, span=2 * n - 1)
+
+def willr(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14) -> pd.Series:
+    high_n = high.rolling(n).max()
+    low_n = low.rolling(n).min()
+    wr = -100 * (high_n - close) / (high_n - low_n).replace(0, 1e-9)
+    return wr
+
+def roc(close: pd.Series, n: int = 10) -> pd.Series:
+    return (close.diff(n) / close.shift(n)).replace([np.inf, -np.inf], 0) * 100
+
+def create_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Creates a set of technical analysis features.
+    """
+    features = pd.DataFrame(index=df.index)
+    close_pct = df['Close'].pct_change().fillna(0)
+    features['pct_change'] = close_pct
+    features['RSI'] = rsi_indicator(df['Close'], n=14)
+    features['AO'] = awesome_oscillator(df['High'], df['Low'])
+    features['WR'] = willr(df['High'], df['Low'], df['Close'])
+    features['ROC'] = roc(df['Close'])
+    stoch_price = stochastic_oscillator(df['High'], df['Low'], df['Close'])
+    features['Stoch_K'] = stoch_price['%K']
+    features['Stoch_D'] = stoch_price['%D']
+    macd_price_df = macd(df['Close'])
+    features['MACD'] = macd_price_df['MACD']
+    features['MACD_Signal'] = macd_price_df['Signal']
+    features['MACD_Hist'] = macd_price_df['Hist']
+    if 'Volume' in df.columns:
+        features['MFI'] = mfi(df['High'], df['Low'], df['Close'], df['Volume'], n=14)
+    bbands = bollinger_bands(df['Close'])
+    if bbands is not None and not bbands.empty:
+        features['BBP'] = bbands.get('BBP_20_2.0')
+    features.replace([np.inf, -np.inf], np.nan, inplace=True)
+    features.bfill(inplace=True)
+    features.ffill(inplace=True)
+    return features
+
+def bollinger_bands(close: pd.Series, n: int = 20, std_dev: float = 2.0):
+    sma_val = sma(close, n)
+    std_val = std(close, n)
+    upper = sma_val + std_dev * std_val
+    lower = sma_val - std_dev * std_val
+    bbp = (close - lower) / (upper - lower).replace(0, 1e-9)
+    return pd.DataFrame({f'BBP_{n}_{std_dev}': bbp, f'BBU_{n}_{std_dev}': upper, f'BBL_{n}_{std_dev}': lower})
+
+
+def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_price', peak_distance: int = 1, peak_threshold: float = 0) -> pd.DataFrame:
+    """
+    Identifies local tops (1), bottoms (-1), and non-reversal points (0).
+    """
+    if method == 'ao_on_price':
+        ao = awesome_oscillator(df['High'], df['Low'])
+    else:
+        raise ValueError(f"Invalid method '{method}' specified for create_target_variable")
+
+    if ao is None or ao.isnull().all():
+        df['target'] = 0
+        return df
+
+    peaks, _ = find_peaks(ao, distance=peak_distance, threshold=peak_threshold)
+    troughs, _ = find_peaks(-ao, distance=peak_distance, threshold=peak_threshold)
+
+    df['target'] = 0
+    df.loc[df.index[peaks], 'target'] = 1
+    df.loc[df.index[troughs], 'target'] = -1
+    return df
 
 def main():
     """
-    Main function to run a Chronos forecast using AutoGluon.
+    Main function to run a classification task using AutoGluon's MultiModalPredictor
+    with an FT-Transformer model.
     """
     # 1. Load Data
     print("Loading historical data...")
     data = fetch_historical_data(
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
-        timeframe= "1h",
+        timeframe="1h",
         start_date="2022-01-01T00:00:00Z"
     )
 
-    # Prepare data for AutoGluon: requires 'timestamp', 'target', and 'item_id' columns.
-    data_ag = data[['Close']].copy()
-    data_ag.reset_index(inplace=True)
-    data_ag.rename(columns={'index': 'timestamp', 'Close': 'target'}, inplace=True)
-    data_ag['item_id'] = 'BTCUSDT'
+    # 2. Create Target Variable
+    print("Creating target variable (price reversals)...")
+    reversal_data = create_target_variable(data.copy(), method='ao_on_price', peak_distance=4, peak_threshold=50)
 
-    # 2. Split data: 70% for training, 30% for validation
-    train_end_index = int(len(data_ag) * 0.7)
-    train_data = data_ag.iloc[:train_end_index]
-    test_data = data_ag.iloc[train_end_index:]
+    # 3. Create Features
+    print("Creating features...")
+    features_df = create_features(data)
 
-    print(f"Training data from {train_data['timestamp'].min()} to {train_data['timestamp'].max()} ({len(train_data)} points)")
-    print(f"Validation data from {test_data['timestamp'].min()} to {test_data['timestamp'].max()} ({len(test_data)} points)")
+    # 4. Combine features and target, and drop rows with missing values
+    final_df = pd.concat([features_df, reversal_data['target']], axis=1).dropna()
+    
+    # Remap labels to be non-negative for some metrics and models
+    final_df['target'] = final_df['target'].map({-1: 0, 0: 1, 1: 2})
+    final_df['target'] = final_df['target'].astype('category')
 
-    train_ts_df = TimeSeriesDataFrame.from_data_frame(
-        train_data,
-        id_column="item_id",
-        timestamp_column="timestamp"
+    print(f"Dataset shape: {final_df.shape}")
+    print("Target distribution:")
+    print(final_df['target'].value_counts())
+
+    # 5. Split data into training and testing sets (70/30 split)
+    train_end_index = int(len(final_df) * 0.7)
+    train_data = final_df.iloc[:train_end_index]
+    test_data = final_df.iloc[train_end_index:]
+
+    print(f"Training data points: {len(train_data)}")
+    print(f"Testing data points: {len(test_data)}")
+
+    # 6. Initialize and fit MultiModalPredictor
+    print("\nInitializing and fitting MultiModalPredictor with FT-Transformer...")
+    predictor = MultiModalPredictor(
+        label='target',
+        problem_type='multiclass',
+        eval_metric='f1_macro'
     )
-
-    # The prediction length is the size of our validation set
-    prediction_length = len(test_data)
-
-    # 3. Initialize and fit the TimeSeriesPredictor
-    predictor = TimeSeriesPredictor(
-        prediction_length=prediction_length,
-        eval_metric="MASE",
-        target="target",
-        freq="1h"
-    )
-    print(predictor)
-    print("\nFitting Chronos model...")
     predictor.fit(
-        train_ts_df,
+        train_data,
         hyperparameters={
-            "Chronos": {"model_path": "amazon/chronos-bolt-base"},
+            'model.names': ['ft_transformer'],
+            'env.per_gpu_batch_size': 128
         },
-        time_limit=600  # 10-minute time limit for fitting
+        time_limit=600  # 10-minute time limit
     )
 
-    # Print the layers of the fitted model
-    predictor._trainer.models[predictor._trainer.model_best]
-    # 4. Generate forecast
-    print("\nGenerating forecast...")
-    predictions = predictor.predict(train_ts_df)
-
-    # 5. Evaluate and plot results
-    # The `score` method evaluates predictions against the ground truth.
-    # We pass the entire dataset to `evaluate`, and AutoGluon automatically
-    # uses the last `prediction_length` time steps as the validation set.
-    full_ts_df = TimeSeriesDataFrame.from_data_frame(
-        data_ag,
-        id_column="item_id",
-        timestamp_column="timestamp"
-    )
-    evaluation = predictor.evaluate(full_ts_df)
-    print("\nForecast Evaluation (on validation data):")
-    print(evaluation)
-
-
-    # Plotting
-    plt.figure(figsize=(15, 8))
-    
-    # Plot training data
-    plt.plot(train_data['timestamp'], train_data['target'], label="Training Data", color='blue')
-    
-    # Plot validation data (ground truth)
-    plt.plot(test_data['timestamp'], test_data['target'], label="Actual Values (Validation)", color='green')
-
-    # Plot forecast
-    predicted_timestamps = predictions.index.get_level_values('timestamp')
-    plt.plot(predicted_timestamps, predictions['mean'], label="Chronos Forecast", linestyle='--', color='red')
-
-    # Plot prediction quantiles
-    plt.fill_between(
-        predicted_timestamps,
-        predictions["0.1"],
-        predictions["0.9"],
-        color="red",
-        alpha=0.1,
-        label="10%-90% confidence interval",
-    )
-
-    plt.title("BTCUSDT Hourly Price: Chronos Forecast vs. Actual")
-    plt.xlabel("Date")
-    plt.ylabel("Price (USDT)")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    print("\nDisplaying plot. Close the plot window to exit.")
-    plt.show()
-
+    # 7. Evaluate the model on the test set
+    print("\nEvaluating model on the test set...")
+    scores = predictor.evaluate(test_data)
+    print("Evaluation scores:")
+    print(scores)
 
 if __name__ == "__main__":
     main()
