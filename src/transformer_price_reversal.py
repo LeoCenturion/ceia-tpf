@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 from scipy.signal import find_peaks
 from autogluon.multimodal import MultiModalPredictor
+import optuna
+from functools import partial
 
 from backtest_utils import fetch_historical_data, sma, ewm, std, rsi_indicator
 
@@ -131,12 +133,95 @@ def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_price', peak_d
     df.loc[df.index[troughs], 'target'] = -1
     return df
 
+def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
+    """
+    Optuna objective function to tune hyperparameters for the FT-Transformer price reversal model.
+    """
+    # === 1. Define Hyperparameter Search Space ===
+    # Peak detection hyperparameters
+    peak_distance = trial.suggest_int('peak_distance', 1, 5)
+    peak_threshold = trial.suggest_float('peak_threshold', 0.0, 0.005)
+
+    # Model hyperparameters for FT-Transformer
+    num_blocks = trial.suggest_int('num_blocks', 2, 6)
+    hidden_size = trial.suggest_categorical('hidden_size', [128, 192, 256])
+
+    # Optimization hyperparameters
+    lr = trial.suggest_float('lr', 1e-5, 1e-3, log=True)
+    weight_decay = trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True)
+
+    # === 2. Run the ML Pipeline ===
+    print(f"\n--- Starting Trial {trial.number} ---")
+    print(f"Params: {trial.params}")
+
+    # Create Target Variable
+    reversal_data = create_target_variable(
+        data.copy(),
+        method='ao_on_pct_change',
+        peak_distance=peak_distance,
+        peak_threshold=peak_threshold
+    )
+    
+    # Prune trial if not enough reversal points are found
+    if reversal_data['target'].nunique() < 3 or reversal_data['target'].value_counts().get(1, 0) < 5 or reversal_data['target'].value_counts().get(-1, 0) < 5:
+        print("Not enough reversal points found with these parameters. Pruning trial.")
+        raise optuna.exceptions.TrialPruned()
+
+    # Create Features
+    features_df = create_features(data)
+    final_df = pd.concat([features_df, reversal_data['target']], axis=1).dropna()
+    final_df['target'] = final_df['target'].map({-1: 0, 0: 1, 1: 2}).astype('category')
+
+    # Split data
+    train_end_index = int(len(final_df) * 0.7)
+    train_data = final_df.iloc[:train_end_index]
+    test_data = final_df.iloc[train_end_index:]
+
+    # Prune if training data is not representative
+    if train_data['target'].nunique() < 3:
+        print("Initial training set does not contain all 3 classes. Pruning trial.")
+        raise optuna.exceptions.TrialPruned()
+
+    # Setup Predictor
+    predictor = MultiModalPredictor(
+        label='target',
+        problem_type='multiclass',
+        eval_metric='f1_macro'
+    )
+
+    try:
+        predictor.fit(
+            train_data,
+            hyperparameters={
+                'model.names': ['ft_transformer'],
+                'model.ft_transformer.num_blocks': num_blocks,
+                'model.ft_transformer.hidden_size': hidden_size,
+                'model.ft_transformer.token_dim': hidden_size,
+                'model.ft_transformer.ffn_hidden_size': hidden_size * 2,
+                'optim.lr': lr,
+                'optim.weight_decay': weight_decay,
+                'env.per_gpu_batch_size': 128
+            },
+            time_limit=600
+        )
+
+        # Evaluate
+        scores = predictor.evaluate(test_data)
+        objective_value = scores.get('f1_macro', 0.0)
+
+    except Exception as e:
+        print(f"Trial {trial.number} failed with an exception: {e}")
+        objective_value = 0.0  # Penalize failed trials
+
+    print(f"Trial {trial.number} finished. F1 Macro: {objective_value:.4f}")
+    return objective_value
+
 def main():
-    # AI prepare an optuna experiment like in xgboost_price_reversal.py AI!
     """
-    Main function to run a classification task using AutoGluon's MultiModalPredictor
-    with an FT-Transformer model.
+    Main function to run the Optuna hyperparameter optimization study.
     """
+    N_TRIALS = 30
+
     # 1. Load Data
     print("Loading historical data...")
     data = fetch_historical_data(
@@ -145,54 +230,34 @@ def main():
         start_date="2022-01-01T00:00:00Z"
     )
 
-    # 2. Create Target Variable
-    print("Creating target variable (price reversals)...")
-    reversal_data = create_target_variable(data.copy(), method='ao_on_pct_change', peak_distance=4, peak_threshold=0.0001)
+    # 2. Setup and Run Optuna Study
+    db_file_name = "optuna-study"
+    study_name_in_db = 'ft_transformer_reversal_v1'
+    storage_name = f"sqlite:///{db_file_name}.db"
 
-    # 3. Create Features
-    print("Creating features...")
-    features_df = create_features(data)
+    print(f"Starting Optuna study: '{study_name_in_db}'. Storage: {storage_name}")
 
-    # 4. Combine features and target, and drop rows with missing values
-    final_df = pd.concat([features_df, reversal_data['target']], axis=1).dropna()
+    objective_with_data = partial(objective, data=data)
 
-    # Remap labels to be non-negative for some metrics and models
-    final_df['target'] = final_df['target'].map({-1: 0, 0: 1, 1: 2})
-    final_df['target'] = final_df['target'].astype('category')
-
-    print(f"Dataset shape: {final_df.shape}")
-    print("Target distribution:")
-    print(final_df['target'].value_counts())
-
-    # 5. Split data into training and testing sets (70/30 split)
-    train_end_index = int(len(final_df) * 0.7)
-    train_data = final_df.iloc[:train_end_index]
-    test_data = final_df.iloc[train_end_index:]
-
-    print(f"Training data points: {len(train_data)}")
-    print(f"Testing data points: {len(test_data)}")
-
-    # 6. Initialize and fit MultiModalPredictor
-    print("\nInitializing and fitting MultiModalPredictor with FT-Transformer...")
-    predictor = MultiModalPredictor(
-        label='target',
-        problem_type='multiclass',
-        eval_metric='f1_macro'
-    )
-    predictor.fit(
-        train_data,
-        hyperparameters={
-            'model.names': ['ft_transformer'],
-            'env.per_gpu_batch_size': 128
-        },
-        time_limit=600  # 10-minute time limit
+    study = optuna.create_study(
+        direction='maximize',
+        study_name=study_name_in_db,
+        storage=storage_name,
+        load_if_exists=True
     )
 
-    # 7. Evaluate the model on the test set
-    print("\nEvaluating model on the test set...")
-    scores = predictor.evaluate(test_data)
-    print("Evaluation scores:")
-    print(scores)
+    study.optimize(objective_with_data, n_trials=N_TRIALS, n_jobs=1) # n_jobs=1 for GPU usage
+    
+    # 3. Print Study Results
+    print("\n--- Optuna Study Best Results ---")
+    try:
+        best_trial = study.best_trial
+        print(f"Best trial value (F1 Macro): {best_trial.value}")
+        print("Best parameters found:")
+        for key, value in best_trial.params.items():
+            print(f"  {key}: {value}")
+    except ValueError:
+        print("No successful trials were completed.")
 
 if __name__ == "__main__":
     main()
