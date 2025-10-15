@@ -106,7 +106,7 @@ def bollinger_bands(close: pd.Series, n: int = 20, std_dev: float = 2.0):
     bbp = (close - lower) / (upper - lower).replace(0, 1e-9)
     return pd.DataFrame({f'BBP_{n}_{std_dev}': bbp, f'BBU_{n}_{std_dev}': upper, f'BBL_{n}_{std_dev}': lower})
 
-
+#AI use ao_on_pct_change AI!
 def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_price', peak_distance: int = 1, peak_threshold: float = 0) -> pd.DataFrame:
     """
     Identifies local tops (1), bottoms (-1), and non-reversal points (0).
@@ -151,7 +151,7 @@ def main():
 
     # 4. Combine features and target, and drop rows with missing values
     final_df = pd.concat([features_df, reversal_data['target']], axis=1).dropna()
-    
+
     # Remap labels to be non-negative for some metrics and models
     final_df['target'] = final_df['target'].map({-1: 0, 0: 1, 1: 2})
     final_df['target'] = final_df['target'].astype('category')
