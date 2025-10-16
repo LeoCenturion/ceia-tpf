@@ -431,6 +431,7 @@ def run_regression_evaluation():
 
     print("\n--- Evaluating Regression Model on Test Set ---")
     scores = predictor.evaluate(test_data)
+    # AI plot the prediction as well as the actual value AI!
     print("Evaluation scores (R^2, RMSE, etc.):")
     print(scores)
 
