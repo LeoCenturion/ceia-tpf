@@ -325,7 +325,29 @@ def run_single_backtest():
     print(f"Testing data points: {len(test_data)}")
 
     # 6. Setup and run simple train/test evaluation
-    #AI can you weight more the -1 an 1 classes AI!
+    # To give more weight to the reversal classes (-1 and 1), we can balance the dataset
+    # by undersampling the majority 'Neutral' class.
+    print("\nBalancing training data by undersampling majority class...")
+    target_counts = train_data['target'].value_counts()
+    majority_class_label = target_counts.idxmax()
+    
+    if len(target_counts) > 1:
+        # Determine target size for majority class (e.g., size of the largest minority class)
+        target_size = target_counts.drop(majority_class_label).max()
+        
+        majority_indices = train_data[train_data['target'] == majority_class_label].index
+        random_indices = np.random.choice(majority_indices, target_size, replace=False)
+        minority_indices = train_data[train_data['target'] != majority_class_label].index
+        
+        undersampled_indices = np.concatenate([random_indices, minority_indices])
+        train_data_balanced = train_data.loc[undersampled_indices].sample(frac=1, random_state=42) # shuffle
+        
+        print(f"Original training target distribution:\n{target_counts}")
+        print(f"New balanced training target distribution:\n{train_data_balanced['target'].value_counts()}")
+    else:
+        print("Only one class in training data. Skipping balancing.")
+        train_data_balanced = train_data
+
     hyperparameters = {
         'model.names': ['ft_transformer'],
         'model.ft_transformer.num_blocks': params['num_blocks'],
@@ -343,7 +365,7 @@ def run_single_backtest():
         eval_metric='f1_macro'
     )
     predictor.fit(
-        train_data,
+        train_data_balanced,
         hyperparameters=hyperparameters,
         time_limit=600
     )
