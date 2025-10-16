@@ -371,13 +371,12 @@ def run_single_backtest():
     print(scores)
 
 
-#AI predict closing price instead AI!
 def run_regression_evaluation():
     """
     Evaluates the FT-Transformer model on a regression task to predict
-    the next period's percentage change in closing price.
+    the next period's closing price.
     """
-    print("\n--- Running Regression Evaluation to Predict Pct Change ---")
+    print("\n--- Running Regression Evaluation to Predict Closing Price ---")
 
     # 1. Load Data
     data = fetch_historical_data(
@@ -390,10 +389,10 @@ def run_regression_evaluation():
     print("Creating features...")
     features_df = create_features(data)
 
-    # 3. Create Target Variable (next period's pct_change)
-    print("Creating regression target (next pct_change)...")
-    target = data['Close'].pct_change().shift(-1)
-    target.name = 'target_pct_change'
+    # 3. Create Target Variable (next period's closing price)
+    print("Creating regression target (next closing price)...")
+    target = data['Close'].shift(-1)
+    target.name = 'target_close_price'
 
     # 4. Combine features and target, and drop rows with missing values
     final_df = pd.concat([features_df, target], axis=1).dropna()
@@ -420,7 +419,7 @@ def run_regression_evaluation():
     }
 
     predictor = MultiModalPredictor(
-        label='target_pct_change',
+        label='target_close_price',
         problem_type='regression',
         eval_metric='r2'
     )
@@ -481,5 +480,5 @@ def main():
 
 if __name__ == "__main__":
     # main()  # Uncomment to run the Optuna study
-    run_single_backtest()
-    # run_regression_evaluation()
+    # run_single_backtest()
+    run_regression_evaluation()
