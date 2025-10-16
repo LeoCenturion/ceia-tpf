@@ -275,7 +275,68 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     print(f"Trial {trial.number} finished. Avg F1 (Top/Bottom): {objective_value:.4f}")
     return objective_value
 
-# AI make a method to run a single train/test AI!
+
+def run_single_backtest():
+    """
+    Runs a single backtest with a specific set of pre-defined parameters.
+    This is useful for analyzing a single run without Optuna.
+    """
+    print("\n--- Running Single Backtest with Specific Parameters ---")
+
+    # 1. Load Data
+    data = fetch_historical_data(
+        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
+        timeframe="1h",
+        start_date="2022-01-01T00:00:00Z"
+    )
+
+    # 2. Define Parameters
+    params = {
+        'peak_distance': 4,
+        'peak_threshold': 0.001,
+        'num_blocks': 4,
+        'hidden_size': 192,
+        'lr': 0.0005,
+        'weight_decay': 1e-4,
+        'refit_every': 24 * 7
+    }
+    print("Using parameters:")
+    for key, value in params.items():
+        print(f"  {key}: {value}")
+
+    # 3. Create Target Variable
+    reversal_data = create_target_variable(
+        data.copy(),
+        method='ao_on_pct_change',
+        peak_distance=params['peak_distance'],
+        peak_threshold=params['peak_threshold']
+    )
+    
+    # 4. Create Features
+    features_df = create_features(data)
+    final_df = pd.concat([features_df, reversal_data['target']], axis=1).dropna()
+    final_df['target'] = final_df['target'].map({-1: 0, 0: 1, 1: 2}).astype('category')
+
+    # 5. Setup and Run Backtest
+    hyperparameters = {
+        'model.names': ['ft_transformer'],
+        'model.ft_transformer.num_blocks': params['num_blocks'],
+        'model.ft_transformer.hidden_size': params['hidden_size'],
+        'model.ft_transformer.token_dim': params['hidden_size'],
+        'model.ft_transformer.ffn_hidden_size': params['hidden_size'] * 2,
+        'optim.lr': params['lr'],
+        'optim.weight_decay': params['weight_decay'],
+        'env.per_gpu_batch_size': 128
+    }
+
+    manual_backtest_autogluon(
+        final_df,
+        hyperparameters=hyperparameters,
+        test_size=0.3,
+        refit_every=params['refit_every']
+    )
+
+
 def main():
     """
     Main function to run the Optuna hyperparameter optimization study.
@@ -320,4 +381,5 @@ def main():
         print("No successful trials were completed.")
 
 if __name__ == "__main__":
-    main()
+    main()  # Uncomment to run the Optuna study
+    # run_single_backtest()
