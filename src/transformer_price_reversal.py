@@ -325,6 +325,7 @@ def run_single_backtest():
     print(f"Testing data points: {len(test_data)}")
 
     # 6. Setup and run simple train/test evaluation
+    #AI can you weight more the -1 an 1 classes AI!
     hyperparameters = {
         'model.names': ['ft_transformer'],
         'model.ft_transformer.num_blocks': params['num_blocks'],
