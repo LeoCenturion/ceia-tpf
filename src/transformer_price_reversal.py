@@ -371,6 +371,7 @@ def run_single_backtest():
     print(scores)
 
 
+#AI predict closing price instead AI!
 def run_regression_evaluation():
     """
     Evaluates the FT-Transformer model on a regression task to predict
