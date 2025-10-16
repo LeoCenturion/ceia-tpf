@@ -348,9 +348,24 @@ def run_single_backtest():
     )
 
     print("\n--- Evaluating on Test Set ---")
-    #AI compute the f1 average as (f1_top + f1_bottom) / 2 AI!
+    y_pred = predictor.predict(test_data.drop(columns=['target']))
+    y_true = test_data['target']
+
+    labels = [0, 1, 2]
+    target_names = ['Bottom (-1)', 'Neutral (0)', 'Top (1)']
+    
+    print("Classification Report:")
+    print(classification_report(y_true, y_pred, labels=labels, target_names=target_names, zero_division=0))
+    
+    report_dict = classification_report(y_true, y_pred, labels=labels, target_names=target_names, zero_division=0, output_dict=True)
+    f1_top = report_dict.get('Top (1)', {}).get('f1-score', 0.0)
+    f1_bottom = report_dict.get('Bottom (-1)', {}).get('f1-score', 0.0)
+    avg_f1 = (f1_top + f1_bottom) / 2
+    
+    print(f"\nAverage F1 Score (Top/Bottom): {avg_f1:.4f}\n")
+
     scores = predictor.evaluate(test_data)
-    print("Evaluation scores:")
+    print("AutoGluon Evaluation Scores:")
     print(scores)
 
 
