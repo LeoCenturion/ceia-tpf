@@ -168,8 +168,7 @@ def manual_backtest_autogluon(
             predictor.fit(
                 train_data_current,
                 hyperparameters=hyperparameters,
-                time_limit=600,
-                verbosity=2
+                time_limit=600
             )
 
         if predictor:
@@ -276,11 +275,12 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     print(f"Trial {trial.number} finished. Avg F1 (Top/Bottom): {objective_value:.4f}")
     return objective_value
 
+# AI make a method to run a single train/test AI!
 def main():
     """
     Main function to run the Optuna hyperparameter optimization study.
     """
-    N_TRIALS = 10
+    N_TRIALS = 1
 
     # 1. Load Data
     print("Loading historical data...")
@@ -292,7 +292,7 @@ def main():
 
     # 2. Setup and Run Optuna Study
     db_file_name = "optuna-study"
-    study_name_in_db = 'transformer_reversal_v0.1'
+    study_name_in_db = 'transformer_reversal_v0.2'
     storage_name = f"sqlite:///{db_file_name}.db"
 
     print(f"Starting Optuna study: '{study_name_in_db}'. Storage: {storage_name}")
