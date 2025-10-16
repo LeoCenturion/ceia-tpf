@@ -317,7 +317,14 @@ def run_single_backtest():
     final_df = pd.concat([features_df, reversal_data['target']], axis=1).dropna()
     final_df['target'] = final_df['target'].map({-1: 0, 0: 1, 1: 2}).astype('category')
 
-    # 5. Setup and Run Backtest
+    # 5. Split data
+    train_end_index = int(len(final_df) * 0.7)
+    train_data = final_df.iloc[:train_end_index]
+    test_data = final_df.iloc[train_end_index:]
+    print(f"Training data points: {len(train_data)}")
+    print(f"Testing data points: {len(test_data)}")
+
+    # 6. Setup and run simple train/test evaluation
     hyperparameters = {
         'model.names': ['ft_transformer'],
         'model.ft_transformer.num_blocks': params['num_blocks'],
@@ -328,13 +335,22 @@ def run_single_backtest():
         'optim.weight_decay': params['weight_decay'],
         'env.per_gpu_batch_size': 128
     }
-    # Don't do backtest in this method AI! 
-    manual_backtest_autogluon(
-        final_df,
-        hyperparameters=hyperparameters,
-        test_size=0.3,
-        refit_every=params['refit_every']
+
+    predictor = MultiModalPredictor(
+        label='target',
+        problem_type='multiclass',
+        eval_metric='f1_macro'
     )
+    predictor.fit(
+        train_data,
+        hyperparameters=hyperparameters,
+        time_limit=600
+    )
+
+    print("\n--- Evaluating on Test Set ---")
+    scores = predictor.evaluate(test_data)
+    print("Evaluation scores:")
+    print(scores)
 
 
 def main():
