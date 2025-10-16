@@ -370,6 +370,7 @@ def run_single_backtest():
     print("AutoGluon Evaluation Scores:")
     print(scores)
 
+#AI make a function that evaluates the algorithm but trying to predict the pct_change of the closing price AI!
 
 def main():
     """
