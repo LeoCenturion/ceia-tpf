@@ -311,12 +311,12 @@ def run_single_backtest():
         peak_distance=params['peak_distance'],
         peak_threshold=params['peak_threshold']
     )
-    
+
     # 4. Create Features
     features_df = create_features(data)
     final_df = pd.concat([features_df, reversal_data['target']], axis=1).dropna()
     final_df['target'] = final_df['target'].map({-1: 0, 0: 1, 1: 2}).astype('category')
-
+    #AI print the count for each target class AI!
     # 5. Split data
     train_end_index = int(len(final_df) * 0.7)
     train_data = final_df.iloc[:train_end_index]
@@ -324,29 +324,6 @@ def run_single_backtest():
     print(f"Training data points: {len(train_data)}")
     print(f"Testing data points: {len(test_data)}")
 
-    # 6. Setup and run simple train/test evaluation
-    # To give more weight to the reversal classes (-1 and 1), we can balance the dataset
-    # by undersampling the majority 'Neutral' class.
-    print("\nBalancing training data by undersampling majority class...")
-    target_counts = train_data['target'].value_counts()
-    majority_class_label = target_counts.idxmax()
-    
-    if len(target_counts) > 1:
-        # Determine target size for majority class (e.g., size of the largest minority class)
-        target_size = target_counts.drop(majority_class_label).max()
-        
-        majority_indices = train_data[train_data['target'] == majority_class_label].index
-        random_indices = np.random.choice(majority_indices, target_size, replace=False)
-        minority_indices = train_data[train_data['target'] != majority_class_label].index
-        
-        undersampled_indices = np.concatenate([random_indices, minority_indices])
-        train_data_balanced = train_data.loc[undersampled_indices].sample(frac=1, random_state=42) # shuffle
-        
-        print(f"Original training target distribution:\n{target_counts}")
-        print(f"New balanced training target distribution:\n{train_data_balanced['target'].value_counts()}")
-    else:
-        print("Only one class in training data. Skipping balancing.")
-        train_data_balanced = train_data
 
     hyperparameters = {
         'model.names': ['ft_transformer'],
@@ -365,9 +342,9 @@ def run_single_backtest():
         eval_metric='f1_macro'
     )
     predictor.fit(
-        train_data_balanced,
+        train_data,
         hyperparameters=hyperparameters,
-        time_limit=600
+        time_limit=6000
     )
 
     print("\n--- Evaluating on Test Set ---")
@@ -376,15 +353,15 @@ def run_single_backtest():
 
     labels = [0, 1, 2]
     target_names = ['Bottom (-1)', 'Neutral (0)', 'Top (1)']
-    
+
     print("Classification Report:")
     print(classification_report(y_true, y_pred, labels=labels, target_names=target_names, zero_division=0))
-    
+
     report_dict = classification_report(y_true, y_pred, labels=labels, target_names=target_names, zero_division=0, output_dict=True)
     f1_top = report_dict.get('Top (1)', {}).get('f1-score', 0.0)
     f1_bottom = report_dict.get('Bottom (-1)', {}).get('f1-score', 0.0)
     avg_f1 = (f1_top + f1_bottom) / 2
-    
+
     print(f"\nAverage F1 Score (Top/Bottom): {avg_f1:.4f}\n")
 
     scores = predictor.evaluate(test_data)
