@@ -370,7 +370,70 @@ def run_single_backtest():
     print("AutoGluon Evaluation Scores:")
     print(scores)
 
-#AI make a function that evaluates the algorithm but trying to predict the pct_change of the closing price AI!
+
+def run_regression_evaluation():
+    """
+    Evaluates the FT-Transformer model on a regression task to predict
+    the next period's percentage change in closing price.
+    """
+    print("\n--- Running Regression Evaluation to Predict Pct Change ---")
+
+    # 1. Load Data
+    data = fetch_historical_data(
+        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
+        timeframe="1h",
+        start_date="2022-01-01T00:00:00Z"
+    )
+
+    # 2. Create Features
+    print("Creating features...")
+    features_df = create_features(data)
+
+    # 3. Create Target Variable (next period's pct_change)
+    print("Creating regression target (next pct_change)...")
+    target = data['Close'].pct_change().shift(-1)
+    target.name = 'target_pct_change'
+
+    # 4. Combine features and target, and drop rows with missing values
+    final_df = pd.concat([features_df, target], axis=1).dropna()
+    print(f"Dataset shape: {final_df.shape}")
+
+    # 5. Split data
+    train_end_index = int(len(final_df) * 0.7)
+    train_data = final_df.iloc[:train_end_index]
+    test_data = final_df.iloc[train_end_index:]
+    print(f"Training data points: {len(train_data)}")
+    print(f"Testing data points: {len(test_data)}")
+
+    # 6. Setup and run regression evaluation
+    # Using similar FT-Transformer params from the classification task
+    hyperparameters = {
+        'model.names': ['ft_transformer'],
+        'model.ft_transformer.num_blocks': 4,
+        'model.ft_transformer.hidden_size': 192,
+        'model.ft_transformer.token_dim': 192,
+        'model.ft_transformer.ffn_hidden_size': 192 * 2,
+        'optim.lr': 0.0005,
+        'optim.weight_decay': 1e-4,
+        'env.per_gpu_batch_size': 128
+    }
+
+    predictor = MultiModalPredictor(
+        label='target_pct_change',
+        problem_type='regression',
+        eval_metric='r2'
+    )
+    predictor.fit(
+        train_data,
+        hyperparameters=hyperparameters,
+        time_limit=600
+    )
+
+    print("\n--- Evaluating Regression Model on Test Set ---")
+    scores = predictor.evaluate(test_data)
+    print("Evaluation scores (R^2, RMSE, etc.):")
+    print(scores)
+
 
 def main():
     """
@@ -418,3 +481,4 @@ def main():
 if __name__ == "__main__":
     # main()  # Uncomment to run the Optuna study
     run_single_backtest()
+    # run_regression_evaluation()
