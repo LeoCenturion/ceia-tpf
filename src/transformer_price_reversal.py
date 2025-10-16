@@ -316,7 +316,9 @@ def run_single_backtest():
     features_df = create_features(data)
     final_df = pd.concat([features_df, reversal_data['target']], axis=1).dropna()
     final_df['target'] = final_df['target'].map({-1: 0, 0: 1, 1: 2}).astype('category')
-    #AI print the count for each target class AI!
+    print("\nTarget class distribution in the full dataset:")
+    print(final_df['target'].value_counts())
+
     # 5. Split data
     train_end_index = int(len(final_df) * 0.7)
     train_data = final_df.iloc[:train_end_index]
