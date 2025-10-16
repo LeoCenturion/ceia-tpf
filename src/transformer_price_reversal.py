@@ -5,6 +5,7 @@ from autogluon.multimodal import MultiModalPredictor
 import optuna
 from functools import partial
 from sklearn.metrics import classification_report
+import matplotlib.pyplot as plt
 
 from backtest_utils import fetch_historical_data, sma, ewm, std, rsi_indicator
 
@@ -431,9 +432,24 @@ def run_regression_evaluation():
 
     print("\n--- Evaluating Regression Model on Test Set ---")
     scores = predictor.evaluate(test_data)
-    # AI plot the prediction as well as the actual value AI!
     print("Evaluation scores (R^2, RMSE, etc.):")
     print(scores)
+
+    # Plotting predictions vs actual values
+    y_pred = predictor.predict(test_data.drop(columns=['target_close_price']))
+    y_true = test_data['target_close_price']
+
+    plt.figure(figsize=(15, 7))
+    plt.plot(y_true.index, y_true, label='Actual Close Price', color='blue')
+    plt.plot(y_true.index, y_pred, label='Predicted Close Price', color='red', linestyle='--')
+    plt.title('Closing Price Prediction: Actual vs. Predicted')
+    plt.xlabel('Date')
+    plt.ylabel('Price (USDT)')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    print("\nDisplaying plot...")
+    plt.show()
 
 
 def main():
