@@ -348,6 +348,7 @@ def run_single_backtest():
     )
 
     print("\n--- Evaluating on Test Set ---")
+    #AI compute the f1 average as (f1_top + f1_bottom) / 2 AI!
     scores = predictor.evaluate(test_data)
     print("Evaluation scores:")
     print(scores)
@@ -397,5 +398,5 @@ def main():
         print("No successful trials were completed.")
 
 if __name__ == "__main__":
-    main()  # Uncomment to run the Optuna study
-    # run_single_backtest()
+    # main()  # Uncomment to run the Optuna study
+    run_single_backtest()
