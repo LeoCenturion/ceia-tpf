@@ -388,8 +388,8 @@ def run_regression_evaluation():
     )
 
     # 2. Create Features
-    print("Creating features...")
-    features_df = create_features(data)
+    print("Using only Close price as a feature...")
+    features_df = data[['Close']]
 
     # 3. Create Target Variable (next period's closing price)
     print("Creating regression target (next closing price)...")
