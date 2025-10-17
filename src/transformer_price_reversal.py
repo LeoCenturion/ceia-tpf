@@ -471,7 +471,6 @@ def run_regression_backtest():
     print(f"\nBacktest results saved to {output_path}")
 
     # 6. Evaluate overall performance and plot
-    # AI add a new file doing this data analysis. The file should have pycell format. Analyze the distribution of the error. Plot the relationship between the absolute value of the error and the amount of days since last refit.Also plot the error through time. AI!
     final_y_true = results_df['actual_close'].dropna()
     final_y_pred = results_df['predicted_close'].dropna()
 
