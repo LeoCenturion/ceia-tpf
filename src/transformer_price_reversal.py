@@ -373,7 +373,7 @@ def run_single_backtest():
 
 
 def run_regression_evaluation():
-    #AI only use close price as feature AI!
+    # AI only use close price as feature AI!
     """
     Evaluates the FT-Transformer model on a regression task to predict
     the next period's closing price.
