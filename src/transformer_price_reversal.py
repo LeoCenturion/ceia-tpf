@@ -373,12 +373,13 @@ def run_single_backtest():
 
 
 #AI create a new function that runs backtest predicting the close price using the open close high low prices as features. Also save the prediction and actual values for every period. In an additional column save the number of periods since the last refitting. Save that df as to disk for future analysis AI!
-def run_regression_evaluation():
+def run_regression_backtest():
     """
-    Evaluates the FT-Transformer model on a regression task to predict
-    the next period's closing price.
+    Performs a walk-forward backtest for a regression task predicting the next closing price.
+    Uses 'Open', 'Close', 'High', 'Low' as features. Saves predictions, actuals,
+    and periods since last refit to disk.
     """
-    print("\n--- Running Regression Evaluation to Predict Closing Price ---")
+    print("\n--- Running Regression Walk-Forward Backtest to Predict Closing Price ---")
 
     # 1. Load Data
     data = fetch_historical_data(
@@ -387,28 +388,21 @@ def run_regression_evaluation():
         start_date="2022-01-01T00:00:00Z"
     )
 
-    # 2. Create Features
-    print("Using only Close price as a feature...")
-    features_df = data[['Close']]
-
-    # 3. Create Target Variable (next period's closing price)
-    print("Creating regression target (next closing price)...")
+    # 2. Prepare Features and Target
+    print("Preparing features (Open, Close, High, Low) and target (next Close)...")
+    features_df = data[['Open', 'High', 'Low', 'Close']].copy()
     target = data['Close'].shift(-1)
     target.name = 'target_close_price'
 
-    # 4. Combine features and target, and drop rows with missing values
     final_df = pd.concat([features_df, target], axis=1).dropna()
-    print(f"Dataset shape: {final_df.shape}")
+    X = final_df.drop(columns=['target_close_price'])
+    y = final_df['target_close_price']
 
-    # 5. Split data
-    train_end_index = int(len(final_df) * 0.7)
-    train_data = final_df.iloc[:train_end_index]
-    test_data = final_df.iloc[train_end_index:]
-    print(f"Training data points: {len(train_data)}")
-    print(f"Testing data points: {len(test_data)}")
+    # 3. Define Backtesting Parameters
+    test_size = 0.3
+    refit_every = 24 * 7 # Refit every week (hourly data)
 
-    # 6. Setup and run regression evaluation
-    # Using similar FT-Transformer params from the classification task
+    # FT-Transformer Hyperparameters (example values, could be optimized with Optuna)
     hyperparameters = {
         'model.names': ['ft_transformer'],
         'model.ft_transformer.num_blocks': 4,
@@ -420,37 +414,93 @@ def run_regression_evaluation():
         'env.per_gpu_batch_size': 128
     }
 
-    predictor = MultiModalPredictor(
-        label='target_close_price',
-        problem_type='regression',
-        eval_metric='r2'
-    )
-    predictor.fit(
-        train_data,
-        hyperparameters=hyperparameters,
-        time_limit=600
-    )
+    # 4. Perform Walk-Forward Backtest
+    split_index = int(len(final_df) * (1 - test_size))
+    
+    predictions_df_list = []
+    predictor = None
+    periods_since_refit = 0
 
-    print("\n--- Evaluating Regression Model on Test Set ---")
-    scores = predictor.evaluate(test_data)
-    print("Evaluation scores (R^2, RMSE, etc.):")
-    print(scores)
+    print("Starting walk-forward backtest...")
+    for i in range(split_index, len(final_df)):
+        current_data_index = i
+        
+        # Periodically refit the model on an expanding window
+        if periods_since_refit % refit_every == 0:
+            print(f"Refitting model at step {i - split_index + 1}/{len(final_df) - split_index} (index {current_data_index})...")
+            train_X = X.iloc[:current_data_index]
+            train_y = y.iloc[:current_data_index]
 
-    # Plotting predictions vs actual values
-    y_pred = predictor.predict(test_data.drop(columns=['target_close_price']))
-    y_true = test_data['target_close_price']
+            predictor = MultiModalPredictor(
+                label='target_close_price',
+                problem_type='regression',
+                eval_metric='r2'
+            )
+            predictor.fit(
+                pd.concat([train_X, train_y], axis=1), # MultiModalPredictor expects df with target
+                hyperparameters=hyperparameters,
+                time_limit=300, # Shorter time limit for refitting steps
+                verbosity=2
+            )
+            periods_since_refit = 0
+        
+        # Make prediction for the current step
+        if predictor:
+            current_X_test = X.iloc[current_data_index:current_data_index+1]
+            predicted_price = predictor.predict(current_X_test).iloc[0]
+        else:
+            predicted_price = np.nan # No prediction if model not yet fitted
 
-    plt.figure(figsize=(15, 7))
-    plt.plot(y_true.index, y_true, label='Actual Close Price', color='blue')
-    plt.plot(y_true.index, y_pred, label='Predicted Close Price', color='red', linestyle='--')
-    plt.title('Closing Price Prediction: Actual vs. Predicted')
-    plt.xlabel('Date')
-    plt.ylabel('Price (USDT)')
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    print("\nDisplaying plot...")
-    plt.show()
+        actual_price = y.iloc[current_data_index]
+        
+        predictions_df_list.append({
+            'timestamp': y.index[current_data_index],
+            'actual_close': actual_price,
+            'predicted_close': predicted_price,
+            'periods_since_refit': periods_since_refit
+        })
+        
+        periods_since_refit += 1
+
+        if (i - split_index + 1) % 100 == 0 or (i == len(final_df) - 1):
+            print(f"Processed {i - split_index + 1}/{len(final_df) - split_index} steps...")
+    
+    results_df = pd.DataFrame(predictions_df_list).set_index('timestamp')
+
+    # 5. Save results to disk
+    output_path = 'regression_backtest_results.csv'
+    results_df.to_csv(output_path)
+    print(f"\nBacktest results saved to {output_path}")
+
+    # 6. Evaluate overall performance and plot
+    final_y_true = results_df['actual_close'].dropna()
+    final_y_pred = results_df['predicted_close'].dropna()
+
+    if not final_y_true.empty and not final_y_pred.empty:
+        # Align indices before evaluation
+        common_index = final_y_true.index.intersection(final_y_pred.index)
+        final_y_true = final_y_true.loc[common_index]
+        final_y_pred = final_y_pred.loc[common_index]
+
+        from sklearn.metrics import mean_squared_error, r2_score
+        rmse = np.sqrt(mean_squared_error(final_y_true, final_y_pred))
+        r2 = r2_score(final_y_true, final_y_pred)
+        print(f"Overall Backtest RMSE: {rmse:.4f}")
+        print(f"Overall Backtest R^2: {r2:.4f}")
+
+        plt.figure(figsize=(15, 7))
+        plt.plot(final_y_true.index, final_y_true, label='Actual Close Price', color='blue')
+        plt.plot(final_y_pred.index, final_y_pred, label='Predicted Close Price', color='red', linestyle='--')
+        plt.title('Closing Price Regression Backtest: Actual vs. Predicted')
+        plt.xlabel('Date')
+        plt.ylabel('Price (USDT)')
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        print("\nDisplaying plot. Close the plot window to exit.")
+        plt.show()
+    else:
+        print("\nNo valid predictions were made for overall evaluation.")
 
 
 def main():
@@ -499,4 +549,5 @@ def main():
 if __name__ == "__main__":
     # main()  # Uncomment to run the Optuna study
     # run_single_backtest()
-    run_regression_evaluation()
+    # run_regression_evaluation() # This was the single train/test evaluation
+    run_regression_backtest() # This is the new walk-forward backtest
