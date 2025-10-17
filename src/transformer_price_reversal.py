@@ -445,7 +445,7 @@ def run_regression_backtest():
         # Make prediction for the current step
         if predictor:
             current_X_test = X.iloc[current_data_index:current_data_index+1]
-            predicted_price = predictor.predict(current_X_test, as_pandas=False)[0]
+            predicted_price = predictor.predict(current_X_test, as_pandas=False)
         else:
             predicted_price = np.nan # No prediction if model not yet fitted
 
@@ -471,6 +471,7 @@ def run_regression_backtest():
     print(f"\nBacktest results saved to {output_path}")
 
     # 6. Evaluate overall performance and plot
+    # AI add a new file doing this data analysis. The file should have pycell format. Analyze the distribution of the error. Plot the relationship between the absolute value of the error and the amount of days since last refit.Also plot the error through time. AI!
     final_y_true = results_df['actual_close'].dropna()
     final_y_pred = results_df['predicted_close'].dropna()
 
