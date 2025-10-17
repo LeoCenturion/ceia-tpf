@@ -439,7 +439,6 @@ def run_regression_backtest():
                 pd.concat([train_X, train_y], axis=1), # MultiModalPredictor expects df with target
                 hyperparameters=hyperparameters,
                 time_limit=300, # Shorter time limit for refitting steps
-                verbosity=2
             )
             periods_since_refit = 0
         
