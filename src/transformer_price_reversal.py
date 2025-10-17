@@ -445,7 +445,7 @@ def run_regression_backtest():
         # Make prediction for the current step
         if predictor:
             current_X_test = X.iloc[current_data_index:current_data_index+1]
-            predicted_price = predictor.predict(current_X_test).iloc[0]
+            predicted_price = predictor.predict(current_X_test, as_pandas=False)[0]
         else:
             predicted_price = np.nan # No prediction if model not yet fitted
 
