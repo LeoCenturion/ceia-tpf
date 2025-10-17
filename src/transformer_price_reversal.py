@@ -372,6 +372,7 @@ def run_single_backtest():
     print(scores)
 
 
+#AI create a new function that runs backtest predicting the close price using the open close high low prices as features. Also save the prediction and actual values for every period. In an additional column save the number of periods since the last refitting. Save that df as to disk for future analysis AI!
 def run_regression_evaluation():
     """
     Evaluates the FT-Transformer model on a regression task to predict
