@@ -23,8 +23,59 @@ results_df['absolute_percentage_error'] = np.abs(results_df['percentage_error'])
 
 print("\nError Statistics:")
 print(results_df[['error', 'absolute_error', 'percentage_error', 'absolute_percentage_error']].describe())
-# AI Given a list of RESULTS_FILE plot barplots comparing the different error metrics calculated above for each file AI!
+
 #%%
+# --- Comparison of multiple backtest results ---
+
+# Add more file paths to this list to compare different model results
+# For example: 'xgboost_regression_backtest_results.csv'
+RESULTS_FILES = [
+    'regression_backtest_results.csv',
+    # 'xgboost_regression_backtest_results.csv',
+]
+
+comparison_metrics = []
+for file in RESULTS_FILES:
+    try:
+        df = pd.read_csv(file, index_col='timestamp', parse_dates=True)
+        # Create a more readable model name from the filename
+        model_name = file.replace('_backtest_results.csv', '').replace('regression_', '')
+
+        # Calculate error metrics
+        df['error'] = df['actual_close'] - df['predicted_close']
+        df['absolute_error'] = np.abs(df['error'])
+        df['percentage_error'] = (df['error'] / df['actual_close']) * 100
+        df['absolute_percentage_error'] = np.abs(df['percentage_error'])
+
+        # Calculate summary statistics for comparison
+        mae = df['absolute_error'].mean()
+        mape = df['absolute_percentage_error'].mean()
+        rmse = np.sqrt((df['error'] ** 2).mean())
+
+        comparison_metrics.append({
+            'model': model_name,
+            'Mean Absolute Error (MAE)': mae,
+            'Mean Absolute Percentage Error (MAPE)': mape,
+            'Root Mean Squared Error (RMSE)': rmse,
+        })
+    except FileNotFoundError:
+        print(f"\nWarning: The file '{file}' was not found. Skipping comparison for this file.")
+
+if comparison_metrics:
+    comparison_df = pd.DataFrame(comparison_metrics).set_index('model')
+    print("\n--- Model Comparison ---")
+    print(comparison_df)
+
+    # Plotting the comparison
+    comparison_df.plot(kind='bar', figsize=(14, 8), subplots=True, layout=(1, 3), sharey=False, rot=0)
+    plt.suptitle('Comparison of Model Performance Metrics', fontsize=16)
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.show()
+
+#%%
+# --- Detailed analysis of primary file continues below ---
+print(f"\n--- Detailed Analysis for: {RESULTS_FILE} ---")
+
 # 1. Analyze the distribution of the error
 plt.figure(figsize=(15, 6))
 
