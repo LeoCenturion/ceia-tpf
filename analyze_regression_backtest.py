@@ -31,10 +31,13 @@ print(results_df[['error', 'absolute_error', 'percentage_error', 'absolute_perce
 # For example: 'xgboost_regression_backtest_results.csv'
 RESULTS_FILES = [
     'regression_backtest_results.csv',
-    # 'xgboost_regression_backtest_results.csv',
+    'regression_backtest_results_7d.csv',
+    'regression_backtest_results_14d.csv',
+    'regression_backtest_results_365d.csv'
 ]
 
 comparison_metrics = []
+#AI compare in the barchart the min, max, mean, and percentiles from doing results_df[['error', 'absolute_error', 'percentage_error', 'absolute_percentage_error']].describe() for each file AI!  
 for file in RESULTS_FILES:
     try:
         df = pd.read_csv(file, index_col='timestamp', parse_dates=True)
@@ -183,4 +186,4 @@ plt.grid(True, linestyle='--', alpha=0.6)
 plt.legend()
 plt.tight_layout()
 plt.show()
-```
+
