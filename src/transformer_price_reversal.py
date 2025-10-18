@@ -320,10 +320,12 @@ def objective(trial, data):
             )
             predictor = TimeSeriesPredictor(prediction_length=1, verbosity=0, freq='1h')
             try:
-                #AI apply a batch size of 1024 for inference and training AI!
                 predictor.fit(
                     train_data,
-                    hyperparameters={"Chronos": {"model_path": model_choice}},
+                    hyperparameters={"Chronos": {
+                        "model_path": model_choice,
+                        "batch_size": 1024,
+                    }},
                     time_limit=300
                 )
             except Exception as e:
@@ -335,7 +337,7 @@ def objective(trial, data):
             train_X_pred = X.iloc[:current_data_index]
             train_y_pred = y.iloc[:current_data_index]
             df_pred = pd.concat([train_y_pred, train_X_pred], axis=1)
-            predicted_price = predictor.predict(df_pred)['mean'].values[0]
+            predicted_price = predictor.predict(df_pred, batch_size=1024)['mean'].values[0]
         else:
             predicted_price = np.nan
 
