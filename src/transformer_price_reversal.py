@@ -212,7 +212,8 @@ def run_timeseries_regression_backtest():
             train_X = X.iloc[:current_data_index]
             train_y = y.iloc[:current_data_index]
             df = pd.concat([train_y, train_X], axis=1)
-            predicted_price = predictor.predict(df)['mean']
+            predicted_price = predictor.predict(df)['mean'].values[0]
+            print(predicted_price)
 
         else:
             predicted_price = np.nan # No prediction if model not yet fitted
@@ -278,9 +279,9 @@ def objective(trial, data):
     model_choice = trial.suggest_categorical('chronos_model', [
         "amazon/chronos-t5-tiny",
         "amazon/chronos-t5-small",
-        # "amazon/chronos-t5-base" # Base model might be too slow for many trials
+        "amazon/chronos-t5-base" # Base model might be too slow for many trials
     ])
-    refit_every = trial.suggest_int('refit_every_hours', 24 * 7, 24 * 30)  # 1 week to 1 month
+    refit_every = trial.suggest_int('refit_every_hours', 24 * 7, 24 * 14)
 
     # 2. Prepare Features and Target
     features_df = data[['Open', 'High', 'Low', 'Close']].copy()
@@ -319,6 +320,7 @@ def objective(trial, data):
             )
             predictor = TimeSeriesPredictor(prediction_length=1, verbosity=0, freq='1h')
             try:
+                #AI apply a batch size of 1024 for inference and training AI!
                 predictor.fit(
                     train_data,
                     hyperparameters={"Chronos": {"model_path": model_choice}},
@@ -333,8 +335,7 @@ def objective(trial, data):
             train_X_pred = X.iloc[:current_data_index]
             train_y_pred = y.iloc[:current_data_index]
             df_pred = pd.concat([train_y_pred, train_X_pred], axis=1)
-            predicted_price_series = predictor.predict(df_pred)['mean']
-            predicted_price = predicted_price_series.iloc[0] if not predicted_price_series.empty else np.nan
+            predicted_price = predictor.predict(df_pred)['mean'].values[0]
         else:
             predicted_price = np.nan
 
@@ -375,7 +376,7 @@ def main():
     """
     Main function to run the Optuna hyperparameter optimization study.
     """
-    N_TRIALS = 1
+    N_TRIALS = 10
 
     # 1. Load Data
     print("Loading historical data...")
@@ -387,7 +388,7 @@ def main():
 
     # 2. Setup and Run Optuna Study
     db_file_name = "optuna-study"
-    study_name_in_db = 'transformer_reversal_v0.2'
+    study_name_in_db = 'transformer_reversal_v1.0'
     storage_name = f"sqlite:///{db_file_name}.db"
 
     print(f"Starting Optuna study: '{study_name_in_db}'. Storage: {storage_name}")
@@ -415,7 +416,7 @@ def main():
         print("No successful trials were completed.")
 
 if __name__ == "__main__":
-    # main()  # Uncomment to run the Optuna study
+    main()  # Uncomment to run the Optuna study
     # run_single_backtest()
     # run_regression_evaluation() # This was the single train/test evaluation
-    run_timeseries_regression_backtest() # This is the new walk-forward backtest
+    # run_timeseries_regression_backtest() # This is the new walk-forward backtest
