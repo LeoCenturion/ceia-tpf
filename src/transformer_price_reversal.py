@@ -269,6 +269,108 @@ def run_timeseries_regression_backtest():
         print("\nNo valid predictions were made for overall evaluation.")
 
 
+def objective(trial, data):
+    """
+    Optuna objective function for time-series regression backtest.
+    """
+    from sklearn.metrics import mean_squared_error
+    # 1. Suggest Hyperparameters
+    model_choice = trial.suggest_categorical('chronos_model', [
+        "amazon/chronos-t5-tiny",
+        "amazon/chronos-t5-small",
+        # "amazon/chronos-t5-base" # Base model might be too slow for many trials
+    ])
+    refit_every = trial.suggest_int('refit_every_hours', 24 * 7, 24 * 30)  # 1 week to 1 month
+
+    # 2. Prepare Features and Target
+    features_df = data[['Open', 'High', 'Low', 'Close']].copy()
+    target = data['Close'].shift(-1)
+    target.name = 'target'
+
+    final_df = pd.concat([features_df, target], axis=1).dropna()
+    X = final_df.drop(columns=['target'])
+    X["item_id"] = "series_0"
+    X['timestamp'] = X.index.values
+    y = final_df['target']
+
+    # 3. Define Backtesting Parameters (use a smaller test set for faster trials)
+    test_size = 0.1
+    split_index = int(len(final_df) * (1 - test_size))
+    
+    predictions_df_list = []
+    predictor = None
+    periods_since_refit = 0
+
+    # 4. Perform Walk-Forward Backtest for the trial
+    print(f"Trial {trial.number}: Starting backtest with model {model_choice} and refit_every={refit_every} hours.")
+    for i in range(split_index, len(final_df)):
+        current_data_index = i
+
+        if periods_since_refit % refit_every == 0:
+            print(f"Trial {trial.number}: Refitting model at step {i - split_index + 1}/{len(final_df) - split_index}...")
+            train_X = X.iloc[:current_data_index]
+            train_y = y.iloc[:current_data_index]
+
+            df = pd.concat([train_y, train_X], axis=1)
+            train_data = TimeSeriesDataFrame.from_data_frame(
+                df,
+                id_column="item_id",
+                timestamp_column="timestamp"
+            )
+            predictor = TimeSeriesPredictor(prediction_length=1, verbosity=0, freq='1h')
+            try:
+                predictor.fit(
+                    train_data,
+                    hyperparameters={"Chronos": {"model_path": model_choice}},
+                    time_limit=300
+                )
+            except Exception as e:
+                print(f"Trial {trial.number} failed during fit: {e}")
+                return np.inf  # Return high value if model fails to fit
+            periods_since_refit = 0
+        
+        if predictor:
+            train_X_pred = X.iloc[:current_data_index]
+            train_y_pred = y.iloc[:current_data_index]
+            df_pred = pd.concat([train_y_pred, train_X_pred], axis=1)
+            predicted_price_series = predictor.predict(df_pred)['mean']
+            predicted_price = predicted_price_series.iloc[0] if not predicted_price_series.empty else np.nan
+        else:
+            predicted_price = np.nan
+
+        actual_price = y.iloc[current_data_index]
+
+        predictions_df_list.append({
+            'timestamp': y.index[current_data_index],
+            'actual_close': actual_price,
+            'predicted_close': predicted_price,
+        })
+        
+        periods_since_refit += 1
+
+    results_df = pd.DataFrame(predictions_df_list).set_index('timestamp')
+
+    # 5. Calculate and return RMSE
+    final_y_true = results_df['actual_close'].dropna()
+    final_y_pred = results_df['predicted_close'].dropna()
+
+    if final_y_true.empty or final_y_pred.empty:
+        print(f"Trial {trial.number}: No valid predictions generated.")
+        return np.inf
+
+    common_index = final_y_true.index.intersection(final_y_pred.index)
+    final_y_true = final_y_true.loc[common_index]
+    final_y_pred = final_y_pred.loc[common_index]
+
+    if len(final_y_true) == 0:
+        print(f"Trial {trial.number}: No overlapping predictions and actuals.")
+        return np.inf
+
+    rmse = np.sqrt(mean_squared_error(final_y_true, final_y_pred))
+    print(f"Trial {trial.number}: Finished with RMSE: {rmse}")
+    return rmse
+
+
 def main():
     """
     Main function to run the Optuna hyperparameter optimization study.
@@ -290,11 +392,10 @@ def main():
 
     print(f"Starting Optuna study: '{study_name_in_db}'. Storage: {storage_name}")
 
-    # AI add an objective function running regression like in run_timeseries_regression_backtest. The objective should be the RMSE AI!
     objective_with_data = partial(objective, data=data)
 
     study = optuna.create_study(
-        direction='maximize',
+        direction='minimize',  # We want to minimize RMSE
         study_name=study_name_in_db,
         storage=storage_name,
         load_if_exists=True
@@ -306,7 +407,7 @@ def main():
     print("\n--- Optuna Study Best Results ---")
     try:
         best_trial = study.best_trial
-        print(f"Best trial value (F1 Macro): {best_trial.value}")
+        print(f"Best trial value (RMSE): {best_trial.value}")
         print("Best parameters found:")
         for key, value in best_trial.params.items():
             print(f"  {key}: {value}")
