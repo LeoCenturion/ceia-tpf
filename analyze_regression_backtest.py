@@ -36,8 +36,7 @@ RESULTS_FILES = [
     'regression_backtest_results_365d.csv'
 ]
 
-comparison_metrics = []
-#AI compare in the barchart the min, max, mean, and percentiles from doing results_df[['error', 'absolute_error', 'percentage_error', 'absolute_percentage_error']].describe() for each file AI!  
+all_stats_list = []
 for file in RESULTS_FILES:
     try:
         df = pd.read_csv(file, index_col='timestamp', parse_dates=True)
@@ -50,30 +49,41 @@ for file in RESULTS_FILES:
         df['percentage_error'] = (df['error'] / df['actual_close']) * 100
         df['absolute_percentage_error'] = np.abs(df['percentage_error'])
 
-        # Calculate summary statistics for comparison
-        mae = df['absolute_error'].mean()
-        mape = df['absolute_percentage_error'].mean()
-        rmse = np.sqrt((df['error'] ** 2).mean())
-
-        comparison_metrics.append({
-            'model': model_name,
-            'Mean Absolute Error (MAE)': mae,
-            'Mean Absolute Percentage Error (MAPE)': mape,
-            'Root Mean Squared Error (RMSE)': rmse,
-        })
+        # Get summary statistics
+        stats = df[['error', 'absolute_error', 'percentage_error', 'absolute_percentage_error']].describe()
+        stats['model'] = model_name
+        all_stats_list.append(stats)
+        
     except FileNotFoundError:
         print(f"\nWarning: The file '{file}' was not found. Skipping comparison for this file.")
 
-if comparison_metrics:
-    comparison_df = pd.DataFrame(comparison_metrics).set_index('model')
-    print("\n--- Model Comparison ---")
+if all_stats_list:
+    # Prepare dataframe for plotting
+    comparison_df = pd.concat(all_stats_list)
+    comparison_df = comparison_df.reset_index().rename(columns={'index': 'statistic'})
+    comparison_df = comparison_df.set_index(['model', 'statistic'])
+
+    print("\n--- Model Comparison Statistics ---")
     print(comparison_df)
 
-    # Plotting the comparison
-    comparison_df.plot(kind='bar', figsize=(14, 8), subplots=True, layout=(1, 3), sharey=False, rot=0)
-    plt.suptitle('Comparison of Model Performance Metrics', fontsize=16)
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    plt.show()
+    # Plotting
+    metrics_to_plot = ['error', 'absolute_error', 'percentage_error', 'absolute_percentage_error']
+    stats_to_plot = ['mean', 'std', 'min', '25%', '50%', '75%', 'max']
+
+    for metric in metrics_to_plot:
+        # Select data for the current metric and stats to plot
+        # Using .loc to avoid potential KeyError if a stat is missing, though describe() is consistent
+        plot_data = comparison_df[metric].unstack(level='model').loc[stats_to_plot]
+
+        # Plotting the comparison
+        plot_data.plot(kind='bar', figsize=(14, 8), rot=0, width=0.8)
+        plt.title(f'Comparison of Statistics for: {metric.replace("_", " ").title()}', fontsize=16)
+        plt.xlabel('Statistic')
+        plt.ylabel('Value')
+        plt.grid(axis='y', linestyle='--', alpha=0.7)
+        plt.legend(title='Model')
+        plt.tight_layout()
+        plt.show()
 
 #%%
 # --- Detailed analysis of primary file continues below ---
