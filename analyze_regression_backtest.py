@@ -23,7 +23,7 @@ results_df['absolute_percentage_error'] = np.abs(results_df['percentage_error'])
 
 print("\nError Statistics:")
 print(results_df[['error', 'absolute_error', 'percentage_error', 'absolute_percentage_error']].describe())
-
+# AI Given a list of RESULTS_FILE plot barplots comparing the different error metrics calculated above for each file AI!
 #%%
 # 1. Analyze the distribution of the error
 plt.figure(figsize=(15, 6))
@@ -48,40 +48,66 @@ plt.tight_layout()
 plt.show()
 
 #%%
+plt.figure(figsize=(15, 6))
+# Histogram
+plt.subplot(1, 2, 1)
+sns.histplot(results_df['percentage_error'], kde=True, bins=50, color='skyblue')
+plt.title('Distribution of Prediction Error')
+plt.xlabel('Error (Actual - Predicted)')
+plt.ylabel('Frequency')
+plt.grid(True, linestyle='--', alpha=0.6)
+
+# KDE Plot
+plt.subplot(1, 2, 2)
+sns.kdeplot(results_df['percentage_error'], fill=True, color='lightcoral')
+plt.title('Kernel Density Estimate of Prediction Error')
+plt.xlabel('Error (Actual - Predicted)')
+plt.ylabel('Density')
+plt.grid(True, linestyle='--', alpha=0.6)
+
+plt.tight_layout()
+plt.show()
+
+#%%
+plt.figure(figsize=(15, 6))
+# Histogram
+plt.subplot(1, 2, 1)
+sns.histplot(results_df['absolute_percentage_error'], kde=True, bins=50, color='skyblue')
+plt.title('Distribution of Prediction Error')
+plt.xlabel('Error (Actual - Predicted)')
+plt.ylabel('Frequency')
+plt.grid(True, linestyle='--', alpha=0.6)
+
+# KDE Plot
+plt.subplot(1, 2, 2)
+sns.kdeplot(results_df['absolute_percentage_error'], fill=True, color='lightcoral')
+plt.title('Kernel Density Estimate of Prediction Error')
+plt.xlabel('Error (Actual - Predicted)')
+plt.ylabel('Density')
+plt.grid(True, linestyle='--', alpha=0.6)
+
+plt.tight_layout()
+plt.show()
+
+#%%
 # 2. Plot the relationship between the absolute value of the error and the amount of periods since last refit
 # Convert periods_since_refit to days (assuming hourly data, 24 periods per day)
 results_df['days_since_refit'] = results_df['periods_since_refit'] / 24
-
+results_df['days_since_refit'] = results_df['days_since_refit'].astype(int)
 plt.figure(figsize=(12, 7))
-sns.scatterplot(
+sns.boxplot(
     data=results_df,
     x='days_since_refit',
-    y='absolute_error',
-    alpha=0.6,
-    hue='days_since_refit', # Color by days for better visualization
-    palette='viridis',
-    size='absolute_error', # Size dots by error magnitude
-    sizes=(20, 400),
-    legend='full'
+    y='absolute_percentage_error',
 )
-# Add a regression line
-sns.regplot(
-    data=results_df,
-    x='days_since_refit',
-    y='absolute_error',
-    scatter=False,
-    color='red',
-    line_kws={'linestyle':'--', 'alpha':0.7},
-    label='Trend'
-)
-plt.title('Absolute Error vs. Days Since Last Model Refit')
+
+plt.title('Percentage Absolute Error vs. Days Since Last Model Refit')
 plt.xlabel('Days Since Last Refit')
-plt.ylabel('Absolute Error |Actual - Predicted|')
+plt.ylabel('% Absolute Error |Actual - Predicted| / Actual')
 plt.grid(True, linestyle='--', alpha=0.6)
 plt.legend(title='Days Since Refit')
 plt.tight_layout()
 plt.show()
-
 #%%
 # 3. Plot the error through time
 plt.figure(figsize=(15, 7))
