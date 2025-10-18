@@ -36,6 +36,7 @@ RESULTS_FILES = [
 ]
 
 all_stats_list = []
+summary_metrics = []
 for file in RESULTS_FILES:
     try:
         df = pd.read_csv(file, index_col='timestamp', parse_dates=True)
@@ -52,6 +53,21 @@ for file in RESULTS_FILES:
         stats = df[['error', 'absolute_error', 'percentage_error', 'absolute_percentage_error']].describe()
         stats['model'] = model_name
         all_stats_list.append(stats)
+
+        # Calculate summary metrics like MAE, RMSE, MASE
+        mae = df['absolute_error'].mean()
+        mape = df['absolute_percentage_error'].mean()
+        rmse = np.sqrt((df['error']**2).mean())
+        mae_naive = np.abs(df['actual_close'].diff()).mean()
+        mase = mae / mae_naive if mae_naive != 0 else np.inf
+
+        summary_metrics.append({
+            'model': model_name,
+            'MAE': mae,
+            'MAPE': mape,
+            'RMSE': rmse,
+            'MASE': mase,
+        })
         
     except FileNotFoundError:
         print(f"\nWarning: The file '{file}' was not found. Skipping comparison for this file.")
@@ -83,7 +99,17 @@ if all_stats_list:
         plt.legend(title='Model')
         plt.tight_layout()
         plt.show()
-# AI also compare different error metrics such as MASE AI!
+
+if summary_metrics:
+    summary_df = pd.DataFrame(summary_metrics).set_index('model')
+    print("\n--- Model Comparison (Summary Metrics) ---")
+    print(summary_df)
+
+    # Plotting
+    summary_df.plot(kind='bar', figsize=(12, 8), subplots=True, layout=(2, 2), sharey=False, rot=45)
+    plt.suptitle('Comparison of Summary Error Metrics', fontsize=16)
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.show()
 #%%
 # --- Detailed analysis of primary file continues below ---
 print(f"\n--- Detailed Analysis for: {RESULTS_FILE} ---")
