@@ -27,8 +27,7 @@ print(results_df[['error', 'absolute_error', 'percentage_error', 'absolute_perce
 #%%
 # --- Comparison of multiple backtest results ---
 
-# Add more file paths to this list to compare different model results
-# For example: 'xgboost_regression_backtest_results.csv'
+
 RESULTS_FILES = [
     'regression_backtest_results.csv',
     'regression_backtest_results_7d.csv',
@@ -84,7 +83,7 @@ if all_stats_list:
         plt.legend(title='Model')
         plt.tight_layout()
         plt.show()
-
+# AI also compare different error metrics such as MASE AI!
 #%%
 # --- Detailed analysis of primary file continues below ---
 print(f"\n--- Detailed Analysis for: {RESULTS_FILE} ---")
