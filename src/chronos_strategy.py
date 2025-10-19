@@ -34,8 +34,9 @@ class ChronosStrategy(TrialStrategy):
         """
         # Check if a prediction was made for the current bar and log it
         if self._last_prediction is not None:
-            # AI it has two indices values ('series_0', Timestamp('2024-01-29 09:00:00')), choose the timestamp one AI!
-            prediction_timestamp = self._last_prediction.index[0]
+            prediction_timestamp = self._last_prediction.index.get_level_values(
+                "timestamp"
+            )[0]
             print(
                 f"prediction_timestamp {prediction_timestamp} == {self.data.index[-1]}"
             )
