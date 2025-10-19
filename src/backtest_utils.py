@@ -200,7 +200,7 @@ def optimize_strategy(data, strategy_class: TrialStrategy, study_name, n_trials=
                 mlflow.log_metric(sanitized_key, value)
             # Log artifacts for the last step if available
             if bt:
-                strategy_class.save_artifacts(trial, stats, bt)
+                stats._strategy.save_artifacts(trial, stats, bt)
                 # plot_filename = f"backtest_plot_trial_{trial.number}.html"
                 # trades_filename = f"trades_trial_{trial.number}.csv"
 
