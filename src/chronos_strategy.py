@@ -3,10 +3,10 @@ import numpy as np
 from backtesting import Strategy, Backtest
 from autogluon.timeseries import TimeSeriesPredictor, TimeSeriesDataFrame
 
-from backtest_utils import fetch_historical_data, run_optimizations
+from backtest_utils import TrialStrategy, fetch_historical_data, run_optimizations
 
 
-class ChronosStrategy(Strategy):
+class ChronosStrategy(TrialStrategy):
     """
     A backtesting strategy using the Chronos time-series model for price prediction.
     """
@@ -73,6 +73,8 @@ class ChronosStrategy(Strategy):
 
             # Predict the next closing price
             prediction = self.predictor.predict(current_data_df)
+            # AI I want you to save all predicitons, the mean and all percentiles, and the actual values in a dataframe in an instance field AI!
+            print(prediction)
             predicted_price = prediction["mean"].values[0]
             current_price = self.data.Close[-1]
 
@@ -104,9 +106,9 @@ class ChronosStrategy(Strategy):
         return {
             "model_path": trial.suggest_categorical(
                 "model_path",
-                ["amazon/chronos-t5-tiny", "amazon/chronos-t5-small"],
+                ["amazon/chronos-t5-tiny"],
             ),
-            "refit_every": trial.suggest_int("refit_every", 24 * 7, 24 * 30, step=24),
+            "refit_every": trial.suggest_int("refit_every", 24 * 30, 24 * 30, step=24),
             "trade_threshold": trial.suggest_float(
                 "trade_threshold", 0.005, 0.05, log=True
             ),
@@ -123,10 +125,10 @@ def main():
     run_optimizations(
         strategies=strategies,
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
-        start_date="2023-01-01T00:00:00Z",
+        start_date="2024-01-01T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",
-        experiment_name="Chronos Strategy Optimization",
-        n_trials_per_strategy=10,
+        experiment_name="Chronos Strategy Optimization v0.1",
+        n_trials_per_strategy=1,
         n_jobs=1,  # Chronos/AutoGluon can be heavy, especially on GPU
     )
 
