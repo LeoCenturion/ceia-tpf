@@ -3,7 +3,7 @@ import numpy as np
 from backtesting import Strategy, Backtest
 from autogluon.timeseries import TimeSeriesPredictor, TimeSeriesDataFrame
 
-from backtest_utils import fetch_historical_data
+from backtest_utils import fetch_historical_data, run_optimizations
 
 
 class ChronosStrategy(Strategy):
@@ -96,41 +96,39 @@ class ChronosStrategy(Strategy):
 
         self.periods_since_refit += 1
 
+    @classmethod
+    def get_optuna_params(cls, trial):
+        """
+        Define the hyperparameter space for Optuna.
+        """
+        return {
+            "model_path": trial.suggest_categorical(
+                "model_path",
+                ["amazon/chronos-t5-tiny", "amazon/chronos-t5-small"],
+            ),
+            "refit_every": trial.suggest_int("refit_every", 24 * 7, 24 * 30, step=24),
+            "trade_threshold": trial.suggest_float(
+                "trade_threshold", 0.005, 0.05, log=True
+            ),
+        }
+
 
 def main():
-    # AI use the backtest utils run_optimizations function AI!
-    """
-    Main function to run a backtest for the ChronosStrategy.
-    """
-    print("--- Running Chronos Strategy Backtest ---")
-
-    # 1. Load Data
-    data = fetch_historical_data(
+    """Main function to run optimization for the Chronos strategy."""
+    strategies = {
+        "ChronosStrategy": ChronosStrategy,
+    }
+    # Note: Chronos backtests are very slow. Consider a low number of trials
+    # and a single job (n_jobs=1) if using a GPU.
+    run_optimizations(
+        strategies=strategies,
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
-        timeframe="1h",
-        start_date="2023-01-01T00:00:00Z",  # Using a smaller period for faster backtest
+        start_date="2023-01-01T00:00:00Z",
+        tracking_uri="sqlite:///mlflow.db",
+        experiment_name="Chronos Strategy Optimization",
+        n_trials_per_strategy=10,
+        n_jobs=1,  # Chronos/AutoGluon can be heavy, especially on GPU
     )
-
-    # 2. Run Backtest
-    # Note: This backtest is very slow due to model refitting.
-    bt = Backtest(data, ChronosStrategy, cash=10000, commission=0.002)
-
-    stats = bt.run()
-    print("\n--- Backtest Results ---")
-    print(stats)
-
-    if isinstance(stats, pd.Series) and not stats.empty:
-        print(f"\nReturn [%]: {stats.get('Return [%]', 'N/A'):.2f}")
-        print(f"Win Rate [%]: {stats.get('Win Rate [%]', 'N/A'):.2f}")
-        print(f"Sharpe Ratio: {stats.get('Sharpe Ratio', 'N/A'):.2f}")
-
-        # 3. Plot Results
-        print("\nPlotting results...")
-        bt.plot()
-    else:
-        print(
-            "Backtest did not produce any stats. This might happen if no trades were executed."
-        )
 
 
 if __name__ == "__main__":
