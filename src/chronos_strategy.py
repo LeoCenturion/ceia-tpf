@@ -1,3 +1,6 @@
+import os
+
+import mlflow
 import pandas as pd
 import numpy as np
 from backtesting import Strategy, Backtest
@@ -115,8 +118,14 @@ class ChronosStrategy(TrialStrategy):
         self.periods_since_refit += 1
 
     def save_artifacts(self, trial, stats, bt):
-        # AI call the base class method and then also save the predictions_df csv as an artifact in mlflow. Remember to delete all temporary files you may use. AI!
-        return
+        super().save_artifacts(trial, stats, bt)
+
+        predictions_filename = f"predictions_trial_{trial.number}.csv"
+        if not self.predictions_df.empty:
+            self.predictions_df.to_csv(predictions_filename)
+            if os.path.exists(predictions_filename):
+                mlflow.log_artifact(predictions_filename)
+                os.remove(predictions_filename)
 
     @classmethod
     def get_optuna_params(cls, trial):
