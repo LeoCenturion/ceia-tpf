@@ -25,11 +25,23 @@ class ChronosStrategy(TrialStrategy):
         """
         self.predictor = None
         self.periods_since_refit = np.inf  # Force refit on first valid occasion
+        self.predictions_df = pd.DataFrame()
+        self._last_prediction = None
 
     def next(self):
         """
         Called on each bar of data.
         """
+        # Check if a prediction was made for the current bar and log it
+        if self._last_prediction is not None:
+            prediction_timestamp = self._last_prediction.index[0]
+            if prediction_timestamp == self.data.index[-1]:
+                log_entry = self._last_prediction.iloc[0].to_dict()
+                log_entry["actual_close"] = self.data.Close[-1]
+
+                new_row = pd.DataFrame(log_entry, index=[prediction_timestamp])
+                self.predictions_df = pd.concat([self.predictions_df, new_row])
+
         # --- Model Refitting ---
         # Refit the model periodically, but only if we have enough data
         if (
@@ -73,7 +85,7 @@ class ChronosStrategy(TrialStrategy):
 
             # Predict the next closing price
             prediction = self.predictor.predict(current_data_df)
-            # AI I want you to save all predicitons, the mean and all percentiles, and the actual values in a dataframe in an instance field AI!
+            self._last_prediction = prediction
             print(prediction)
             predicted_price = prediction["mean"].values[0]
             current_price = self.data.Close[-1]
