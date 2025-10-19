@@ -37,16 +37,16 @@ class ChronosStrategy(TrialStrategy):
             prediction_timestamp = self._last_prediction.index.get_level_values(
                 "timestamp"
             )[0]
-            print(
-                f"prediction_timestamp {prediction_timestamp} == {self.data.index[-1]}"
-            )
+            # print(
+            #     f"prediction_timestamp {prediction_timestamp} == {self.data.index[-1]}"
+            # )
             if prediction_timestamp == self.data.index[-1]:
                 log_entry = self._last_prediction.iloc[0].to_dict()
                 log_entry["actual_close"] = self.data.Close[-1]
 
                 new_row = pd.DataFrame(log_entry, index=[prediction_timestamp])
                 self.predictions_df = pd.concat([self.predictions_df, new_row])
-        print(self.predictions_df)
+        # print(self.predictions_df)
         # --- Model Refitting ---
         # Refit the model periodically, but only if we have enough data
         if (
@@ -113,6 +113,10 @@ class ChronosStrategy(TrialStrategy):
                     self.sell()
 
         self.periods_since_refit += 1
+
+    def save_artifacts(self, trial, stats, bt):
+        # AI call the base class method and then also save the predictions_df csv as an artifact in mlflow. Remember to delete all temporary files you may use. AI!
+        return
 
     @classmethod
     def get_optuna_params(cls, trial):
