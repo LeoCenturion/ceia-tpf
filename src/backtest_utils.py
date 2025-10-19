@@ -5,9 +5,33 @@ import mlflow
 import numpy as np
 import os
 import re
-from backtesting import Backtest
+from backtesting import Backtest, Strategy
 from sklearn.metrics import f1_score
 
+class TrialStrategy(Strategy):
+    # trades_df = pd.DataFrame()
+
+    def save_artifacts(self, trial, stats, bt):
+        plot_filename = f"backtest_plot_trial_{trial.number}.html"
+        trades_filename = f"trades_trial_{trial.number}.csv"
+
+        bt.plot(filename=plot_filename, open_browser=False)
+        if os.path.exists(plot_filename):
+            mlflow.log_artifact(plot_filename)
+            # Save trades
+        trades_df = stats['_trades']
+        if not trades_df.empty:
+            trades_df.to_csv(trades_filename, index=False)
+            mlflow.log_artifact(trades_filename)
+
+            # Clean up created files
+            if os.path.exists(plot_filename):
+                os.remove(plot_filename)
+            if os.path.exists(trades_filename):
+                os.remove(trades_filename)
+    @classmethod
+    def get_optuna_params(cls, trial):
+        return {}
 
 def fetch_historical_data(
     symbol: str = "BTC/USDT",
@@ -144,7 +168,7 @@ def sanitize_metric_name(name):
 
 
 
-def optimize_strategy(data, strategy, study_name, n_trials=100, n_jobs=8):
+def optimize_strategy(data, strategy_class: TrialStrategy, study_name, n_trials=100, n_jobs=8):
     """
     Optimize strategy hyperparameters using Optuna.
     For each trial, run an expanding window backtest and log the averaged stats to MLflow.
@@ -153,9 +177,9 @@ def optimize_strategy(data, strategy, study_name, n_trials=100, n_jobs=8):
     parent_run_id = parent_run.info.run_id if parent_run else None
 
     def objective(trial):
-        params = strategy.get_optuna_params(trial)
+        params = strategy_class.get_optuna_params(trial)
 
-        bt = Backtest(data, strategy, cash=10000, commission=0.001)
+        bt: Backtest = Backtest(data, strategy_class, cash=10000, commission=0.001)
         stats = bt.run(**params)
 
         run_name = f"{study_name}-" + "-".join([f"{k}={v}" for k, v in params.items()])
@@ -176,25 +200,26 @@ def optimize_strategy(data, strategy, study_name, n_trials=100, n_jobs=8):
                 mlflow.log_metric(sanitized_key, value)
             # Log artifacts for the last step if available
             if bt:
-                plot_filename = f"backtest_plot_trial_{trial.number}.html"
-                trades_filename = f"trades_trial_{trial.number}.csv"
+                strategy_class.save_artifacts(trial, stats, bt)
+                # plot_filename = f"backtest_plot_trial_{trial.number}.html"
+                # trades_filename = f"trades_trial_{trial.number}.csv"
 
                 # Save plot
                 # open_browser=False prevents the plot from opening automatically
-                bt.plot(filename=plot_filename, open_browser=False)
-                if os.path.exists(plot_filename):
-                    mlflow.log_artifact(plot_filename)
-                # Save trades
-                trades_df = stats['_trades']
-                if not trades_df.empty:
-                    trades_df.to_csv(trades_filename, index=False)
-                    mlflow.log_artifact(trades_filename)
+                # bt.plot(filename=plot_filename, open_browser=False)
+                # if os.path.exists(plot_filename):
+                #     mlflow.log_artifact(plot_filename)
+                # # Save trades
+                # trades_df = stats['_trades']
+                # if not trades_df.empty:
+                #     trades_df.to_csv(trades_filename, index=False)
+                #     mlflow.log_artifact(trades_filename)
 
-                # Clean up created files
-                if os.path.exists(plot_filename):
-                    os.remove(plot_filename)
-                if os.path.exists(trades_filename):
-                    os.remove(trades_filename)
+                # # Clean up created files
+                # if os.path.exists(plot_filename):
+                #     os.remove(plot_filename)
+                # if os.path.exists(trades_filename):
+                #     os.remove(trades_filename)
 
         sharpe_ratio = stats.get('Sharpe Ratio', 0)
         if sharpe_ratio is None or np.isnan(sharpe_ratio):
