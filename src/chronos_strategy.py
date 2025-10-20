@@ -30,29 +30,66 @@ class ChronosStrategy(TrialStrategy):
         self.periods_since_refit = np.inf  # Force refit on first valid occasion
         self.predictions_df = pd.DataFrame()
         self._last_prediction = None
-        # AI finetune the model with the first 0.7 fraction of the dataset and then start the backtest AI!
+
+        # --- Initial Fine-tuning ---
+        full_df = self.data.df
+        split_idx = int(len(full_df) * 0.7)
+        self.backtest_start_index = split_idx
+
+        # Do not proceed if there's not enough data for initial training
+        if split_idx < self.min_train_bars:
+            print(
+                f"Not enough data for initial training. Required: {self.min_train_bars}, available for training: {split_idx}. Skipping initial fit."
+            )
+            self.periods_since_refit = (
+                np.inf
+            )  # Will force a fit later when enough data is available
+            return
+
+        initial_train_df = full_df.iloc[:split_idx]
+
+        print(
+            f"[{initial_train_df.index[-1]}] Performing initial fine-tuning on {split_idx} data points..."
+        )
+
+        # Prepare data for AutoGluon
+        history_df = initial_train_df.copy()
+        history_df["target"] = history_df["Close"]
+        history_df["item_id"] = "series_0"
+        history_df["timestamp"] = history_df.index.values
+
+        train_data = TimeSeriesDataFrame.from_data_frame(
+            history_df, id_column="item_id", timestamp_column="timestamp"
+        )
+
+        # Initialize and fit the predictor
+        self.predictor = TimeSeriesPredictor(
+            prediction_length=1, verbosity=0, freq="1h", target="target"
+        )
+        try:
+            self.predictor.fit(
+                train_data,
+                hyperparameters={
+                    "Chronos": {
+                        "model_path": self.model_path,
+                        "fine_tune_batch_size": 2048,
+                        "batch_size": 2048,
+                    }
+                },
+            )
+            print(f"[{initial_train_df.index[-1]}] Initial fine-tuning complete.")
+            self.periods_since_refit = 0  # Reset counter
+        except Exception as e:
+            print(f"[{initial_train_df.index[-1]}] Initial model fitting failed: {e}")
+            self.predictor = None
+            self.periods_since_refit = np.inf
 
     def next(self):
         """
         Called on each bar of data.
         """
-
-        # Check if a prediction was made for the current bar and log it
-        if self._last_prediction is not None:
-            prediction_timestamp = self._last_prediction.index.get_level_values(
-                "timestamp"
-            )[0]
-            # print(
-            #     f"prediction_timestamp {prediction_timestamp} == {self.data.index[-1]}"
-            # )
-            if prediction_timestamp == self.data.index[-1]:
-                log_entry = self._last_prediction.iloc[0].to_dict()
-                log_entry["actual_close"] = self.data.Close[-1]
-
-                new_row = pd.DataFrame(log_entry, index=[prediction_timestamp])
-                self.predictions_df = pd.concat([self.predictions_df, new_row])
         # --- Model Refitting ---
-        # Refit the model periodically, but only if we have enough data
+        # Refit the model periodically. This happens across the entire dataset.
         if (
             self.periods_since_refit >= self.refit_every
             and len(self.data.df) >= self.min_train_bars
@@ -90,37 +127,49 @@ class ChronosStrategy(TrialStrategy):
                 print(f"[{self.data.index[-1]}] Model fitting failed: {e}")
                 self.predictor = None  # Ensure predictor is None if fit fails
 
-        # --- Prediction and Trading Logic ---
-        if self.predictor:
-            # Prepare data for prediction
-            current_data_df = self.data.df.copy()
-            current_data_df["target"] = current_data_df["Close"]
-            current_data_df["item_id"] = "series_0"
-            current_data_df["timestamp"] = current_data_df.index.values
+        # --- Backtesting Phase ---
+        # Only start logging, predicting, and trading after the initial training period.
+        is_backtesting_phase = len(self.data) >= self.backtest_start_index
+        if is_backtesting_phase:
+            # Check if a prediction was made for the current bar and log it
+            if self._last_prediction is not None:
+                prediction_timestamp = self._last_prediction.index.get_level_values(
+                    "timestamp"
+                )[0]
+                if prediction_timestamp == self.data.index[-1]:
+                    log_entry = self._last_prediction.iloc[0].to_dict()
+                    log_entry["actual_close"] = self.data.Close[-1]
+                    new_row = pd.DataFrame(log_entry, index=[prediction_timestamp])
+                    self.predictions_df = pd.concat([self.predictions_df, new_row])
 
-            # Predict the next closing price
-            prediction = self.predictor.predict(current_data_df)
-            self._last_prediction = prediction
-            predicted_price = prediction["mean"].values[0]
-            current_price = self.data.Close[-1]
+            # --- Prediction and Trading Logic ---
+            if self.predictor:
+                # Prepare data for prediction
+                current_data_df = self.data.df.copy()
+                current_data_df["target"] = current_data_df["Close"]
+                current_data_df["item_id"] = "series_0"
+                current_data_df["timestamp"] = current_data_df.index.values
 
-            # --- Trading Signal Generation ---
-            upper_bound = current_price * (1 + self.trade_threshold)
-            lower_bound = current_price * (1 - self.trade_threshold)
+                # Predict the next closing price
+                prediction = self.predictor.predict(current_data_df)
+                self._last_prediction = prediction
+                predicted_price = prediction["mean"].values[0]
+                current_price = self.data.Close[-1]
 
-            if predicted_price > upper_bound:
-                # If we predict a significant price increase, close any short and go long
-                if self.position.is_short:
-                    self.position.close()
-                if not self.position.is_long:
-                    self.buy()
+                # --- Trading Signal Generation ---
+                upper_bound = current_price * (1 + self.trade_threshold)
+                lower_bound = current_price * (1 - self.trade_threshold)
 
-            elif predicted_price < lower_bound:
-                # If we predict a significant price decrease, close any long and go short
-                if self.position.is_long:
-                    self.position.close()
-                if not self.position.is_short:
-                    self.sell()
+                if predicted_price > upper_bound:
+                    if self.position.is_short:
+                        self.position.close()
+                    if not self.position.is_long:
+                        self.buy()
+                elif predicted_price < lower_bound:
+                    if self.position.is_long:
+                        self.position.close()
+                    if not self.position.is_short:
+                        self.sell()
 
         self.periods_since_refit += 1
 
