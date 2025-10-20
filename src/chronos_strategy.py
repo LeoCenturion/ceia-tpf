@@ -30,11 +30,13 @@ class ChronosStrategy(TrialStrategy):
         self.periods_since_refit = np.inf  # Force refit on first valid occasion
         self.predictions_df = pd.DataFrame()
         self._last_prediction = None
+        # AI finetune the model with the first 0.7 fraction of the dataset and then start the backtest AI!
 
     def next(self):
         """
         Called on each bar of data.
         """
+
         # Check if a prediction was made for the current bar and log it
         if self._last_prediction is not None:
             prediction_timestamp = self._last_prediction.index.get_level_values(
@@ -49,7 +51,6 @@ class ChronosStrategy(TrialStrategy):
 
                 new_row = pd.DataFrame(log_entry, index=[prediction_timestamp])
                 self.predictions_df = pd.concat([self.predictions_df, new_row])
-        # print(self.predictions_df)
         # --- Model Refitting ---
         # Refit the model periodically, but only if we have enough data
         if (
@@ -75,7 +76,13 @@ class ChronosStrategy(TrialStrategy):
             try:
                 self.predictor.fit(
                     train_data,
-                    hyperparameters={"Chronos": {"model_path": self.model_path}},
+                    hyperparameters={
+                        "Chronos": {
+                            "model_path": self.model_path,
+                            "fine_tune_batch_size": 2048,
+                            "batch_size": 2048,
+                        }
+                    },
                 )
                 print(f"[{self.data.index[-1]}] Model refit complete.")
                 self.periods_since_refit = 0  # Reset counter
@@ -137,9 +144,9 @@ class ChronosStrategy(TrialStrategy):
                 "model_path",
                 ["amazon/chronos-t5-tiny"],
             ),
-            "refit_every": trial.suggest_int("refit_every", 24 * 30, 24 * 30, step=24),
+            "refit_every": trial.suggest_int("refit_every", 24 * 7, 24 * 14, step=24),
             "trade_threshold": trial.suggest_float(
-                "trade_threshold", 0.005, 0.05, log=True
+                "trade_threshold", 0.005, 0.01, log=True
             ),
         }
 
@@ -157,7 +164,7 @@ def main():
         start_date="2024-01-01T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",
         experiment_name="Chronos Strategy Optimization v0.1",
-        n_trials_per_strategy=1,
+        n_trials_per_strategy=2,
         n_jobs=1,  # Chronos/AutoGluon can be heavy, especially on GPU
     )
 
