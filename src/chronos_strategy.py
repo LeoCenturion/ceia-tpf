@@ -191,9 +191,9 @@ class PrecomputedChronosStrategy(TrialStrategy):
     """
 
     # --- Strategy Parameters (can be optimized) ---
-    predictions_file = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/src/predictions_trial_0.csv"  # Path to the predictions CSV
+    predictions_file = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/mlruns/8/b202c488dd084dbcb3f3604dbcaf1a2b/artifacts/predictions_trial_0.csv"  # Path to the predictions CSV
     trade_threshold = 0.01  # % change required to trigger a trade
-    prediction_column = 'mean'  # which prediction column to use, e.g., 'mean', '0.5'
+    prediction_column = "mean"  # which prediction column to use, e.g., 'mean', '0.5'
 
     def init(self):
         """
@@ -201,12 +201,16 @@ class PrecomputedChronosStrategy(TrialStrategy):
         """
         try:
             # The predictions CSV is expected to have the timestamp as the first column.
-            self.predictions_df = pd.read_csv(self.predictions_file, index_col=0, parse_dates=True)
+            self.predictions_df = pd.read_csv(
+                self.predictions_file, index_col=0, parse_dates=True
+            )
             # Ensure the index is timezone-naive to match backtesting.py data
             if self.predictions_df.index.tz is not None:
                 self.predictions_df.index = self.predictions_df.index.tz_localize(None)
         except FileNotFoundError:
-            print(f"Error: Predictions file not found at '{self.predictions_file}'. This strategy requires pre-computed predictions.")
+            print(
+                f"Error: Predictions file not found at '{self.predictions_file}'. This strategy requires pre-computed predictions."
+            )
             self.predictions_df = pd.DataFrame()
         except Exception as e:
             print(f"Error loading predictions file: {e}")
@@ -220,14 +224,16 @@ class PrecomputedChronosStrategy(TrialStrategy):
             return
 
         current_timestamp = self.data.index[-1]
-        
+
         # The prediction file is indexed by the timestamp it's predicting FOR.
         # So we can look up the current timestamp directly.
         if current_timestamp in self.predictions_df.index:
             prediction_row = self.predictions_df.loc[current_timestamp]
-            
+
             if self.prediction_column not in prediction_row:
-                print(f"Warning: prediction column '{self.prediction_column}' not found for timestamp {current_timestamp}. Skipping.")
+                print(
+                    f"Warning: prediction column '{self.prediction_column}' not found for timestamp {current_timestamp}. Skipping."
+                )
                 return
 
             predicted_price = prediction_row[self.prediction_column]
@@ -253,10 +259,19 @@ class PrecomputedChronosStrategy(TrialStrategy):
         """
         Define the hyperparameter space for Optuna.
         """
-        percentile_columns = [f'{p/10.0:.1f}' for p in range(1, 10)]
+        percentile_columns = [f"{p / 10.0:.1f}" for p in range(1, 10)]
         return {
-            "trade_threshold": trial.suggest_float("trade_threshold", 0.001, 0.05, log=True),
-            "prediction_column": trial.suggest_categorical("prediction_column", ['mean'] + percentile_columns),
+            "trade_threshold": trial.suggest_float(
+                "trade_threshold", 0.001, 0.05, log=True
+            ),
+            "prediction_column": trial.suggest_categorical(
+                # AI add quantiles "0.1".. etc AI!
+                "prediction_column",
+                [
+                    "mean",
+                ]
+                + percentile_columns,
+            ),
         }
 
 
