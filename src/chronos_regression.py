@@ -322,6 +322,9 @@ def objective(trial, data):
     X["timestamp"] = X.index.values
     y = final_df["target"]
 
+    # Combine into a single DataFrame for AutoGluon to avoid repeated concatenation
+    autogluon_df = pd.concat([y, X], axis=1)
+
     # 3. Define Backtesting Parameters (use a smaller test set for faster trials)
     test_size = 0.1
     split_index = int(len(final_df) * (1 - test_size))
@@ -341,13 +344,9 @@ def objective(trial, data):
             print(
                 f"Trial {trial.number}: Refitting model at step {i - split_index + 1}/{len(final_df) - split_index}..."
             )
-            # AI refactor so you don't have to concat each iteration AI!
-            train_X = X.iloc[:current_data_index]
-            train_y = y.iloc[:current_data_index]
-
-            df = pd.concat([train_y, train_X], axis=1)
+            train_df = autogluon_df.iloc[:current_data_index]
             train_data = TimeSeriesDataFrame.from_data_frame(
-                df, id_column="item_id", timestamp_column="timestamp"
+                train_df, id_column="item_id", timestamp_column="timestamp"
             )
             predictor = TimeSeriesPredictor(prediction_length=1, verbosity=0, freq="1h")
             try:
@@ -374,10 +373,8 @@ def objective(trial, data):
         }
 
         if predictor:
-            train_X_pred = X.iloc[:current_data_index]
-            train_y_pred = y.iloc[:current_data_index]
-            df_pred = pd.concat([train_y_pred, train_X_pred], axis=1)
-            prediction_df = predictor.predict(df_pred)
+            predict_context_df = autogluon_df.iloc[:current_data_index]
+            prediction_df = predictor.predict(predict_context_df)
             if not prediction_df.empty:
                 prediction_values = prediction_df.iloc[0].to_dict()
                 log_entry.update(prediction_values)
