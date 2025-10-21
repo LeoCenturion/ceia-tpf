@@ -457,7 +457,10 @@ def main():
         timeframe="1h",
         start_date="2025-01-01T00:00:00Z",
     )
-    # AI precompute the data to get the pct_change of open,close,high,low AI!
+    # Precompute percentage change for OHLC data
+    for col in ['Open', 'Close', 'High', 'Low']:
+        data[col] = data[col].pct_change()
+    data.dropna(inplace=True)
     study_name_in_db = "chronos_pct_change_regression_v0.1"
     run_study(data, study_name_in_db, 1)
 
