@@ -333,30 +333,35 @@ def objective(trial, data):
                 return np.inf  # Return high value if model fails to fit
             periods_since_refit = 0
         
+        actual_price = y.iloc[current_data_index]
+        log_entry = {
+            "timestamp": y.index[current_data_index],
+            "actual_close": actual_price,
+        }
+
         if predictor:
             train_X_pred = X.iloc[:current_data_index]
             train_y_pred = y.iloc[:current_data_index]
             df_pred = pd.concat([train_y_pred, train_X_pred], axis=1)
-            predicted_price = predictor.predict(df_pred)['mean'].values[0]
-        else:
-            predicted_price = np.nan
+            prediction_df = predictor.predict(df_pred)
+            if not prediction_df.empty:
+                prediction_values = prediction_df.iloc[0].to_dict()
+                log_entry.update(prediction_values)
 
-        actual_price = y.iloc[current_data_index]
-
-        predictions_df_list.append({
-            'timestamp': y.index[current_data_index],
-            'actual_close': actual_price,
-            'predicted_close': predicted_price,
-        })
+        predictions_df_list.append(log_entry)
         
         periods_since_refit += 1
 
     
     results_df = pd.DataFrame(predictions_df_list).set_index('timestamp')
-    # AI save the df with not only the mean but also all the percentiles AI!
+    
+    # Save predictions to a CSV for each trial
+    predictions_filename = f"predictions_trial_{trial.number}.csv"
+    results_df.to_csv(predictions_filename)
+
     # 5. Calculate and return RMSE
     final_y_true = results_df['actual_close'].dropna()
-    final_y_pred = results_df['predicted_close'].dropna()
+    final_y_pred = results_df['mean'].dropna()
 
     if final_y_true.empty or final_y_pred.empty:
         print(f"Trial {trial.number}: No valid predictions generated.")
