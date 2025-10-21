@@ -184,11 +184,87 @@ class ChronosStrategy(TrialStrategy):
         }
 
 
-# AI add a new strategy that reads a csv that contains the prediction from a previous run. It contains the mean and 10 perentiles 0.1, 0.2, ...etc AI!
+class PrecomputedChronosStrategy(TrialStrategy):
+    """
+    A backtesting strategy that uses pre-computed predictions from a CSV file.
+    The CSV file should contain 'mean' and percentile predictions indexed by timestamp.
+    """
+
+    # --- Strategy Parameters (can be optimized) ---
+    predictions_file = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/src/predictions_trial_0.csv"  # Path to the predictions CSV
+    trade_threshold = 0.01  # % change required to trigger a trade
+    prediction_column = 'mean'  # which prediction column to use, e.g., 'mean', '0.5'
+
+    def init(self):
+        """
+        Initialize the strategy and load pre-computed predictions.
+        """
+        try:
+            # The predictions CSV is expected to have the timestamp as the first column.
+            self.predictions_df = pd.read_csv(self.predictions_file, index_col=0, parse_dates=True)
+            # Ensure the index is timezone-naive to match backtesting.py data
+            if self.predictions_df.index.tz is not None:
+                self.predictions_df.index = self.predictions_df.index.tz_localize(None)
+        except FileNotFoundError:
+            print(f"Error: Predictions file not found at '{self.predictions_file}'. This strategy requires pre-computed predictions.")
+            self.predictions_df = pd.DataFrame()
+        except Exception as e:
+            print(f"Error loading predictions file: {e}")
+            self.predictions_df = pd.DataFrame()
+
+    def next(self):
+        """
+        Called on each bar of data.
+        """
+        if self.predictions_df.empty:
+            return
+
+        current_timestamp = self.data.index[-1]
+        
+        # The prediction file is indexed by the timestamp it's predicting FOR.
+        # So we can look up the current timestamp directly.
+        if current_timestamp in self.predictions_df.index:
+            prediction_row = self.predictions_df.loc[current_timestamp]
+            
+            if self.prediction_column not in prediction_row:
+                print(f"Warning: prediction column '{self.prediction_column}' not found for timestamp {current_timestamp}. Skipping.")
+                return
+
+            predicted_price = prediction_row[self.prediction_column]
+            current_price = self.data.Close[-1]
+
+            # --- Trading Signal Generation ---
+            upper_bound = current_price * (1 + self.trade_threshold)
+            lower_bound = current_price * (1 - self.trade_threshold)
+
+            if predicted_price > upper_bound:
+                if self.position.is_short:
+                    self.position.close()
+                if not self.position.is_long:
+                    self.buy()
+            elif predicted_price < lower_bound:
+                if self.position.is_long:
+                    self.position.close()
+                if not self.position.is_short:
+                    self.sell()
+
+    @classmethod
+    def get_optuna_params(cls, trial):
+        """
+        Define the hyperparameter space for Optuna.
+        """
+        percentile_columns = [f'{p/10.0:.1f}' for p in range(1, 10)]
+        return {
+            "trade_threshold": trial.suggest_float("trade_threshold", 0.001, 0.05, log=True),
+            "prediction_column": trial.suggest_categorical("prediction_column", ['mean'] + percentile_columns),
+        }
+
+
 def main():
     """Main function to run optimization for the Chronos strategy."""
     strategies = {
-        "ChronosStrategy": ChronosStrategy,
+        # "ChronosStrategy": ChronosStrategy,
+        "PrecomputedChronosStrategy": PrecomputedChronosStrategy,
     }
     # Note: Chronos backtests are very slow. Consider a low number of trials
     # and a single job (n_jobs=1) if using a GPU.
@@ -197,8 +273,8 @@ def main():
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
         start_date="2018-01-01T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",
-        experiment_name="Chronos Strategy Optimization v1.0",
-        n_trials_per_strategy=1,
+        experiment_name="Precomputed Chronos Strategy Optimization v1.0",
+        n_trials_per_strategy=10,
         n_jobs=1,  # Chronos/AutoGluon can be heavy, especially on GPU
     )
 
