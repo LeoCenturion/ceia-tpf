@@ -275,11 +275,10 @@ def objective(trial, data):
     Optuna objective function for time-series regression backtest.
     """
     from sklearn.metrics import mean_squared_error
-    # 1. Suggest Hyperparameters
     model_choice = trial.suggest_categorical('chronos_model', [
         "amazon/chronos-t5-tiny",
         "amazon/chronos-t5-small",
-        "amazon/chronos-t5-base" # Base model might be too slow for many trials
+        "amazon/chronos-t5-base"
     ])
     refit_every = trial.suggest_int('refit_every_hours', 24 * 7, 24 * 14)
 
@@ -324,6 +323,7 @@ def objective(trial, data):
                     train_data,
                     hyperparameters={"Chronos": {
                         "model_path": model_choice,
+                        "fine_tune_batch_size": 1024,
                         "batch_size": 1024,
                     }},
                     time_limit=300
@@ -337,7 +337,7 @@ def objective(trial, data):
             train_X_pred = X.iloc[:current_data_index]
             train_y_pred = y.iloc[:current_data_index]
             df_pred = pd.concat([train_y_pred, train_X_pred], axis=1)
-            predicted_price = predictor.predict(df_pred, batch_size=1024)['mean'].values[0]
+            predicted_price = predictor.predict(df_pred)['mean'].values[0]
         else:
             predicted_price = np.nan
 
@@ -351,8 +351,9 @@ def objective(trial, data):
         
         periods_since_refit += 1
 
+    
     results_df = pd.DataFrame(predictions_df_list).set_index('timestamp')
-
+    # AI save the df with not only the mean but also all the percentiles AI!
     # 5. Calculate and return RMSE
     final_y_true = results_df['actual_close'].dropna()
     final_y_pred = results_df['predicted_close'].dropna()
@@ -405,7 +406,7 @@ def main():
     )
 
     study.optimize(objective_with_data, n_trials=N_TRIALS, n_jobs=1) # n_jobs=1 for GPU usage
-    
+
     # 3. Print Study Results
     print("\n--- Optuna Study Best Results ---")
     try:
