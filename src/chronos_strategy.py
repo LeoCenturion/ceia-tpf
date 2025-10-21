@@ -265,7 +265,6 @@ class PrecomputedChronosStrategy(TrialStrategy):
                 "trade_threshold", 0.001, 0.05, log=True
             ),
             "prediction_column": trial.suggest_categorical(
-                # AI add quantiles "0.1".. etc AI!
                 "prediction_column",
                 [
                     "mean",
