@@ -341,6 +341,7 @@ def objective(trial, data):
             print(
                 f"Trial {trial.number}: Refitting model at step {i - split_index + 1}/{len(final_df) - split_index}..."
             )
+            # AI refactor so you don't have to concat each iteration AI!
             train_X = X.iloc[:current_data_index]
             train_y = y.iloc[:current_data_index]
 
@@ -458,7 +459,7 @@ def main():
         start_date="2025-01-01T00:00:00Z",
     )
     # Precompute percentage change for OHLC data
-    for col in ['Open', 'Close', 'High', 'Low']:
+    for col in ["Open", "Close", "High", "Low"]:
         data[col] = data[col].pct_change()
     data.dropna(inplace=True)
     study_name_in_db = "chronos_pct_change_regression_v0.1"
