@@ -6,7 +6,6 @@ import seaborn as sns
 
 # Configuration
 RESULTS_FILE = 'regression_backtest_results.csv'
-#AI the columns are timestamp,actual_close,mean,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9 adapt the code AI!  
 # Load the backtest results
 try:
     results_df = pd.read_csv(RESULTS_FILE, index_col='timestamp', parse_dates=True)
@@ -16,7 +15,7 @@ except FileNotFoundError:
     exit()
 
 # Calculate error metrics
-results_df['error'] = results_df['actual_close'] - results_df['predicted_close']
+results_df['error'] = results_df['actual_close'] - results_df['mean']
 results_df['absolute_error'] = np.abs(results_df['error'])
 results_df['percentage_error'] = (results_df['error'] / results_df['actual_close']) * 100
 results_df['absolute_percentage_error'] = np.abs(results_df['percentage_error'])
@@ -44,7 +43,7 @@ for file in RESULTS_FILES:
         model_name = file.replace('_backtest_results.csv', '').replace('regression_', '')
 
         # Calculate error metrics
-        df['error'] = df['actual_close'] - df['predicted_close']
+        df['error'] = df['actual_close'] - df['mean']
         df['absolute_error'] = np.abs(df['error'])
         df['percentage_error'] = (df['error'] / df['actual_close']) * 100
         df['absolute_percentage_error'] = np.abs(df['percentage_error'])
@@ -121,7 +120,7 @@ plt.figure(figsize=(15, 6))
 plt.subplot(1, 2, 1)
 sns.histplot(results_df['error'], kde=True, bins=50, color='skyblue')
 plt.title('Distribution of Prediction Error')
-plt.xlabel('Error (Actual - Predicted)')
+plt.xlabel('Error (Actual - Mean)')
 plt.ylabel('Frequency')
 plt.grid(True, linestyle='--', alpha=0.6)
 
@@ -129,7 +128,7 @@ plt.grid(True, linestyle='--', alpha=0.6)
 plt.subplot(1, 2, 2)
 sns.kdeplot(results_df['error'], fill=True, color='lightcoral')
 plt.title('Kernel Density Estimate of Prediction Error')
-plt.xlabel('Error (Actual - Predicted)')
+plt.xlabel('Error (Actual - Mean)')
 plt.ylabel('Density')
 plt.grid(True, linestyle='--', alpha=0.6)
 
@@ -142,7 +141,7 @@ plt.figure(figsize=(15, 6))
 plt.subplot(1, 2, 1)
 sns.histplot(results_df['percentage_error'], kde=True, bins=50, color='skyblue')
 plt.title('Distribution of Prediction Error')
-plt.xlabel('Error (Actual - Predicted)')
+plt.xlabel('Error (Actual - Mean)')
 plt.ylabel('Frequency')
 plt.grid(True, linestyle='--', alpha=0.6)
 
@@ -150,7 +149,7 @@ plt.grid(True, linestyle='--', alpha=0.6)
 plt.subplot(1, 2, 2)
 sns.kdeplot(results_df['percentage_error'], fill=True, color='lightcoral')
 plt.title('Kernel Density Estimate of Prediction Error')
-plt.xlabel('Error (Actual - Predicted)')
+plt.xlabel('Error (Actual - Mean)')
 plt.ylabel('Density')
 plt.grid(True, linestyle='--', alpha=0.6)
 
@@ -163,7 +162,7 @@ plt.figure(figsize=(15, 6))
 plt.subplot(1, 2, 1)
 sns.histplot(results_df['absolute_percentage_error'], kde=True, bins=50, color='skyblue')
 plt.title('Distribution of Prediction Error')
-plt.xlabel('Error (Actual - Predicted)')
+plt.xlabel('Error (Actual - Mean)')
 plt.ylabel('Frequency')
 plt.grid(True, linestyle='--', alpha=0.6)
 
@@ -171,7 +170,7 @@ plt.grid(True, linestyle='--', alpha=0.6)
 plt.subplot(1, 2, 2)
 sns.kdeplot(results_df['absolute_percentage_error'], fill=True, color='lightcoral')
 plt.title('Kernel Density Estimate of Prediction Error')
-plt.xlabel('Error (Actual - Predicted)')
+plt.xlabel('Error (Actual - Mean)')
 plt.ylabel('Density')
 plt.grid(True, linestyle='--', alpha=0.6)
 
@@ -192,7 +191,7 @@ sns.boxplot(
 
 plt.title('Percentage Absolute Error vs. Days Since Last Model Refit')
 plt.xlabel('Days Since Last Refit')
-plt.ylabel('% Absolute Error |Actual - Predicted| / Actual')
+plt.ylabel('% Absolute Error |Actual - Mean| / Actual')
 plt.grid(True, linestyle='--', alpha=0.6)
 plt.legend(title='Days Since Refit')
 plt.tight_layout()
@@ -204,7 +203,7 @@ plt.plot(results_df.index, results_df['error'], label='Prediction Error', color=
 plt.axhline(0, color='gray', linestyle='--', linewidth=1) # Zero error line
 plt.title('Prediction Error Through Time')
 plt.xlabel('Date')
-plt.ylabel('Error (Actual - Predicted)')
+plt.ylabel('Error (Actual - Mean)')
 plt.grid(True, linestyle='--', alpha=0.6)
 plt.legend()
 plt.tight_layout()
