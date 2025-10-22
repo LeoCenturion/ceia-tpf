@@ -222,4 +222,29 @@ plt.tight_layout()
 plt.show()
 
 
-#AI add a section plotting barcharts showing the absolute percentage error of the mean and the percentiles. The columns are timestamp,actual_close,mean,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9 AI!
+#%%
+# 4. Compare MAPE of mean vs percentile predictions
+prediction_cols = ['mean'] + [f'{q:.1f}' for q in np.arange(0.1, 1.0, 0.1)]
+# Filter for columns that actually exist in the dataframe
+prediction_cols = [col for col in prediction_cols if col in results_df.columns]
+
+if prediction_cols:
+    mape_scores = {}
+    for col in prediction_cols:
+        # Calculate Absolute Percentage Error for the column
+        ape = np.abs((results_df['actual_close'] - results_df[col]) / results_df['actual_close']) * 100
+        mape_scores[col] = ape.mean()
+
+    # Create a DataFrame for plotting
+    mape_df = pd.DataFrame(list(mape_scores.items()), columns=['Prediction', 'MAPE']).sort_values('Prediction')
+
+    # Plotting
+    plt.figure(figsize=(12, 7))
+    sns.barplot(data=mape_df, x='Prediction', y='MAPE', palette='viridis')
+    plt.title('Mean Absolute Percentage Error (MAPE) for Mean and Percentile Predictions', fontsize=16)
+    plt.xlabel('Prediction Type (Mean / Percentile)', fontsize=12)
+    plt.ylabel('Mean Absolute Percentage Error (%)', fontsize=12)
+    plt.xticks(rotation=0)
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.show()
