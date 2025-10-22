@@ -265,4 +265,24 @@ if prediction_cols:
     plt.tight_layout()
     plt.show()
 
-#AI plot the predictions and the actual values as a time seriesAI!
+#%%
+# 5. Plot actual vs. predicted values over time
+plt.figure(figsize=(15, 8))
+
+# Plot actual closing price
+plt.plot(results_df.index, results_df['actual_close'], label='Actual Close', color='blue', linewidth=1.5)
+
+# Plot mean prediction
+plt.plot(results_df.index, results_df['mean'], label='Mean Prediction', color='orange', linestyle='--', linewidth=1.5)
+
+# Plot prediction intervals (e.g., 10th to 90th percentile)
+if '0.1' in results_df.columns and '0.9' in results_df.columns:
+    plt.fill_between(results_df.index, results_df['0.1'], results_df['0.9'], color='orange', alpha=0.2, label='10-90th Percentile Range')
+
+plt.title('Actual vs. Predicted Close Price Over Time', fontsize=16)
+plt.xlabel('Date', fontsize=12)
+plt.ylabel('Price', fontsize=12)
+plt.legend()
+plt.grid(True, linestyle='--', alpha=0.6)
+plt.tight_layout()
+plt.show()
