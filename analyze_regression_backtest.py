@@ -221,3 +221,5 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 
+
+#AI add a section plotting barcharts showing the absolute percentage error of the mean and the percentiles. The columns are timestamp,actual_close,mean,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9 AI!
