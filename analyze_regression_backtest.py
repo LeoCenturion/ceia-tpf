@@ -6,7 +6,7 @@ import seaborn as sns
 
 # Configuration
 RESULTS_FILE = 'regression_backtest_results.csv'
-
+#AI the columns are timestamp,actual_close,mean,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9 adapt the code AI!  
 # Load the backtest results
 try:
     results_df = pd.read_csv(RESULTS_FILE, index_col='timestamp', parse_dates=True)
