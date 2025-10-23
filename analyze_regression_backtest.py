@@ -286,3 +286,5 @@ plt.legend()
 plt.grid(True, linestyle='--', alpha=0.6)
 plt.tight_layout()
 plt.show()
+
+# AI binarize the actual price, mean, and all percentiles acording to the next criteria: -1 if pct_change is lower than -0.57, +1 if its greater than 0.57, 0 otherwise. Plot the result AI!
