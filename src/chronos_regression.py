@@ -367,10 +367,10 @@ def objective(trial, data):
             periods_since_refit = 0
 
         actual_price = y.iloc[current_data_index]
-        # AI also add hours_since_last_refit AI!
         log_entry = {
             "timestamp": y.index[current_data_index],
             "actual_close": actual_price,
+            "hours_since_last_refit": periods_since_refit,
         }
 
         if predictor:
