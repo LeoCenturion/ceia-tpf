@@ -305,7 +305,9 @@ def objective(trial, data):
     """
     from sklearn.metrics import mean_squared_error
 
-    # AI add hyperparameter search for torch_dtype, fine_tune_lr, batch_size AI!
+    torch_dtype = trial.suggest_categorical("torch_dtype", ["bfloat16", "float32"])
+    fine_tune_lr = trial.suggest_float("fine_tune_lr", 1e-5, 1e-3, log=True)
+    batch_size = trial.suggest_categorical("batch_size", [32, 64, 128, 256])
     model_choice = trial.suggest_categorical(
         "chronos_model",
         ["amazon/chronos-t5-tiny", "amazon/chronos-t5-small", "amazon/chronos-t5-base"],
@@ -356,8 +358,10 @@ def objective(trial, data):
                     hyperparameters={
                         "Chronos": {
                             "model_path": model_choice,
-                            "fine_tune_batch_size": 1024,
-                            "batch_size": 1024,
+                            "torch_dtype": torch_dtype,
+                            "fine_tune_lr": fine_tune_lr,
+                            "fine_tune_batch_size": batch_size,
+                            "batch_size": batch_size,
                         }
                     },
                     time_limit=300,
