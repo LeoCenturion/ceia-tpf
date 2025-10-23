@@ -356,3 +356,5 @@ plt.title('Confusion Matrix for Mean Prediction Signal')
 plt.xlabel('Predicted Label')
 plt.ylabel('True Label')
 plt.show()
+
+#AI for each percentile compute the average f1 of -1 and 1 and compare them AI!
