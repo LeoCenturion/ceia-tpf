@@ -367,6 +367,7 @@ def objective(trial, data):
             periods_since_refit = 0
 
         actual_price = y.iloc[current_data_index]
+        # AI also add hours_since_last_refit AI!
         log_entry = {
             "timestamp": y.index[current_data_index],
             "actual_close": actual_price,
@@ -456,10 +457,10 @@ def main():
         start_date="2025-01-01T00:00:00Z",
     )
     # Precompute percentage change for OHLC data
-    for col in ["Open", "Close", "High", "Low"]:
-        data[col] = data[col].pct_change()
-    data.dropna(inplace=True)
-    study_name_in_db = "chronos_pct_change_regression_v0.1"
+    # for col in ["Open", "Close", "High", "Low"]:
+    #     data[col] = data[col].pct_change()
+    # data.dropna(inplace=True)
+    study_name_in_db = "chronos_pct_change_regression_v0.2"
     run_study(data, study_name_in_db, 1)
 
 
