@@ -287,4 +287,72 @@ plt.grid(True, linestyle='--', alpha=0.6)
 plt.tight_layout()
 plt.show()
 
-# AI binarize the actual price, mean, and all percentiles acording to the next criteria: -1 if pct_change is lower than -0.57, +1 if its greater than 0.57, 0 otherwise. Plot the result AI!
+#%%
+# 6. Binarize signals and evaluate classification performance
+from sklearn.metrics import classification_report, confusion_matrix
+
+binarization_threshold = 0.57 / 100  # 0.57%
+
+# Columns to binarize
+cols_to_binarize = ['actual_close'] + [col for col in prediction_cols if col in results_df.columns]
+
+# Calculate percentage change for each column
+pct_change_df = results_df[cols_to_binarize].pct_change()
+
+# Define the binarization function
+def binarize_signal(series, threshold):
+    return np.select(
+        [series > threshold, series < -threshold],
+        [1, -1],
+        default=0
+    )
+
+# Apply binarization
+binarized_df = pct_change_df.apply(lambda x: binarize_signal(x, threshold=binarization_threshold))
+binarized_df.dropna(inplace=True) # Drop first row with NaN from pct_change
+
+# --- Plot binarized time series ---
+plt.figure(figsize=(20, 10))
+plt.plot(binarized_df.index, binarized_df['actual_close'], 
+         label='Actual Signal', marker='o', linestyle='None', color='black', markersize=5)
+# Offset predictions slightly on y-axis for better visibility
+plt.plot(binarized_df.index, binarized_df['mean'] + 0.05, 
+         label='Mean Signal', marker='x', linestyle='None', color='orange')
+
+if '0.1' in binarized_df.columns and '0.9' in binarized_df.columns:
+    plt.plot(binarized_df.index, binarized_df['0.1'] - 0.05, 
+             label='0.1 Percentile Signal', marker='v', linestyle='None', color='red', alpha=0.7)
+    plt.plot(binarized_df.index, binarized_df['0.9'] + 0.1, 
+             label='0.9 Percentile Signal', marker='^', linestyle='None', color='green', alpha=0.7)
+
+plt.title('Binarized Signals Over Time (Movement Prediction)', fontsize=16)
+plt.xlabel('Date', fontsize=12)
+plt.ylabel('Signal (-1: Down, 0: Neutral, 1: Up)', fontsize=12)
+plt.yticks([-1, 0, 1])
+plt.ylim(-1.5, 1.5)
+plt.legend()
+plt.grid(axis='x', linestyle='--', alpha=0.6)
+plt.tight_layout()
+plt.show()
+
+
+# --- Evaluate classification performance of the 'mean' prediction ---
+y_true = binarized_df['actual_close']
+y_pred = binarized_df['mean']
+
+# Classification Report
+print("\n--- Classification Report for Mean Prediction Signal ---")
+print("Threshold for Up/Down signal: +/- {:.2f}%".format(binarization_threshold * 100))
+report = classification_report(y_true, y_pred, labels=[-1, 0, 1], target_names=['Down', 'Neutral', 'Up'], zero_division=0)
+print(report)
+
+# Confusion Matrix
+cm = confusion_matrix(y_true, y_pred, labels=[-1, 0, 1])
+plt.figure(figsize=(8, 6))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+            xticklabels=['Down', 'Neutral', 'Up'], 
+            yticklabels=['Down', 'Neutral', 'Up'])
+plt.title('Confusion Matrix for Mean Prediction Signal')
+plt.xlabel('Predicted Label')
+plt.ylabel('True Label')
+plt.show()
