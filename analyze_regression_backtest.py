@@ -357,4 +357,41 @@ plt.xlabel('Predicted Label')
 plt.ylabel('True Label')
 plt.show()
 
-#AI for each percentile compute the average f1 of -1 and 1 and compare them AI!
+#%%
+# 7. Compare F1-scores for Up/Down predictions across all predictions
+f1_results = {}
+y_true = binarized_df['actual_close']
+
+# Columns to evaluate (mean and all percentiles)
+cols_to_evaluate = [col for col in prediction_cols if col in binarized_df.columns]
+
+for col in cols_to_evaluate:
+    y_pred = binarized_df[col]
+    # Get classification report as a dictionary
+    report_dict = classification_report(y_true, y_pred, labels=[-1, 1],
+                                        target_names=['Down', 'Up'],
+                                        output_dict=True,
+                                        zero_division=0)
+
+    # Extract F1 scores for 'Down' and 'Up' classes
+    f1_down = report_dict.get('Down', {}).get('f1-score', 0)
+    f1_up = report_dict.get('Up', {}).get('f1-score', 0)
+
+    # Calculate the average F1 score for these two classes
+    avg_f1 = (f1_down + f1_up) / 2
+    f1_results[col] = avg_f1
+
+# Create a DataFrame for plotting
+f1_df = pd.DataFrame(list(f1_results.items()), columns=['Prediction', 'Average_F1_Up_Down']).sort_values('Prediction')
+
+# Plotting
+plt.figure(figsize=(12, 7))
+sns.barplot(data=f1_df, x='Prediction', y='Average_F1_Up_Down', palette='magma')
+plt.title('Average F1-Score (Up/Down Classes) for Each Prediction', fontsize=16)
+plt.xlabel('Prediction Type (Mean / Percentile)', fontsize=12)
+plt.ylabel('Average F1-Score', fontsize=12)
+plt.xticks(rotation=0)
+plt.ylim(0, 1) # F1-score is between 0 and 1
+plt.grid(axis='y', linestyle='--', alpha=0.7)
+plt.tight_layout()
+plt.show()
