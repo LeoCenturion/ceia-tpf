@@ -129,16 +129,17 @@ def run_study(data, study_name_in_db, ntrials):
         print("No successful trials were completed.")
 
 
+# AI do a function with 1 execution with fit predict with 'medium' quality AI!
 def main():
     """Main function to load data and run the Optuna study for classification."""
     print("Loading historical data for AutoGluon classification task...")
     data = fetch_historical_data(
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
         timeframe="1h",
-        start_date="2022-01-01T00:00:00Z",
+        start_date="2024-01-01T00:00:00Z",
     )
-    study_name_in_db = "autogluon_tabular_classification_v1"
-    run_study(data, study_name_in_db, ntrials=50)
+    study_name_in_db = "autogluon_tabular_classification_v0.1"
+    run_study(data, study_name_in_db, ntrials=1)
 
 
 if __name__ == "__main__":
