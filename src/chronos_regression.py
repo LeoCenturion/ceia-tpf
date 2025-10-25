@@ -305,12 +305,19 @@ def objective(trial, data):
     """
     from sklearn.metrics import mean_squared_error
 
+    # AI set these parameters...
+    #     torch_dtype bfloat16
+    # fine_tune_lr 0.00013715308900439288
+    # batch_size 256
+    # chronos_model amazon/chronos-t5-tiny
+    # refit_every_hours 294
+    # ...AI!
     torch_dtype = trial.suggest_categorical("torch_dtype", ["bfloat16", "float32"])
     fine_tune_lr = trial.suggest_float("fine_tune_lr", 1e-5, 1e-3, log=True)
-    batch_size = trial.suggest_categorical("batch_size", [32, 64, 128, 256])
+    batch_size = trial.suggest_categorical("batch_size", [64, 128, 256, 1024])
     model_choice = trial.suggest_categorical(
         "chronos_model",
-        ["amazon/chronos-t5-tiny", "amazon/chronos-t5-small", "amazon/chronos-t5-base"],
+        ["amazon/chronos-t5-tiny", "amazon/chronos-t5-base"],
     )
     refit_every = trial.suggest_int("refit_every_hours", 24 * 7, 24 * 14, step=7)
 
@@ -459,14 +466,14 @@ def main():
     data = fetch_historical_data(
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
         timeframe="1h",
-        start_date="2025-01-01T00:00:00Z",
+        start_date="2018-01-01T00:00:00Z",
     )
     # Precompute percentage change for OHLC data
     # for col in ["Open", "Close", "High", "Low"]:
     #     data[col] = data[col].pct_change()
     # data.dropna(inplace=True)
     study_name_in_db = "chronos_pct_change_regression_v0.2"
-    run_study(data, study_name_in_db, 1)
+    run_study(data, study_name_in_db, 10)
 
 
 if __name__ == "__main__":
