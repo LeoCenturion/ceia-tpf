@@ -7,7 +7,7 @@ from autogluon.tabular import TabularPredictor
 from sklearn.metrics import f1_score
 
 from backtest_utils import fetch_historical_data
-from xgboost_price_reversal import create_features, create_ao_target
+from indicators import create_features, create_ao_target
 
 
 def objective(trial, data):
