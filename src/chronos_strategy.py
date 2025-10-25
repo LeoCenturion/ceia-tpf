@@ -191,9 +191,11 @@ class PrecomputedChronosStrategy(TrialStrategy):
     """
 
     # --- Strategy Parameters (can be optimized) ---
-    predictions_file = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/mlruns/8/b202c488dd084dbcb3f3604dbcaf1a2b/artifacts/predictions_trial_0.csv"  # Path to the predictions CSV
+    # predictions_file = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/mlruns/8/b202c488dd084dbcb3f3604dbcaf1a2b/artifacts/predictions_trial_0.csv"  # Path to the predictions CSV
+    predictions_file = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/predictions_trial_0.csv"
     trade_threshold = 0.01  # % change required to trigger a trade
     prediction_column = "mean"  # which prediction column to use, e.g., 'mean', '0.5'
+    target_type = "diff"
 
     def init(self):
         """
@@ -240,8 +242,7 @@ class PrecomputedChronosStrategy(TrialStrategy):
             current_price = self.data.Close[-1]
 
             # --- Trading Signal Generation ---
-            upper_bound = current_price * (1 + self.trade_threshold)
-            lower_bound = current_price * (1 - self.trade_threshold)
+            lower_bound, upper_bound = self.compute_bounds(current_price)
 
             if predicted_price > upper_bound:
                 if self.position.is_short:
@@ -253,6 +254,15 @@ class PrecomputedChronosStrategy(TrialStrategy):
                     self.position.close()
                 if not self.position.is_short:
                     self.sell()
+
+    def compute_bounds(self, current_price):
+        if self.target_type == "nominal":
+            upper_bound = current_price * (1 + self.trade_threshold)
+            lower_bound = current_price * (1 - self.trade_threshold)
+        else:  # diff
+            upper_bound = +self.trade_threshold
+            lower_bound = -self.trade_threshold
+        return lower_bound, upper_bound
 
     @classmethod
     def get_optuna_params(cls, trial):
@@ -271,6 +281,7 @@ class PrecomputedChronosStrategy(TrialStrategy):
                 ]
                 + percentile_columns,
             ),
+            "target_type": "diff",
         }
 
 
@@ -285,10 +296,10 @@ def main():
     run_optimizations(
         strategies=strategies,
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
-        start_date="2018-01-01T00:00:00Z",
+        start_date="2025-03-28T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",
-        experiment_name="Precomputed Chronos Strategy Optimization v1.0",
-        n_trials_per_strategy=10,
+        experiment_name="Precomputed Chronos Strategy Optimization v1.3",
+        n_trials_per_strategy=20,
         n_jobs=1,  # Chronos/AutoGluon can be heavy, especially on GPU
     )
 

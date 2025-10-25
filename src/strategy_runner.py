@@ -3,6 +3,7 @@ from backtesting import Strategy
 from backtesting.lib import crossover
 
 from backtest_utils import (
+    TrialStrategy,
     pct_change,
     sma,
     ewm,
@@ -39,8 +40,8 @@ class MaCrossover(Strategy):
     def get_optuna_params(cls, trial):
         """Suggest hyperparameters for Optuna optimization."""
         return {
-            'short_window': trial.suggest_int('short_window', 10, 100),
-            'long_window': trial.suggest_int('long_window', 50, 250),
+            "short_window": trial.suggest_int("short_window", 10, 100),
+            "long_window": trial.suggest_int("long_window", 50, 250),
         }
 
 
@@ -69,8 +70,8 @@ class BollingerBands(Strategy):
     def get_optuna_params(cls, trial):
         """Suggest hyperparameters for Optuna optimization."""
         return {
-            'bb_window': trial.suggest_int('bb_window', 10, 100),
-            'bb_std': trial.suggest_float('bb_std', 1.5, 3.5),
+            "bb_window": trial.suggest_int("bb_window", 10, 100),
+            "bb_std": trial.suggest_float("bb_std", 1.5, 3.5),
         }
 
 
@@ -82,7 +83,9 @@ class MACD(Strategy):
     take_profit = 0.10
 
     def init(self):
-        self.macd = self.I(ewm, self.data.Close, self.fast_span) - self.I(ewm, self.data.Close, self.slow_span)
+        self.macd = self.I(ewm, self.data.Close, self.fast_span) - self.I(
+            ewm, self.data.Close, self.slow_span
+        )
         self.signal = self.I(ewm, self.macd, self.signal_span)
 
     def next(self):
@@ -98,9 +101,9 @@ class MACD(Strategy):
     def get_optuna_params(cls, trial):
         """Suggest hyperparameters for Optuna optimization."""
         return {
-            'fast_span': trial.suggest_int('fast_span', 5, 50),
-            'slow_span': trial.suggest_int('slow_span', 20, 100),
-            'signal_span': trial.suggest_int('signal_span', 5, 50),
+            "fast_span": trial.suggest_int("fast_span", 5, 50),
+            "slow_span": trial.suggest_int("slow_span", 20, 100),
+            "signal_span": trial.suggest_int("signal_span", 5, 50),
         }
 
 
@@ -120,26 +123,34 @@ class RSIDivergence(Strategy):
         price = self.data.Close[-1]
 
         # Bullish divergence: price makes a lower low, RSI makes a higher low
-        price_low_lookback = self.data.Low[-self.divergence_period:-1]
+        price_low_lookback = self.data.Low[-self.divergence_period : -1]
         prev_price_low_idx_in_slice = price_low_lookback.argmin()
         prev_low_idx = -(self.divergence_period - prev_price_low_idx_in_slice)
 
         # Bearish divergence: price makes a higher high, RSI makes a lower high
-        price_high_lookback = self.data.High[-self.divergence_period:-1]
+        price_high_lookback = self.data.High[-self.divergence_period : -1]
         prev_price_high_idx_in_slice = price_high_lookback.argmax()
         prev_high_idx = -(self.divergence_period - prev_price_high_idx_in_slice)
 
-        if self.data.Low[-1] < self.data.Low[prev_low_idx] and self.rsi[-1] > self.rsi[prev_low_idx]:
+        if (
+            self.data.Low[-1] < self.data.Low[prev_low_idx]
+            and self.rsi[-1] > self.rsi[prev_low_idx]
+        ):
             self.buy(sl=price * (1 - self.stop_loss), tp=price * (1 + self.take_profit))
-        elif self.data.High[-1] > self.data.High[prev_high_idx] and self.rsi[-1] < self.rsi[prev_high_idx]:
-            self.sell(sl=price * (1 + self.stop_loss), tp=price * (1 - self.take_profit))
+        elif (
+            self.data.High[-1] > self.data.High[prev_high_idx]
+            and self.rsi[-1] < self.rsi[prev_high_idx]
+        ):
+            self.sell(
+                sl=price * (1 + self.stop_loss), tp=price * (1 - self.take_profit)
+            )
 
     @classmethod
     def get_optuna_params(cls, trial):
         """Suggest hyperparameters for Optuna optimization."""
         return {
-            'rsi_window': trial.suggest_int('rsi_window', 5, 30),
-            'divergence_period': trial.suggest_int('divergence_period', 10, 60),
+            "rsi_window": trial.suggest_int("rsi_window", 5, 30),
+            "divergence_period": trial.suggest_int("divergence_period", 10, 60),
         }
 
 
@@ -169,7 +180,9 @@ class MultiIndicatorStrategy(Strategy):
             if trade.is_long:
                 trade.sl = max(trade.sl or 0, price * (1 - self.trailing_sl_pct))
             else:
-                trade.sl = min(trade.sl or float('inf'), price * (1 + self.trailing_sl_pct))
+                trade.sl = min(
+                    trade.sl or float("inf"), price * (1 + self.trailing_sl_pct)
+                )
 
         # Entry logic
         if not self.position:
@@ -187,22 +200,22 @@ class MultiIndicatorStrategy(Strategy):
     def get_optuna_params(cls, trial):
         """Suggest hyperparameters for Optuna optimization."""
         return {
-            'bb_window': trial.suggest_int('bb_window', 10, 50),
-            'bb_std': trial.suggest_float('bb_std', 1.5, 3.5),
-            'fast_sma_window': trial.suggest_int('fast_sma_window', 30, 70),
-            'slow_sma_window': trial.suggest_int('slow_sma_window', 80, 120),
-            'trailing_sl_pct': trial.suggest_float('trailing_sl_pct', 0.01, 0.1),
+            "bb_window": trial.suggest_int("bb_window", 10, 50),
+            "bb_std": trial.suggest_float("bb_std", 1.5, 3.5),
+            "fast_sma_window": trial.suggest_int("fast_sma_window", 30, 70),
+            "slow_sma_window": trial.suggest_int("slow_sma_window", 80, 120),
+            "trailing_sl_pct": trial.suggest_float("trailing_sl_pct", 0.01, 0.1),
         }
 
 
-class SwingTrading(Strategy):
+class SwingTrading(TrialStrategy):
     swing_filter_p = 0.025
-    trade_mode = 'aggressive'  # 'aggressive' or 'conservative'
+    trade_mode = "aggressive"  # 'aggressive' or 'conservative'
 
     def init(self):
         self.swing_direction = 0  # 1 for up, -1 for down
-        self.current_high = 0.
-        self.current_low = float('inf')
+        self.current_high = 0.0
+        self.current_low = float("inf")
         self.swing_highs = []
         self.swing_lows = []
 
@@ -233,10 +246,12 @@ class SwingTrading(Strategy):
             if self.data.Low[-1] < self.current_low:
                 self.current_low = self.data.Low[-1]
                 # Conservative sell logic: check for breakdown
-                if (self.trade_mode == 'conservative' and
-                        len(self.swing_lows) >= 2 and
-                        not self.entry_signal_triggered and
-                        self.current_low < self.swing_lows[-2]):
+                if (
+                    self.trade_mode == "conservative"
+                    and len(self.swing_lows) >= 2
+                    and not self.entry_signal_triggered
+                    and self.current_low < self.swing_lows[-2]
+                ):
                     self.sell()
                     self.entry_signal_triggered = True
 
@@ -249,7 +264,7 @@ class SwingTrading(Strategy):
 
                 if self.position.is_short:
                     self.position.close()
-                if self.trade_mode == 'aggressive':
+                if self.trade_mode == "aggressive":
                     self.buy()
 
         # --- UPSWING LOGIC ---
@@ -258,10 +273,12 @@ class SwingTrading(Strategy):
             if self.data.High[-1] > self.current_high:
                 self.current_high = self.data.High[-1]
                 # Conservative buy logic: check for breakout
-                if (self.trade_mode == 'conservative' and
-                        len(self.swing_highs) >= 2 and
-                        not self.entry_signal_triggered and
-                        self.current_high > self.swing_highs[-2]):
+                if (
+                    self.trade_mode == "conservative"
+                    and len(self.swing_highs) >= 2
+                    and not self.entry_signal_triggered
+                    and self.current_high > self.swing_highs[-2]
+                ):
                     self.buy()
                     self.entry_signal_triggered = True
 
@@ -274,14 +291,16 @@ class SwingTrading(Strategy):
 
                 if self.position.is_long:
                     self.position.close()
-                if self.trade_mode == 'aggressive':
+                if self.trade_mode == "aggressive":
                     self.sell()
 
     @classmethod
     def get_optuna_params(cls, trial):
         return {
-            'swing_filter_p': trial.suggest_float('swing_filter_p', 0.01, 0.2),
-            'trade_mode': trial.suggest_categorical('trade_mode', ['aggressive', 'conservative']),
+            "swing_filter_p": trial.suggest_float("swing_filter_p", 0.01, 0.15),
+            "trade_mode": trial.suggest_categorical(
+                "trade_mode", ["aggressive", "conservative"]
+            ),
         }
 
 
@@ -301,9 +320,8 @@ def main():
         start_date="2022-01-01T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",
         experiment_name="Trading Strategies",
-        n_trials_per_strategy=60,
-        n_jobs=12
-
+        n_trials_per_strategy=1,
+        n_jobs=12,
     )
 
 

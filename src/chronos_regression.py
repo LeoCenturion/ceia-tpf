@@ -466,8 +466,8 @@ def main():
     # for col in ["Open", "Close", "High", "Low"]:
     #     data[col] = data[col].pct_change()
     # data.dropna(inplace=True)
-    study_name_in_db = "chronos_pct_change_regression_v0.2"
-    run_study(data, study_name_in_db, 10)
+    study_name_in_db = "chronos_pct_change_regression_v0.3"
+    run_study(data, study_name_in_db, 1)
 
 
 if __name__ == "__main__":

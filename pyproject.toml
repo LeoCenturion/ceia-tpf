@@ -7,9 +7,9 @@ readme = "README.md"
 package-mode = false
 
 [tool.poetry.dependencies]
-python = "^3.11,<3.14"
+python = "^3.11,<3.13"
 pandas = "^2.2.3"
-numpy = "^2.1.2"
+numpy = "^1.26.2"
 seaborn = "0.13.2"
 scipy = "^1.14.1"
 scikit-learn = "^1.6.1"
@@ -32,8 +32,9 @@ matplotlib = "^3.10.6"
 xgboost = "^3.0.5"
 cupy = "^13.6.0"
 torch = "2.7.1"
-transformers = "4.55.0"
+transformers = "4.49.0"
 accelerator = "^2025.9.5"
+autogluon = "^1.4.0"
 
 
 [build-system]
