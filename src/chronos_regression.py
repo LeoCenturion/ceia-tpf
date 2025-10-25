@@ -305,7 +305,7 @@ def objective(trial, data):
     """
     from sklearn.metrics import mean_squared_error
 
-    # AI set these parameters...
+    # AI suggest these parameters in the trial...
     #     torch_dtype bfloat16
     # fine_tune_lr 0.00013715308900439288
     # batch_size 256
