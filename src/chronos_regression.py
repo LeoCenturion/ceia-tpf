@@ -305,21 +305,15 @@ def objective(trial, data):
     """
     from sklearn.metrics import mean_squared_error
 
-    # AI suggest these parameters in the trial...
-    #     torch_dtype bfloat16
-    # fine_tune_lr 0.00013715308900439288
-    # batch_size 256
-    # chronos_model amazon/chronos-t5-tiny
-    # refit_every_hours 294
-    # ...AI!
-    torch_dtype = trial.suggest_categorical("torch_dtype", ["bfloat16", "float32"])
-    fine_tune_lr = trial.suggest_float("fine_tune_lr", 1e-5, 1e-3, log=True)
-    batch_size = trial.suggest_categorical("batch_size", [64, 128, 256, 1024])
-    model_choice = trial.suggest_categorical(
-        "chronos_model",
-        ["amazon/chronos-t5-tiny", "amazon/chronos-t5-base"],
+    torch_dtype = trial.suggest_categorical("torch_dtype", ["bfloat16"])
+    fine_tune_lr = trial.suggest_float(
+        "fine_tune_lr", 0.00013715308900439288, 0.00013715308900439288
     )
-    refit_every = trial.suggest_int("refit_every_hours", 24 * 7, 24 * 14, step=7)
+    batch_size = trial.suggest_categorical("batch_size", [256])
+    model_choice = trial.suggest_categorical(
+        "chronos_model", ["amazon/chronos-t5-tiny"]
+    )
+    refit_every = trial.suggest_int("refit_every_hours", 294, 294)
 
     # 2. Prepare Features and Target
     features_df = data[["Open", "High", "Low", "Close"]].copy()
