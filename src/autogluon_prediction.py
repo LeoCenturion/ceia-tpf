@@ -1,3 +1,75 @@
+from functools import partial
+
+import optuna
+import pandas as pd
+import numpy as np
+from autogluon.tabular import TabularPredictor
+from sklearn.metrics import f1_score
+
+from backtest_utils import fetch_historical_data
+
+
+def awesome_oscillator(
+    high: pd.Series, low: pd.Series, fast_period: int = 5, slow_period: int = 34
+) -> pd.Series:
+    """Calculates the Awesome Oscillator."""
+    median_price = (high + low) / 2
+    ao = sma(median_price, fast_period) - sma(median_price, slow_period)
+    return ao
+
+
+def macd(
+    close: pd.Series,
+    fast_period: int = 12,
+    slow_period: int = 26,
+    signal_period: int = 9,
+) -> pd.DataFrame:
+    """Calculates MACD, Signal Line, and Histogram."""
+    ema_fast = ewm(close, span=fast_period)
+    ema_slow = ewm(close, span=slow_period)
+    macd_line = ema_fast - ema_slow
+    signal_line = ewm(macd_line, span=signal_period)
+    histogram = macd_line - signal_line
+    return pd.DataFrame({"MACD": macd_line, "Signal": signal_line, "Hist": histogram})
+
+
+def mfi(
+    high: pd.Series, low: pd.Series, close: pd.Series, volume: pd.Series, n: int = 14
+) -> pd.Series:
+    """Calculates the Money Flow Index."""
+    typical_price = (high + low + close) / 3
+    money_flow = typical_price * volume
+
+    positive_flow = pd.Series(
+        np.where(typical_price > typical_price.shift(1), money_flow, 0),
+        index=typical_price.index,
+    )
+    negative_flow = pd.Series(
+        np.where(typical_price < typical_price.shift(1), money_flow, 0),
+        index=typical_price.index,
+    )
+
+    positive_mf = positive_flow.rolling(window=n, min_periods=0).sum()
+    negative_mf = negative_flow.rolling(window=n, min_periods=0).sum()
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        money_ratio = positive_mf / negative_mf
+        mfi = 100 - (100 / (1 + money_ratio))
+    mfi.replace([np.inf, -np.inf], 100, inplace=True)
+    return mfi
+
+
+def stochastic_oscillator(
+    high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14, d_n: int = 3
+) -> pd.DataFrame:
+    """Calculates the Stochastic Oscillator (%K and %D)."""
+    low_n = low.rolling(window=n).min()
+    high_n = high.rolling(window=n).max()
+    k_percent = 100 * ((close - low_n) / (high_n - low_n).replace(0, 1e-9))
+    d_percent = sma(k_percent, d_n)
+    return pd.DataFrame({"%K": k_percent, "%D": d_percent})
+
+
 def create_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     Creates a set of technical analysis features based on percentage changes and raw price data.
@@ -172,17 +244,6 @@ def create_target_variable(
     df.loc[df.index[troughs], "target"] = -1  # Bottoms
 
     return df
-
-
-from functools import partial
-
-import optuna
-import pandas as pd
-import numpy as np
-from autogluon.tabular import TabularPredictor
-from sklearn.metrics import f1_score
-
-from backtest_utils import fetch_historical_data
 
 
 def objective(trial, data):

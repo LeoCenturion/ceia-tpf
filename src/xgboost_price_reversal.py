@@ -19,8 +19,8 @@ import mplfinance as mpf
 import cupy as cp
 
 from backtest_utils import fetch_historical_data, sma, ewm, std, rsi_indicator
-
-
+ 
+#AI refactor these indicators and put them in the ./indicators.py file AI!
 def awesome_oscillator(high: pd.Series, low: pd.Series, fast_period: int = 5, slow_period: int = 34) -> pd.Series:
     """Calculates the Awesome Oscillator."""
     median_price = (high + low) / 2
