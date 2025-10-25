@@ -129,17 +129,62 @@ def run_study(data, study_name_in_db, ntrials):
         print("No successful trials were completed.")
 
 
-# AI do a function with 1 execution with fit predict with 'medium' quality AI!
+def run_single_fit_predict(data):
+    """
+    Runs a single train/test evaluation using AutoGluon TabularPredictor.
+    """
+    print("\n--- Running Single Fit/Predict with AutoGluon ---")
+
+    # 1. Create features and target variable
+    target_method = "ao_on_pct_change"
+    print(f"Creating features and target variable using method: '{target_method}'")
+    features_df = create_features(data)
+    data_with_target = create_target_variable(data.copy(), method=target_method)
+
+    target = data_with_target["target"].shift(-1)
+    final_df = pd.concat([features_df, target], axis=1).dropna()
+    final_df["target"] = final_df["target"].astype(int)
+
+    # 2. Split data into training and testing sets
+    test_size = 0.3
+    split_index = int(len(final_df) * (1 - test_size))
+    train_df = final_df.iloc[:split_index]
+    test_df = final_df.iloc[split_index:]
+    print(f"Data split: {len(train_df)} training samples, {len(test_df)} testing samples.")
+
+    # 3. Initialize and fit the TabularPredictor
+    predictor = TabularPredictor(
+        label="target", problem_type="multiclass", eval_metric="f1_macro"
+    )
+
+    print("\nFitting model with 'medium_quality' presets...")
+    predictor.fit(train_df, presets="medium_quality", time_limit=600)
+
+    # 4. Evaluate the model on the test data
+    print("\n--- Evaluating Model on Test Data ---")
+    performance = predictor.evaluate(test_df)
+    print("Model performance on test data:")
+    print(performance)
+
+    print("\n--- Leaderboard ---")
+    leaderboard = predictor.leaderboard(test_df)
+    print(leaderboard)
+
+    from sklearn.metrics import classification_report
+
+    y_test = test_df["target"]
+    y_pred = predictor.predict(test_df.drop(columns=["target"]))
+    print("\n--- Classification Report ---")
+    print(classification_report(y_test, y_pred, zero_division=0))
 def main():
-    """Main function to load data and run the Optuna study for classification."""
+    """Main function to load data and run the AutoGluon classification task."""
     print("Loading historical data for AutoGluon classification task...")
     data = fetch_historical_data(
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
         timeframe="1h",
         start_date="2024-01-01T00:00:00Z",
     )
-    study_name_in_db = "autogluon_tabular_classification_v0.1"
-    run_study(data, study_name_in_db, ntrials=1)
+    run_single_fit_predict(data)
 
 
 if __name__ == "__main__":
