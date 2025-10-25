@@ -367,10 +367,40 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
     return features
 
 
-# AI add a function to create a target based on pct_change of a price. It shoul be able token
-# - mark -1,0,+1 if a price moves less or more than x% in relation to it's previous price
-# - mark -1,0,+1 if a price moves more than x sigma, sigma being the standard deviation up to that point
-# ...AI!
+def create_price_change_target(
+    df: pd.DataFrame,
+    method: str = "fixed_pct",
+    pct_threshold: float = 0.01,
+    std_fraction: float = 1.0,
+    window: int = 24 * 7,
+) -> pd.DataFrame:
+    """
+    Creates a target variable based on the next period's price percentage change.
+
+    Methods:
+    - 'fixed_pct': Target is 1 if price increases by more than pct_threshold,
+                   -1 if it decreases by more than pct_threshold, 0 otherwise.
+    - 'std_dev':   Target is 1 if price increase exceeds std_fraction * rolling_std,
+                   -1 if price decrease exceeds std_fraction * rolling_std, 0 otherwise.
+    """
+    close_pct_change = df["Close"].pct_change()
+    # The target is based on the NEXT period's price change.
+    future_pct_change = close_pct_change.shift(-1)
+    df["target"] = 0
+
+    if method == "fixed_pct":
+        df.loc[future_pct_change > pct_threshold, "target"] = 1
+        df.loc[future_pct_change < -pct_threshold, "target"] = -1
+    elif method == "std_dev":
+        rolling_std = close_pct_change.rolling(window=window).std()
+        df.loc[future_pct_change >= (rolling_std * std_fraction), "target"] = 1
+        df.loc[future_pct_change <= -(rolling_std * std_fraction), "target"] = -1
+    else:
+        raise ValueError(f"Invalid method '{method}' specified for create_price_change_target")
+    
+    return df
+
+
 def create_ao_target(
     df: pd.DataFrame,
     method: str = "ao_on_pct_change",
