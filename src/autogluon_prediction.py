@@ -7,7 +7,7 @@ from autogluon.tabular import TabularPredictor
 from sklearn.metrics import f1_score
 
 from backtest_utils import fetch_historical_data
-from xgboost_price_reversal import create_features, create_target_variable
+from xgboost_price_reversal import create_features, create_ao_target
 
 
 def objective(trial, data):
@@ -24,7 +24,7 @@ def objective(trial, data):
     # 1. Create features and target variable
     print("Creating features and target variable...")
     features_df = create_features(data)
-    data_with_target = create_target_variable(data.copy(), method=target_method)
+    data_with_target = create_ao_target(data.copy(), method=target_method)
 
     # We want to predict the next period's movement.
     # So, we use features from time 't' to predict the target at time 't+1'.
@@ -139,7 +139,7 @@ def run_single_fit_predict(data):
     target_method = "ao_on_pct_change"
     print(f"Creating features and target variable using method: '{target_method}'")
     features_df = create_features(data)
-    data_with_target = create_target_variable(data.copy(), method=target_method)
+    data_with_target = create_ao_target(data.copy(), method=target_method)
 
     target = data_with_target["target"].shift(-1)
     final_df = pd.concat([features_df, target], axis=1).dropna()
@@ -150,7 +150,9 @@ def run_single_fit_predict(data):
     split_index = int(len(final_df) * (1 - test_size))
     train_df = final_df.iloc[:split_index]
     test_df = final_df.iloc[split_index:]
-    print(f"Data split: {len(train_df)} training samples, {len(test_df)} testing samples.")
+    print(
+        f"Data split: {len(train_df)} training samples, {len(test_df)} testing samples."
+    )
 
     # 3. Initialize and fit the TabularPredictor
     predictor = TabularPredictor(
@@ -176,6 +178,8 @@ def run_single_fit_predict(data):
     y_pred = predictor.predict(test_df.drop(columns=["target"]))
     print("\n--- Classification Report ---")
     print(classification_report(y_test, y_pred, zero_division=0))
+
+
 def main():
     """Main function to load data and run the AutoGluon classification task."""
     print("Loading historical data for AutoGluon classification task...")

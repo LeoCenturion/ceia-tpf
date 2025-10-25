@@ -148,7 +148,8 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
 
     return features
 
-def create_target_variable(df: pd.DataFrame, method: str = 'ao_on_pct_change', peak_distance: int = 1, peak_threshold: float = 0, std_fraction: float = 1.0) -> pd.DataFrame:
+# AI move create_ao_target and create_features to ./indicators.py AI!
+def create_ao_target(df: pd.DataFrame, method: str = 'ao_on_pct_change', peak_distance: int = 1, peak_threshold: float = 0, std_fraction: float = 1.0) -> pd.DataFrame:
     """
     Identifies local tops (1), bottoms (-1), and non-reversal points (0)
     using different methods, and returns the DataFrame with a 'target' column.
@@ -400,7 +401,7 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     print(f"Params: {trial.params}")
 
     # Create Target Variable
-    reversal_data = create_target_variable(
+    reversal_data = create_ao_target(
         data.copy(),
         method=peak_method,
         peak_distance=peak_distance,
@@ -558,7 +559,7 @@ def show_plot():
     )
     # 2. Create a representative target variable for correlation analysis
     # The exact method doesn't matter as much as having a target to correlate against.
-    reversal_data = create_target_variable(data.copy(), method='ao_on_price')
+    reversal_data = create_ao_target(data.copy(), method='ao_on_price')
     y = reversal_data['target']
 
     # 3. Create features
@@ -602,7 +603,7 @@ def run_single_backtest():
         print(f"  {key}: {value}")
 
     # 3. Create Target Variable
-    reversal_data = create_target_variable(
+    reversal_data = create_ao_target(
         data.copy(),
         method=params['peak_method'],
         peak_distance=params['peak_distance'],
