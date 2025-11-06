@@ -22,7 +22,7 @@ class MartingaleStrategy(TrialStrategy):
         if self.position:
             # We assume we are always long.
             # A "win" is if the current close is higher than the entry price.
-            if self.data.Close[-1] > self.position.entry_price:
+            if self.data.Close[-1] > self.trades[-1].entry_price:
                 # Last trade was a win, reset trade size
                 self.trade_size = self.initial_trade_size
             else:
