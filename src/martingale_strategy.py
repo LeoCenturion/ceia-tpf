@@ -47,11 +47,69 @@ class MartingaleStrategy(TrialStrategy):
         }
 
 
-# AI add a delayed martingale strategy. Wait until 2 or 3 down days have passed until betting again. AI!
+class DelayedMartingaleStrategy(TrialStrategy):
+    """
+    A delayed Martingale strategy.
+
+    Waits for a specified number of consecutive down periods before starting to bet.
+    Always bets long. If a trade is a loss, the next trade size is multiplied by a factor.
+    If a trade is a win, the trade size resets to the initial amount.
+    Each trade is held for one bar.
+    """
+
+    initial_trade_size = 0.01  # Percentage of equity
+    multiplier = 2.0  # Multiplier for the next trade on loss
+    wait_periods = 3  # Number of consecutive down periods to wait for
+
+    def init(self):
+        self.trade_size = self.initial_trade_size
+        self.down_periods_counter = 0
+
+    def next(self):
+        # Update consecutive down periods counter
+        if len(self.data.Close) > 1 and self.data.Close[-1] < self.data.Close[-2]:
+            self.down_periods_counter += 1
+        else:
+            self.down_periods_counter = 0
+
+        # Close any open position from the previous bar.
+        # The profit/loss of this trade determines the size of the next one.
+        if self.position:
+            # We assume we are always long.
+            # A "win" is if the current close is higher than the entry price.
+            if self.data.Close[-1] > self.trades[-1].entry_price:
+                # Last trade was a win, reset trade size
+                self.trade_size = self.initial_trade_size
+            else:
+                # Last trade was a loss, increase trade size
+                self.trade_size *= self.multiplier
+
+            self.position.close()
+
+        # Entry logic: only bet if we have waited enough down periods
+        if not self.position and self.down_periods_counter >= self.wait_periods:
+            trade_size = min(self.trade_size, 0.99)
+            if self.equity > 0 and trade_size > 0:
+                self.buy(size=trade_size)
+
+    @classmethod
+    def get_optuna_params(cls, trial):
+        """Suggest hyperparameters for Optuna optimization."""
+        return {
+            "initial_trade_size": trial.suggest_float(
+                "initial_trade_size", 0.005, 0.05
+            ),
+            "multiplier": trial.suggest_float("multiplier", 1.5, 3.0),
+            "wait_periods": trial.suggest_int("wait_periods", 2, 5),
+        }
+
 
 def main():
     """Main function to run the optimization with default parameters."""
-    strategies = {"MartingaleStrategy": MartingaleStrategy}
+    strategies = {
+        "MartingaleStrategy": MartingaleStrategy,
+        "DelayedMartingaleStrategy": DelayedMartingaleStrategy,
+    }
     run_optimizations(
         strategies=strategies,
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
