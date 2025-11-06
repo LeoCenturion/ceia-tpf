@@ -1,4 +1,4 @@
-from backtest_utils import TrialStrategy, run_optimizations
+from backtest_utils import TrialStrategy, run_optimizations, sma
 
 
 class MartingaleStrategy(TrialStrategy):
@@ -160,40 +160,98 @@ class AntiMartingaleStrategy(TrialStrategy):
             "max_win_streak": trial.suggest_int("max_win_streak", 3, 10),
         }
 
-# AI implement a martingale with trend filter strategy:
-# By combining the Theory of Runs with the direction of
-# the trend, and the upward bias that we see in the table of
-# runs, the chance of being on the correct side of the
-# longest runs is increased, and the size of the price move
-# in the direction of the trend may also tend to be larger.
-# Long-term trends will offer the best chance of identifying
-# the direction of prices. We can create rules to take
-# advantage of this:
-# 1.If the trend has just turned up, based on a moving
-# average, enter a long position with 1 unit (the initial
-# investment divided by the price).
-# 2.3.4.If the trend is still up and the price closes lower,
-# double the size of the long position.
-# If the trend is up and the price closes higher, remove
-# all positions in excess of the original 1 unit.
-# If the trend turns down, exit all longs and sell short 1
-# unit.
-# 5.If the trend is down and prices close higher, double
-# the size of the short position.
-# 6.If the trend is down and prices close lower, cover all
-# short positions in excess of the original 1 unit.
-# Because it is possible for prices to go the wrong way
-# longer than you have money, we need to cap the number
-# of times we can double down. AI!
+class MartingaleWithTrendFilter(TrialStrategy):
+    """
+    A Martingale strategy that uses a moving average as a trend filter.
+    It doubles down on positions when the price moves against the trend,
+    and reduces the position to the initial size when the price moves with the trend.
+    """
+
+    ma_window = 50
+    initial_trade_size = 0.01  # Percentage of equity
+    max_doubles = 3
+
+    def init(self):
+        self.ma = self.I(sma, self.data.Close, self.ma_window)
+        self.trend = 0  # 1 for up, -1 for down
+        self.doubles_count = 0
+        self.base_trade_size = 0
+        self.is_sizing_trade = False
+
+    def next(self):
+        # Capture base trade size on the bar after the initial trade
+        if self.is_sizing_trade and self.position:
+            self.base_trade_size = abs(self.position.size)
+            self.is_sizing_trade = False
+
+        if len(self.data.Close) < self.ma_window:
+            return
+
+        new_trend = 1 if self.data.Close[-1] > self.ma[-1] else -1
+
+        if new_trend != self.trend:
+            if self.position:
+                self.position.close()
+
+            if new_trend == 1:
+                self.buy(size=self.initial_trade_size)
+            else:  # new_trend == -1
+                self.sell(size=self.initial_trade_size)
+
+            self.doubles_count = 0
+            self.trend = new_trend
+            self.is_sizing_trade = True
+        else:
+            if not self.position or self.is_sizing_trade:
+                return
+
+            if self.trend == 1:  # Uptrend continuation
+                if self.data.Close[-1] < self.data.Close[-2]:  # Price closes lower
+                    if self.doubles_count < self.max_doubles:
+                        self.buy(size=self.position.size)
+                        self.doubles_count += 1
+                elif self.data.Close[-1] > self.data.Close[-2]:  # Price closes higher
+                    if self.position.size > self.base_trade_size > 0:
+                        size_to_close = self.position.size - self.base_trade_size
+                        self.sell(size=size_to_close)
+                        self.doubles_count = 0
+
+            elif self.trend == -1:  # Downtrend continuation
+                if self.data.Close[-1] > self.data.Close[-2]:  # Price closes higher
+                    if self.doubles_count < self.max_doubles:
+                        self.sell(size=abs(self.position.size))
+                        self.doubles_count += 1
+                elif self.data.Close[-1] < self.data.Close[-2]:  # Price closes lower
+                    if abs(self.position.size) > self.base_trade_size > 0:
+                        size_to_close = (
+                            abs(self.position.size) - self.base_trade_size
+                        )
+                        self.buy(size=size_to_close)
+                        self.doubles_count = 0
+
+    @classmethod
+    def get_optuna_params(cls, trial):
+        """Suggest hyperparameters for Optuna optimization."""
+        return {
+            "ma_window": trial.suggest_int("ma_window", 20, 200),
+            "initial_trade_size": trial.suggest_float(
+                "initial_trade_size", 0.01, 0.1
+            ),
+            "max_doubles": trial.suggest_int("max_doubles", 1, 5),
+        }
+
+
 def main():
     """Main function to run the optimization with default parameters."""
     strategies = {
         # "MartingaleStrategy": MartingaleStrategy,
         # "DelayedMartingaleStrategy": DelayedMartingaleStrategy,
-        "AntiMartingaleStrategy": AntiMartingaleStrategy,
+        # "AntiMartingaleStrategy": AntiMartingaleStrategy,
+        "MartingaleWithTrendFilter": MartingaleWithTrendFilter,
     }
     run_optimizations(
         strategies=strategies,
+        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
         start_date="2018-01-01T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",
