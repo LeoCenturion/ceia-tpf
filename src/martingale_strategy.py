@@ -160,12 +160,36 @@ class AntiMartingaleStrategy(TrialStrategy):
             "max_win_streak": trial.suggest_int("max_win_streak", 3, 10),
         }
 
-
+# AI implement a martingale with trend filter strategy:
+# By combining the Theory of Runs with the direction of
+# the trend, and the upward bias that we see in the table of
+# runs, the chance of being on the correct side of the
+# longest runs is increased, and the size of the price move
+# in the direction of the trend may also tend to be larger.
+# Long-term trends will offer the best chance of identifying
+# the direction of prices. We can create rules to take
+# advantage of this:
+# 1.If the trend has just turned up, based on a moving
+# average, enter a long position with 1 unit (the initial
+# investment divided by the price).
+# 2.3.4.If the trend is still up and the price closes lower,
+# double the size of the long position.
+# If the trend is up and the price closes higher, remove
+# all positions in excess of the original 1 unit.
+# If the trend turns down, exit all longs and sell short 1
+# unit.
+# 5.If the trend is down and prices close higher, double
+# the size of the short position.
+# 6.If the trend is down and prices close lower, cover all
+# short positions in excess of the original 1 unit.
+# Because it is possible for prices to go the wrong way
+# longer than you have money, we need to cap the number
+# of times we can double down. AI!
 def main():
     """Main function to run the optimization with default parameters."""
     strategies = {
         # "MartingaleStrategy": MartingaleStrategy,
-        "DelayedMartingaleStrategy": DelayedMartingaleStrategy,
+        # "DelayedMartingaleStrategy": DelayedMartingaleStrategy,
         "AntiMartingaleStrategy": AntiMartingaleStrategy,
     }
     run_optimizations(
