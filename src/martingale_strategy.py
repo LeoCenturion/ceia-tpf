@@ -252,7 +252,6 @@ def main():
     run_optimizations(
         strategies=strategies,
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
-        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
         start_date="2018-01-01T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",
         experiment_name="Martingale Strategies",
