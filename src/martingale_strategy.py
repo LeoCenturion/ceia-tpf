@@ -103,12 +103,70 @@ class DelayedMartingaleStrategy(TrialStrategy):
             "wait_periods": trial.suggest_int("wait_periods", 2, 5),
         }
 
-# AI apply an anti martingale strategy. Keep doubling the bet until theres a loss or n up periods have passed AI!
+class AntiMartingaleStrategy(TrialStrategy):
+    """
+    An anti-Martingale (reverse Martingale) betting strategy.
+
+    Always bets long. If a trade is a win, the next trade size is multiplied by a factor.
+    This continues until a loss occurs or a maximum number of consecutive wins is reached.
+    If a trade is a loss, the trade size resets to the initial amount.
+    Each trade is held for one bar.
+    """
+
+    initial_trade_size = 0.01  # Percentage of equity
+    multiplier = 2.0  # Multiplier for the next trade on win
+    max_win_streak = 5  # Maximum number of consecutive wins before resetting
+
+    def init(self):
+        self.trade_size = self.initial_trade_size
+        self.win_streak = 0
+
+    def next(self):
+        # Close any open position from the previous bar.
+        # The profit/loss of this trade determines the size of the next one.
+        if self.position:
+            # We assume we are always long.
+            # A "win" is if the current close is higher than the entry price.
+            if self.data.Close[-1] > self.trades[-1].entry_price:
+                # Last trade was a win, increase trade size and streak
+                self.win_streak += 1
+                if self.win_streak >= self.max_win_streak:
+                    # Max streak reached, reset
+                    self.trade_size = self.initial_trade_size
+                    self.win_streak = 0
+                else:
+                    # Continue streak, increase size
+                    self.trade_size *= self.multiplier
+            else:
+                # Last trade was a loss, reset trade size and streak
+                self.trade_size = self.initial_trade_size
+                self.win_streak = 0
+
+            self.position.close()
+
+        # Place a new bet (buy order) for the next period, capped at 99% of equity.
+        trade_size = min(self.trade_size, 0.99)
+        if self.equity > 0 and trade_size > 0:
+            self.buy(size=trade_size)
+
+    @classmethod
+    def get_optuna_params(cls, trial):
+        """Suggest hyperparameters for Optuna optimization."""
+        return {
+            "initial_trade_size": trial.suggest_float(
+                "initial_trade_size", 0.005, 0.05
+            ),
+            "multiplier": trial.suggest_float("multiplier", 1.5, 3.0),
+            "max_win_streak": trial.suggest_int("max_win_streak", 3, 10),
+        }
+
+
 def main():
     """Main function to run the optimization with default parameters."""
     strategies = {
         # "MartingaleStrategy": MartingaleStrategy,
         "DelayedMartingaleStrategy": DelayedMartingaleStrategy,
+        "AntiMartingaleStrategy": AntiMartingaleStrategy,
     }
     run_optimizations(
         strategies=strategies,
