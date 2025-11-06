@@ -103,11 +103,11 @@ class DelayedMartingaleStrategy(TrialStrategy):
             "wait_periods": trial.suggest_int("wait_periods", 2, 5),
         }
 
-
+# AI apply an anti martingale strategy. Keep doubling the bet until theres a loss or n up periods have passed AI!
 def main():
     """Main function to run the optimization with default parameters."""
     strategies = {
-        "MartingaleStrategy": MartingaleStrategy,
+        # "MartingaleStrategy": MartingaleStrategy,
         "DelayedMartingaleStrategy": DelayedMartingaleStrategy,
     }
     run_optimizations(
@@ -116,7 +116,7 @@ def main():
         start_date="2018-01-01T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",
         experiment_name="Martingale Strategies",
-        n_trials_per_strategy=20,
+        n_trials_per_strategy=12,
         n_jobs=12,
     )
 
