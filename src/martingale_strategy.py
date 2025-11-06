@@ -47,6 +47,8 @@ class MartingaleStrategy(TrialStrategy):
         }
 
 
+# AI add a delayed martingale strategy. Wait until 2 or 3 down days have passed until betting again. AI!
+
 def main():
     """Main function to run the optimization with default parameters."""
     strategies = {"MartingaleStrategy": MartingaleStrategy}
