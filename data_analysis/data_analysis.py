@@ -444,6 +444,7 @@ print(f"Number of dollar bars created: {len(dollar_bars)}")
 #%% [markdown]
 # The number of bars created is very similar to the original number of hourly bars, which is expected since we used the average hourly activity as the threshold. However, the timing of these bars will now be irregular.
 
+#AI print the volume over time, also plot distribution of volume bars AI!
 #%% [markdown]
 # ### 7.1. Comparison of Close Prices
 
@@ -501,3 +502,4 @@ print("\n--- Volume Bar Duration ---")
 print(volume_bars['duration_hours'].describe())
 print("\n--- Dollar Bar Duration ---")
 print(dollar_bars['duration_hours'].describe())
+
