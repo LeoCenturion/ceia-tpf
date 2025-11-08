@@ -5,6 +5,7 @@ from tqdm import tqdm # Para seguimiento de progreso
 
 # --- Configuration ---
 # Directorio donde se encuentran los 2000+ archivos CSV.
+#AI make DATA_DIR a cli arg AI!
 DATA_DIR = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m"
 FILE_PATTERN = "*.csv"
 OUTPUT_FILE_NAME = "BTCUSDT_consolidated_klines.csv"
