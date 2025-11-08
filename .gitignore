@@ -8,3 +8,8 @@
 /src/__pycache__/
 /
 /.cache/
+/setup.sh
+/data/BTCUSDT-1m-2025-09.csv
+/data/BTCUSDT-1m-2025-09.zip
+/.ipynb_checkpoints/
+/.pki/

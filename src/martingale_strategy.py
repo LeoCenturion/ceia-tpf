@@ -255,7 +255,7 @@ def main():
         start_date="2018-01-01T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",
         experiment_name="Martingale Strategies",
-        n_trials_per_strategy=12,
+        n_trials_per_strategy=50,
         n_jobs=12,
     )
 

@@ -2,12 +2,11 @@ from functools import partial
 
 import optuna
 import pandas as pd
-import numpy as np
 from autogluon.tabular import TabularPredictor
 from sklearn.metrics import f1_score
 
 from backtest_utils import fetch_historical_data
-from indicators import create_features, create_ao_target
+from indicators import create_features, create_ao_target, create_price_change_target
 
 
 def objective(trial, data):
@@ -140,7 +139,9 @@ def run_single_fit_predict(data):
     print(f"Creating features and target variable using method: '{target_method}'")
     features_df = create_features(data)
     data_with_target = create_ao_target(data.copy(), method=target_method)
-
+    data_with_target = create_price_change_target(
+        data.copy(), pct_threshold=0.0 / 100.0
+    )
     target = data_with_target["target"].shift(-1)
     final_df = pd.concat([features_df, target], axis=1).dropna()
     final_df["target"] = final_df["target"].astype(int)
@@ -186,7 +187,7 @@ def main():
     data = fetch_historical_data(
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
         timeframe="1h",
-        start_date="2024-01-01T00:00:00Z",
+        start_date="2018-01-01T00:00:00Z",
     )
     run_single_fit_predict(data)
 

@@ -1,47 +1,24 @@
-import pandas as pd
-import numpy as np
-from scipy.stats import pearsonr
-from scipy.signal import find_peaks
-import pandas as pd
-import numpy as np
-from scipy.stats import pearsonr
-from scipy.signal import find_peaks
-import optuna
 from functools import partial
-from sklearn.model_selection import train_test_split
+
+import cupy as cp
+import matplotlib.pyplot as plt
+import mplfinance as mpf
+import numpy as np
+import optuna
+import pandas as pd
+import seaborn as sns
 import xgboost as xgb
-from sklearn.metrics import classification_report, accuracy_score
+from scipy.stats import pearsonr
+from sklearn.metrics import accuracy_score, classification_report
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.class_weight import compute_class_weight
-import matplotlib.pyplot as plt
-import seaborn as sns
-import mplfinance as mpf
-import cupy as cp
 
-from backtest_utils import fetch_historical_data, sma, ewm, std, rsi_indicator
+from backtest_utils import fetch_historical_data
 from indicators import (
-    awesome_oscillator,
-    macd,
-    mfi,
-    stochastic_oscillator,
-    true_range,
-    atr,
-    willr,
-    roc,
-    ultimate_oscillator,
-    true_strength_index,
-    adx,
-    aroon,
-    cci,
-    _stochastic_series,
-    stc,
-    vortex,
-    bollinger_bands,
-    keltner_channels,
-    donchian_channels,
-    create_features,
     create_ao_target,
+    create_features,
 )
+
 
 def select_features(X: pd.DataFrame, y: pd.Series, corr_threshold=0.7, p_value_threshold=0.1) -> list:
     """
