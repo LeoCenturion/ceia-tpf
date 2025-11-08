@@ -39,7 +39,7 @@ def awesome_oscillator(high: pd.Series, low: pd.Series, fast_period: int = 5, sl
 # ## 2. Load and Prepare Data
 
 #%%
-DATA_PATH = 'data/BTCUSDT_1h.csv'
+DATA_PATH = '/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1h/BTCUSDT_consolidated_klines.csv'
 df = pd.read_csv(DATA_PATH)
 
 # Convert to datetime and set as index
@@ -550,7 +550,7 @@ print(dollar_bars['duration_hours'].describe())
 # ## 8. Bar Threshold Sensitivity Analysis
 #
 # The choice of threshold is critical for volume and dollar bars. A low threshold will sample frequently, capturing more noise, while a high threshold will sample less frequently, potentially missing smaller price movements. Here, we visualize how changing the threshold affects the resulting price series.
-
+# AI instead of plotting print: serial correlation, variability over time (homocedasticity), gaussian distribution properties AI! 
 #%% [markdown]
 # ### 8.1. Varying the BTC Volume Threshold
 #
