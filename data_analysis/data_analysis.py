@@ -46,6 +46,8 @@ df = pd.read_csv(DATA_PATH)
 df['timestamp'] = pd.to_datetime(df['date'])
 df.set_index('timestamp', inplace=True)
 df.sort_index(inplace=True)
+# The original 'date' column is now redundant. Drop it to prevent conflicts.
+df.drop(columns=['date'], inplace=True)
 
 print("Data loaded and prepared. Shape:", df.shape)
 print(df.head())
