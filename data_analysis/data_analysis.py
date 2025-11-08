@@ -444,9 +444,52 @@ print(f"Number of dollar bars created: {len(dollar_bars)}")
 #%% [markdown]
 # The number of bars created is very similar to the original number of hourly bars, which is expected since we used the average hourly activity as the threshold. However, the timing of these bars will now be irregular.
 
-#AI print the volume over time, also plot distribution of volume bars AI!
 #%% [markdown]
-# ### 7.1. Comparison of Close Prices
+# ### 7.1. Analysis of Volume
+# 
+# First, let's look at the trading volume (in USDT) from the original hourly data to see how activity varies over time.
+
+#%%
+print("Plotting hourly trading volume over time...")
+plt.figure(figsize=(15, 7))
+plt.plot(df.index, df['Volume USDT'], label='Hourly Volume (USDT)', color='purple', alpha=0.7, linewidth=0.8)
+plt.title('Hourly Trading Volume (USDT) Over Time')
+plt.xlabel('Date')
+plt.ylabel('Volume (USDT)')
+plt.legend()
+plt.show()
+
+#%% [markdown]
+# The plot clearly shows periods of high and low trading activity, reinforcing the idea that a fixed time interval may not be the best way to sample the market.
+# 
+# Next, we'll examine the distribution of the volumes within the bars we created. Since we defined a fixed threshold for bar creation, we expect the volumes to be clustered around that threshold.
+
+#%%
+print("Plotting the distribution of volumes within the generated bars...")
+fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+
+# Distribution of BTC volume in Volume Bars
+sns.histplot(volume_bars['Volume BTC'], ax=axes[0], bins=50, kde=True, color='blue')
+axes[0].set_title('Distribution of BTC Volume in Volume Bars')
+axes[0].set_xlabel('Volume (BTC)')
+axes[0].axvline(avg_hourly_btc_volume, color='r', linestyle='--', label=f'Threshold: {avg_hourly_btc_volume:.2f}')
+axes[0].legend()
+
+# Distribution of USDT volume in Dollar Bars
+sns.histplot(dollar_bars['Volume USDT'], ax=axes[1], bins=50, kde=True, color='green')
+axes[1].set_title('Distribution of USDT Volume in Dollar Bars')
+axes[1].set_xlabel('Volume (USDT)')
+axes[1].axvline(avg_hourly_usdt_volume, color='r', linestyle='--', label=f'Threshold: ${avg_hourly_usdt_volume:,.2f}')
+axes[1].legend()
+
+fig.tight_layout()
+plt.show()
+
+#%% [markdown]
+# As expected, the distributions are tightly centered around the threshold values we used. The small variations occur because a bar is only formed *after* the cumulative volume crosses the threshold, so the final volume for a bar is typically slightly higher than the threshold itself.
+
+#%% [markdown]
+# ### 7.2. Comparison of Close Prices
 
 #%%
 print("Plotting comparison of close prices across bar types...")
@@ -467,7 +510,7 @@ plt.show()
 # The plot shows how volume and dollar bars sample the price series. During periods of low volatility and volume, the points for volume/dollar bars are sparse. During periods of high activity, they are clustered together, capturing more detail than fixed time bars.
 
 #%% [markdown]
-# ### 7.2. Analysis of Bar Durations
+# ### 7.3. Analysis of Bar Durations
 #
 # A key feature of volume and dollar bars is their variable duration in time. Let's analyze the distribution of these durations.
 
