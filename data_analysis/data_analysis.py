@@ -546,3 +546,4 @@ print(volume_bars['duration_hours'].describe())
 print("\n--- Dollar Bar Duration ---")
 print(dollar_bars['duration_hours'].describe())
 
+# AI, in two plots, plot the volume bars close price varying the volume_threshold starting with the mean and going to the 0.9 percentile AI!
