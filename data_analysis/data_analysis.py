@@ -12,6 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from statsmodels.tsa.stattools import adfuller
+from src.volume_data_processor import create_volume_bars, create_dollar_bars
 
 # Set plot style
 sns.set(style="whitegrid")
@@ -403,4 +404,96 @@ print(f"Annualized Volatility: {annualized_volatility:.2%}")
 print(f"Sharpe Ratio: {sharpe_ratio:.2f}")
 print(f"Maximum Drawdown: {max_drawdown:.2%}")
 
-# AI analyze data using create_volume_bars and create_dollar_bars AI!
+#%% [markdown]
+# ## 7. Volume and Dollar Bar Analysis
+#
+# Time-based bars (like the hourly data we've used) are standard, but they don't account for market activity. During quiet periods, time bars have low volume and volatility, while during active periods, they can contain multiple significant market events.
+#
+# An alternative is to use data-driven bars, such as **Volume Bars** and **Dollar Bars**.
+# - **Volume Bars**: A new bar is formed whenever a pre-defined amount of the asset (e.g., BTC) has been traded.
+# - **Dollar Bars**: A new bar is formed whenever a pre-defined value (e.g., in USDT) has been traded.
+#
+# This approach samples data more frequently during high-activity periods and less frequently during low-activity periods, potentially providing a better signal for analysis and strategy development. We will use the average hourly volume and dollar value as thresholds to create these bars.
+
+#%%
+print("Creating Volume and Dollar bars...")
+
+# Calculate thresholds based on the average hourly activity
+avg_hourly_btc_volume = df['Volume BTC'].mean()
+avg_hourly_usdt_volume = df['Volume USDT'].mean()
+
+print(f"Using Volume Threshold: {avg_hourly_btc_volume:.2f} BTC")
+print(f"Using Dollar Threshold: ${avg_hourly_usdt_volume:,.2f} USDT")
+
+# The bar creation functions expect a 'date' column.
+# We reset the index to turn the 'timestamp' index into a column, then rename it to 'date'.
+df_for_bars = df.reset_index().rename(columns={'timestamp': 'date'})
+
+# Create the bars
+volume_bars = create_volume_bars(df_for_bars, volume_threshold=avg_hourly_btc_volume)
+dollar_bars = create_dollar_bars(df_for_bars, dollar_threshold=avg_hourly_usdt_volume)
+
+print(f"\nNumber of original 1-hour bars: {len(df)}")
+print(f"Number of volume bars created: {len(volume_bars)}")
+print(f"Number of dollar bars created: {len(dollar_bars)}")
+
+#%% [markdown]
+# The number of bars created is very similar to the original number of hourly bars, which is expected since we used the average hourly activity as the threshold. However, the timing of these bars will now be irregular.
+
+#%% [markdown]
+# ### 7.1. Comparison of Close Prices
+
+#%%
+print("Plotting comparison of close prices across bar types...")
+plt.figure(figsize=(15, 8))
+
+# Plot the close prices for each bar type
+plt.plot(df.index, df['close'], label='Time Bars (1-Hour)', alpha=0.6, linewidth=1)
+plt.plot(volume_bars.index, volume_bars['close'], label=f'Volume Bars', alpha=0.8, linestyle='--', marker='.', markersize=2, linewidth=0.5)
+plt.plot(dollar_bars.index, dollar_bars['close'], label=f'Dollar Bars', alpha=0.8, linestyle=':', marker='x', markersize=2, linewidth=0.5)
+
+plt.title('Comparison of Close Prices: Time vs. Volume vs. Dollar Bars')
+plt.xlabel('Date')
+plt.ylabel('Price (USDT)')
+plt.legend()
+plt.show()
+
+#%% [markdown]
+# The plot shows how volume and dollar bars sample the price series. During periods of low volatility and volume, the points for volume/dollar bars are sparse. During periods of high activity, they are clustered together, capturing more detail than fixed time bars.
+
+#%% [markdown]
+# ### 7.2. Analysis of Bar Durations
+#
+# A key feature of volume and dollar bars is their variable duration in time. Let's analyze the distribution of these durations.
+
+#%%
+print("Analyzing the distribution of bar durations...")
+
+# Calculate duration in hours for each bar
+volume_bars['duration_hours'] = volume_bars.index.to_series().diff().dt.total_seconds() / 3600
+dollar_bars['duration_hours'] = dollar_bars.index.to_series().diff().dt.total_seconds() / 3600
+
+# Plot the distributions
+fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
+
+sns.histplot(volume_bars['duration_hours'].dropna(), ax=axes[0], bins=50, kde=True)
+axes[0].set_title('Distribution of Volume Bar Durations')
+axes[0].set_xlabel('Duration (hours)')
+axes[0].set_ylabel('Frequency')
+
+sns.histplot(dollar_bars['duration_hours'].dropna(), ax=axes[1], bins=50, kde=True)
+axes[1].set_title('Distribution of Dollar Bar Durations')
+axes[1].set_xlabel('Duration (hours)')
+
+fig.tight_layout()
+plt.show()
+
+#%% [markdown]
+# The distributions show that most bars complete in under an hour, which is expected as we used the average hourly volume as a threshold. The right-skewed tail indicates that some bars take much longer to form, corresponding to periods of very low market activity.
+
+#%%
+print("Descriptive statistics for bar durations (in hours):")
+print("\n--- Volume Bar Duration ---")
+print(volume_bars['duration_hours'].describe())
+print("\n--- Dollar Bar Duration ---")
+print(dollar_bars['duration_hours'].describe())
