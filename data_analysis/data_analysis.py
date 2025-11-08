@@ -15,6 +15,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from statsmodels.tsa.stattools import adfuller
 from src.volume_data_processor import create_volume_bars, create_dollar_bars
+from scipy import stats
+from statsmodels.stats.diagnostic import acorr_ljungbox
 
 # Set plot style
 sns.set(style="whitegrid")
@@ -547,78 +549,118 @@ print("\n--- Dollar Bar Duration ---")
 print(dollar_bars['duration_hours'].describe())
 
 #%% [markdown]
-# ## 8. Bar Threshold Sensitivity Analysis
+# ## 8. Statistical Properties of Returns for Different Bar Types
 #
-# The choice of threshold is critical for volume and dollar bars. A low threshold will sample frequently, capturing more noise, while a high threshold will sample less frequently, potentially missing smaller price movements. Here, we visualize how changing the threshold affects the resulting price series.
-# AI instead of plotting print: serial correlation, variability over time (homocedasticity), gaussian distribution properties AI! 
-#%% [markdown]
-# ### 8.1. Varying the BTC Volume Threshold
+# A key motivation for using alternative bars (like volume or dollar bars) is that they may produce returns series with better statistical properties—closer to being independent and identically distributed (i.i.d.) Gaussian. This is desirable for many financial models.
 #
-# We'll create volume bars using three different thresholds: the mean hourly volume, the 75th percentile, and the 90th percentile. This will show how the sampling frequency decreases as the threshold increases.
+# We will now analyze and compare the following properties for returns calculated from time, volume, and dollar bars:
+# 1.  **Gaussian Distribution**: How close are the returns to a normal distribution? We'll check skewness, kurtosis, and perform a Jarque-Bera test.
+# 2.  **Serial Correlation**: Are the returns independent of each other? We'll use the Ljung-Box test to check for autocorrelation.
+# 3.  **Homoscedasticity**: Is the variance of returns constant over time? We will use Levene's test to compare the variance of the first and second halves of the data.
 
 #%%
-print("Analyzing sensitivity to BTC volume threshold...")
+def analyze_returns_properties(returns: pd.Series, bar_type: str):
+    """
+    Performs and prints a statistical analysis of a returns series.
+    """
+    print(f"\n--- Analysis of Returns for {bar_type} ---")
+    returns = returns.dropna()
+    if len(returns) < 20:
+        print("  - Not enough data points for analysis.")
+        print("-" * 50)
+        return
 
-# Define a range of percentile-based thresholds
+    # 1. Gaussian Distribution Properties
+    print("\n1. Gaussian Distribution Properties:")
+    jb_test = stats.jarque_bera(returns)
+    print(f"  - Skewness: {returns.skew():.4f}")
+    print(f"  - Kurtosis: {returns.kurtosis():.4f} (Excess kurtosis)")
+    print(f"  - Jarque-Bera Test Statistic: {jb_test.statistic:.4f}, p-value: {jb_test.pvalue:.4f}")
+    if jb_test.pvalue < 0.05:
+        print("  - Result: The distribution is likely non-Gaussian (p-value < 0.05).")
+    else:
+        print("  - Result: The distribution may be Gaussian (p-value >= 0.05).")
+
+    # 2. Serial Correlation (Autocorrelation)
+    print("\n2. Serial Correlation (Ljung-Box Test):")
+    # Ensure there are enough observations for the test
+    lags = min(10, len(returns) // 5)
+    if lags > 0:
+        lb_test = acorr_ljungbox(returns, lags=[lags], return_df=True)
+        p_value = lb_test['lb_pvalue'].iloc[0]
+        print(f"  - Ljung-Box p-value (lag {lags}): {p_value:.4f}")
+        if p_value < 0.05:
+            print("  - Result: Significant serial correlation detected (p-value < 0.05).")
+        else:
+            print("  - Result: No significant serial correlation detected (p-value >= 0.05).")
+    else:
+        print("  - Not enough data to perform Ljung-Box test.")
+
+    # 3. Homoscedasticity (Variability over time) using Levene's test
+    print("\n3. Homoscedasticity (Levene's Test):")
+    mid_point = len(returns) // 2
+    part1 = returns.iloc[:mid_point]
+    part2 = returns.iloc[mid_point:]
+    if len(part1) > 5 and len(part2) > 5:
+        levene_test = stats.levene(part1, part2)
+        print(f"  - Levene Test Statistic: {levene_test.statistic:.4f}, p-value: {levene_test.pvalue:.4f}")
+        if levene_test.pvalue < 0.05:
+            print("  - Result: The variances are unequal (heteroscedastic, p-value < 0.05).")
+        else:
+            print("  - Result: The variances are equal (homoscedastic, p-value >= 0.05).")
+    else:
+        print("  - Not enough data to perform Levene's test.")
+
+    print("-" * 50)
+
+#%% [markdown]
+# ### 8.1. Analysis of Time Bar Returns (Baseline)
+
+#%%
+time_bar_returns = df['close'].pct_change()
+analyze_returns_properties(time_bar_returns, "1-Hour Time Bars")
+
+#%% [markdown]
+# ### 8.2. Analysis of Volume Bar Returns
+#
+# We'll analyze returns from volume bars created using three different thresholds: the mean hourly volume, the 75th percentile, and the 90th percentile.
+
+#%%
+print("\nAnalyzing statistical properties of Volume Bar returns...")
+
 volume_thresholds = {
     'Mean': df['Volume BTC'].mean(),
     '75th Percentile': df['Volume BTC'].quantile(0.75),
     '90th Percentile': df['Volume BTC'].quantile(0.90)
 }
 
-plt.figure(figsize=(15, 8))
-plt.plot(df.index, df['close'], label='Time Bars (1-Hour)', alpha=0.3, color='gray', linewidth=1)
-
-markers = ['o', 'x', '^']
-colors = ['blue', 'green', 'red']
-
-for (label, threshold), marker, color in zip(volume_thresholds.items(), markers, colors):
+for label, threshold in volume_thresholds.items():
     bars = create_volume_bars(df_for_bars, volume_threshold=threshold)
-    plt.plot(bars.index, bars['close'],
-             label=f'Volume Bar (Threshold: {threshold:.2f} BTC)',
-             linestyle='', marker=marker, markersize=3, color=color, alpha=0.9)
-    print(f"Threshold '{label}' ({threshold:.2f} BTC) created {len(bars)} bars.")
-
-plt.title('Comparison of Close Prices with Varying BTC Volume Thresholds')
-plt.xlabel('Date')
-plt.ylabel('Price (USDT)')
-plt.legend()
-plt.show()
-
+    returns = bars['close'].pct_change()
+    bar_label = f"Volume Bars ({label} Threshold: {threshold:.2f} BTC)"
+    analyze_returns_properties(returns, bar_label)
 
 #%% [markdown]
-# As the BTC volume threshold increases, the number of bars decreases significantly. The plot shows that higher thresholds result in a much sparser sampling of the price, focusing only on periods where a very large volume of BTC was traded.
-
-#%% [markdown]
-# ### 8.2. Varying the USDT Dollar Threshold
+# ### 8.3. Analysis of Dollar Bar Returns
 #
 # We'll do the same analysis for dollar bars, using thresholds based on the mean, 75th, and 90th percentiles of hourly USDT volume.
 
 #%%
-print("Analyzing sensitivity to USDT dollar threshold...")
+print("\nAnalyzing statistical properties of Dollar Bar returns...")
 
-# Define a range of percentile-based thresholds for dollar volume
 dollar_thresholds = {
     'Mean': df['Volume USDT'].mean(),
     '75th Percentile': df['Volume USDT'].quantile(0.75),
     '90th Percentile': df['Volume USDT'].quantile(0.90)
 }
 
-plt.figure(figsize=(15, 8))
-plt.plot(df.index, df['close'], label='Time Bars (1-Hour)', alpha=0.3, color='gray', linewidth=1)
-
-for (label, threshold), marker, color in zip(dollar_thresholds.items(), markers, colors):
+for label, threshold in dollar_thresholds.items():
     bars = create_dollar_bars(df_for_bars, dollar_threshold=threshold)
-    plt.plot(bars.index, bars['close'],
-             label=f'Dollar Bar (Threshold: ${threshold:,.0f})',
-             linestyle='', marker=marker, markersize=3, color=color, alpha=0.9)
-    print(f"Threshold '{label}' (${threshold:,.0f}) created {len(bars)} bars.")
-
-plt.title('Comparison of Close Prices with Varying USDT Dollar Thresholds')
-plt.xlabel('Date')
-plt.ylabel('Price (USDT)')
-plt.legend()
-plt.show()
+    returns = bars['close'].pct_change()
+    bar_label = f"Dollar Bars ({label} Threshold: ${threshold:,.0f})"
+    analyze_returns_properties(returns, bar_label)
 
 #%% [markdown]
-# The result is similar for dollar bars. Higher dollar value thresholds lead to fewer bars, each representing a much larger amount of market activity in terms of value traded. This demonstrates the trade-off between sampling frequency and the significance of each data point.
+# ### 8.4. Summary of Findings
+#
+# This analysis typically shows that as we move from time-based sampling to activity-based sampling (volume/dollar bars), the resulting returns series often exhibit weaker serial correlation and become closer to a Gaussian distribution (i.e., lower kurtosis). This makes them a more suitable input for many standard financial models that assume i.i.d. returns. However, heteroscedasticity (non-constant variance) often remains a persistent feature in financial data, regardless of the bar type.
