@@ -546,4 +546,79 @@ print(volume_bars['duration_hours'].describe())
 print("\n--- Dollar Bar Duration ---")
 print(dollar_bars['duration_hours'].describe())
 
-# AI, in two plots, plot the volume bars close price varying the volume_threshold starting with the mean and going to the 0.9 percentile AI!
+#%% [markdown]
+# ## 8. Bar Threshold Sensitivity Analysis
+#
+# The choice of threshold is critical for volume and dollar bars. A low threshold will sample frequently, capturing more noise, while a high threshold will sample less frequently, potentially missing smaller price movements. Here, we visualize how changing the threshold affects the resulting price series.
+
+#%% [markdown]
+# ### 8.1. Varying the BTC Volume Threshold
+#
+# We'll create volume bars using three different thresholds: the mean hourly volume, the 75th percentile, and the 90th percentile. This will show how the sampling frequency decreases as the threshold increases.
+
+#%%
+print("Analyzing sensitivity to BTC volume threshold...")
+
+# Define a range of percentile-based thresholds
+volume_thresholds = {
+    'Mean': df['Volume BTC'].mean(),
+    '75th Percentile': df['Volume BTC'].quantile(0.75),
+    '90th Percentile': df['Volume BTC'].quantile(0.90)
+}
+
+plt.figure(figsize=(15, 8))
+plt.plot(df.index, df['close'], label='Time Bars (1-Hour)', alpha=0.3, color='gray', linewidth=1)
+
+markers = ['o', 'x', '^']
+colors = ['blue', 'green', 'red']
+
+for (label, threshold), marker, color in zip(volume_thresholds.items(), markers, colors):
+    bars = create_volume_bars(df_for_bars, volume_threshold=threshold)
+    plt.plot(bars.index, bars['close'],
+             label=f'Volume Bar (Threshold: {threshold:.2f} BTC)',
+             linestyle='', marker=marker, markersize=3, color=color, alpha=0.9)
+    print(f"Threshold '{label}' ({threshold:.2f} BTC) created {len(bars)} bars.")
+
+plt.title('Comparison of Close Prices with Varying BTC Volume Thresholds')
+plt.xlabel('Date')
+plt.ylabel('Price (USDT)')
+plt.legend()
+plt.show()
+
+
+#%% [markdown]
+# As the BTC volume threshold increases, the number of bars decreases significantly. The plot shows that higher thresholds result in a much sparser sampling of the price, focusing only on periods where a very large volume of BTC was traded.
+
+#%% [markdown]
+# ### 8.2. Varying the USDT Dollar Threshold
+#
+# We'll do the same analysis for dollar bars, using thresholds based on the mean, 75th, and 90th percentiles of hourly USDT volume.
+
+#%%
+print("Analyzing sensitivity to USDT dollar threshold...")
+
+# Define a range of percentile-based thresholds for dollar volume
+dollar_thresholds = {
+    'Mean': df['Volume USDT'].mean(),
+    '75th Percentile': df['Volume USDT'].quantile(0.75),
+    '90th Percentile': df['Volume USDT'].quantile(0.90)
+}
+
+plt.figure(figsize=(15, 8))
+plt.plot(df.index, df['close'], label='Time Bars (1-Hour)', alpha=0.3, color='gray', linewidth=1)
+
+for (label, threshold), marker, color in zip(dollar_thresholds.items(), markers, colors):
+    bars = create_dollar_bars(df_for_bars, dollar_threshold=threshold)
+    plt.plot(bars.index, bars['close'],
+             label=f'Dollar Bar (Threshold: ${threshold:,.0f})',
+             linestyle='', marker=marker, markersize=3, color=color, alpha=0.9)
+    print(f"Threshold '{label}' (${threshold:,.0f}) created {len(bars)} bars.")
+
+plt.title('Comparison of Close Prices with Varying USDT Dollar Thresholds')
+plt.xlabel('Date')
+plt.ylabel('Price (USDT)')
+plt.legend()
+plt.show()
+
+#%% [markdown]
+# The result is similar for dollar bars. Higher dollar value thresholds lead to fewer bars, each representing a much larger amount of market activity in terms of value traded. This demonstrates the trade-off between sampling frequency and the significance of each data point.
