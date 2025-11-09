@@ -90,4 +90,25 @@ def create_dollar_bars(df: pd.DataFrame, dollar_threshold: float) -> pd.DataFram
     return _aggregate_to_bars(df, 'Volume USDT', dollar_threshold)
 
 
-# AI adda new function that aggregates based on absolute price change AI!
+def create_price_change_bars(df: pd.DataFrame, price_change_threshold: float) -> pd.DataFrame:
+    """
+    Creates bars based on cumulative absolute price change.
+
+    A new bar is formed whenever the cumulative absolute percentage change of the close price
+    reaches the price_change_threshold. The change is calculated as a fraction (e.g., 0.01 for 1%).
+    The input DataFrame should have columns including: date, open, high, low, close,
+    'Volume BTC', 'Volume USDT', and tradeCount.
+
+    Args:
+        df (pd.DataFrame): DataFrame with tick or bar data.
+        price_change_threshold (float): The amount of absolute fractional price change to accumulate.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing the new bars.
+    """
+    df_copy = df.copy()
+    # Calculate fractional change, not percentage
+    df_copy['abs_pct_change'] = df_copy['close'].pct_change().abs()
+    # The first value will be NaN, fill it with 0 so it doesn't break the cumulative sum
+    df_copy['abs_pct_change'].fillna(0, inplace=True)
+    return _aggregate_to_bars(df_copy, 'abs_pct_change', price_change_threshold)
