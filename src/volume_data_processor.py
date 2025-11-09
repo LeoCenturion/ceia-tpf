@@ -1,4 +1,5 @@
 import pandas as pd
+import argparse
 
 
 def _aggregate_to_bars(df: pd.DataFrame, metric_col: str, threshold: float) -> pd.DataFrame:
@@ -113,4 +114,54 @@ def create_price_change_bars(df: pd.DataFrame, price_change_threshold: float) ->
     df_copy['abs_pct_change'] = df_copy['abs_pct_change'].fillna(0)
     return _aggregate_to_bars(df_copy, 'abs_pct_change', price_change_threshold)
 
-# AI add a main function that takes a csv 
+
+def main():
+    """
+    Main function to run the bar aggregation script from the command line.
+    """
+    parser = argparse.ArgumentParser(description="Aggregate time-series data into different bar types.")
+    parser.add_argument("input_csv", help="Path to the input CSV file.")
+    parser.add_argument("bar_type", choices=['volume', 'dollar', 'price_change'], help="Type of bar to create.")
+    parser.add_argument("threshold", type=float, help="Threshold value for bar creation.")
+    parser.add_argument("-o", "--output_csv", help="Path to the output CSV file. If not provided, prints to console.")
+    
+    args = parser.parse_args()
+
+    print(f"Loading data from {args.input_csv}...")
+    try:
+        df = pd.read_csv(args.input_csv)
+    except FileNotFoundError:
+        print(f"Error: Input file not found at {args.input_csv}")
+        return
+
+    # The bar creation functions expect a 'date' column.
+    if 'date' not in df.columns:
+        print(f"Error: Input CSV must contain a 'date' column. Found columns: {df.columns.tolist()}")
+        return
+
+    print(f"Creating {args.bar_type} bars with threshold {args.threshold}...")
+    
+    if args.bar_type == 'volume':
+        result_df = create_volume_bars(df, args.threshold)
+    elif args.bar_type == 'dollar':
+        result_df = create_dollar_bars(df, args.threshold)
+    elif args.bar_type == 'price_change':
+        result_df = create_price_change_bars(df, args.threshold)
+    else:
+        # This case should not be reached due to argparse choices
+        print(f"Error: Unknown bar type '{args.bar_type}'")
+        return
+    
+    print(f"Successfully created {len(result_df)} bars.")
+
+    if args.output_csv:
+        print(f"Saving results to {args.output_csv}...")
+        result_df.to_csv(args.output_csv, index=True)
+        print("Done.")
+    else:
+        print("\n--- Resulting Bars ---")
+        print(result_df.to_string())
+
+
+if __name__ == "__main__":
+    main()

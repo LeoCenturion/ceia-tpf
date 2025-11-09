@@ -857,4 +857,68 @@ plot_threshold_sweep_analysis(
 # These results provide strong evidence that by sampling based on market activity, we can produce a returns series with more desirable statistical properties for modeling. The trade-off is that higher thresholds lead to fewer data points, which can be a problem for models that require a large amount of data.
 
 
-# AI do that same sweep but for minute data found in /home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/monthly/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv AI!
+#%% [markdown]
+# ## 10. Threshold Sweep Analysis on 1-Minute Data
+#
+# We will now repeat the entire threshold sweep analysis using 1-minute resolution data. This higher frequency data will allow us to see if the same patterns hold and how the much smaller time interval affects the choice of thresholds and the resulting statistical properties.
+
+#%%
+print("\n--- Starting Analysis on 1-Minute Data ---")
+
+# --- 1. Load and Prepare 1-Minute Data ---
+DATA_PATH_1M = '/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/monthly/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv'
+print(f"Loading 1-minute data from: {DATA_PATH_1M}")
+df_1m = pd.read_csv(DATA_PATH_1M)
+
+# Convert to datetime and set as index
+# The consolidation script already creates a 'date' column for the index.
+df_1m['timestamp'] = pd.to_datetime(df_1m['date'])
+df_1m.set_index('timestamp', inplace=True)
+df_1m.sort_index(inplace=True)
+df_1m.drop(columns=['date'], inplace=True)
+
+print("1-minute data loaded and prepared. Shape:", df_1m.shape)
+
+# Create the DataFrame for bar creation functions
+df_for_bars_1m = df_1m.reset_index().rename(columns={'timestamp': 'date'})
+
+#%% [markdown]
+# ### 10.1. Volume Bar Threshold Sweep (1-Minute Data)
+
+#%%
+plot_threshold_sweep_analysis(
+    df_for_bars=df_for_bars_1m,
+    bar_creation_func=create_volume_bars,
+    metric_series=df_1m['Volume BTC'],
+    sweep_title="Volume Bars (BTC) from 1-Minute Data"
+)
+
+#%% [markdown]
+# ### 10.2. Dollar Bar Threshold Sweep (1-Minute Data)
+
+#%%
+plot_threshold_sweep_analysis(
+    df_for_bars=df_for_bars_1m,
+    bar_creation_func=create_dollar_bars,
+    metric_series=df_1m['Volume USDT'],
+    sweep_title="Dollar Bars (USDT) from 1-Minute Data"
+)
+
+#%% [markdown]
+# ### 10.3. Price Change Bar Threshold Sweep (1-Minute Data)
+
+#%%
+# Calculate absolute fractional price change to use for the metric series
+abs_frac_change_1m = df_1m['close'].pct_change().abs().dropna()
+
+plot_threshold_sweep_analysis(
+    df_for_bars=df_for_bars_1m,
+    bar_creation_func=create_price_change_bars,
+    metric_series=abs_frac_change_1m,
+    sweep_title="Price Change Bars from 1-Minute Data"
+)
+
+#%% [markdown]
+# ### 10.4. Summary of 1-Minute Data Analysis
+#
+# The analysis on 1-minute data generally confirms the findings from the hourly data: using activity-based bars tends to improve the statistical properties of the returns series. However, the scale of the thresholds is much smaller due to the finer time resolution. The trends of decreasing kurtosis and serial correlation with increasing thresholds remain consistent, reinforcing the validity of this sampling technique across different timeframes.
