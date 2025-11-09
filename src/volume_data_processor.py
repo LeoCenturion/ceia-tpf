@@ -89,3 +89,5 @@ def create_dollar_bars(df: pd.DataFrame, dollar_threshold: float) -> pd.DataFram
     """
     return _aggregate_to_bars(df, 'Volume USDT', dollar_threshold)
 
+
+# AI adda new function that aggregates based on absolute price change AI!
