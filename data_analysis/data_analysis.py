@@ -872,6 +872,7 @@ df_1m = pd.read_csv(DATA_PATH_1M)
 
 # Convert to datetime and set as index
 # The consolidation script already creates a 'date' column for the index.
+# AI date formats can be like 2017-11-29 14:54:00.000 or 2017-11-29 14:54:00.000 AI!
 df_1m['timestamp'] = pd.to_datetime(df_1m['date'])
 df_1m.set_index('timestamp', inplace=True)
 df_1m.sort_index(inplace=True)
