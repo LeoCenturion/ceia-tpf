@@ -665,4 +665,4 @@ for label, threshold in dollar_thresholds.items():
 #
 # This analysis typically shows that as we move from time-based sampling to activity-based sampling (volume/dollar bars), the resulting returns series often exhibit weaker serial correlation and become closer to a Gaussian distribution (i.e., lower kurtosis). This makes them a more suitable input for many standard financial models that assume i.i.d. returns. However, heteroscedasticity (non-constant variance) often remains a persistent feature in financial data, regardless of the bar type.
 
-# AI now repeat the analysis but of the integrated data (pct_change) and the integrated volume bars (also for each percentile ). This is compute the statistics for the pct_change of the original data and for the pct_change of the volume bars  AI!
+# AI for both volume and dollar bars do a sweep from mean to 100th percentile times 4 searching and plot all the satistical properties described previously. AI! 
