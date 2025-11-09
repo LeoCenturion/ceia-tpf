@@ -14,7 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from statsmodels.tsa.stattools import adfuller
-from src.volume_data_processor import create_volume_bars, create_dollar_bars
+from src.volume_data_processor import create_volume_bars, create_dollar_bars, create_price_change_bars
 from scipy import stats
 from statsmodels.stats.diagnostic import acorr_ljungbox
 
@@ -831,9 +831,22 @@ plot_threshold_sweep_analysis(
     sweep_title="Dollar Bars (USDT)"
 )
 
-# AI add a section for create_price_change_bars AI! 
 #%% [markdown]
-# ### 9.4. Summary of Sweep Analysis
+# ### 9.4. Price Change Bar Threshold Sweep
+
+#%%
+# Calculate absolute fractional price change to use for the metric series
+abs_frac_change = df['close'].pct_change().abs().dropna()
+
+plot_threshold_sweep_analysis(
+    df_for_bars=df_for_bars,
+    bar_creation_func=create_price_change_bars,
+    metric_series=abs_frac_change,
+    sweep_title="Price Change Bars"
+)
+
+#%% [markdown]
+# ### 9.5. Summary of Sweep Analysis
 #
 # The plots show several key trends:
 # - **Number of Bars**: As expected, the number of bars created decreases exponentially as the threshold increases.
