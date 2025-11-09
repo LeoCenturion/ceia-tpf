@@ -855,3 +855,6 @@ plot_threshold_sweep_analysis(
 # - **Normality (Jarque-Bera p-value)**: The p-value for the Jarque-Bera test also tends to increase, indicating that the returns are moving closer to a normal distribution.
 #
 # These results provide strong evidence that by sampling based on market activity, we can produce a returns series with more desirable statistical properties for modeling. The trade-off is that higher thresholds lead to fewer data points, which can be a problem for models that require a large amount of data.
+
+
+# AI do that same sweep but for minute data found in /home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/monthly/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv AI!

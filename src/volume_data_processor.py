@@ -110,5 +110,7 @@ def create_price_change_bars(df: pd.DataFrame, price_change_threshold: float) ->
     # Calculate fractional change, not percentage
     df_copy['abs_pct_change'] = df_copy['close'].pct_change().abs()
     # The first value will be NaN, fill it with 0 so it doesn't break the cumulative sum
-    df_copy['abs_pct_change'].fillna(0, inplace=True)
+    df_copy['abs_pct_change'] = df_copy['abs_pct_change'].fillna(0)
     return _aggregate_to_bars(df_copy, 'abs_pct_change', price_change_threshold)
+
+# AI add a main function that takes a csv 
