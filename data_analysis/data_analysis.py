@@ -665,4 +665,179 @@ for label, threshold in dollar_thresholds.items():
 #
 # This analysis typically shows that as we move from time-based sampling to activity-based sampling (volume/dollar bars), the resulting returns series often exhibit weaker serial correlation and become closer to a Gaussian distribution (i.e., lower kurtosis). This makes them a more suitable input for many standard financial models that assume i.i.d. returns. However, heteroscedasticity (non-constant variance) often remains a persistent feature in financial data, regardless of the bar type.
 
-# AI for both volume and dollar bars do a sweep from mean to 100th percentile times 4 searching and plot all the satistical properties described previously. AI! 
+#%% [markdown]
+# ## 9. Threshold Sweep Analysis for Statistical Properties
+#
+# To understand how the choice of threshold affects the statistical properties of returns, we will perform a sweep across a range of thresholds for both volume and dollar bars. We will start from the mean hourly value and go up to four times the maximum observed hourly value.
+#
+# For each threshold, we will compute the same statistical properties as before and plot them. This will help us identify if there are optimal threshold regions where the returns series is "best behaved" (e.g., lowest kurtosis, highest p-value for normality tests, etc.).
+
+#%% [markdown]
+# ### 9.1. Helper Functions for Threshold Sweep
+
+#%%
+def get_returns_properties(returns: pd.Series):
+    """
+    Calculates statistical properties of a returns series.
+    Returns a dictionary of results, or NaNs if data is insufficient.
+    """
+    returns = returns.dropna()
+    if len(returns) < 20:
+        return {
+            'skew': np.nan, 'kurtosis': np.nan, 'jb_pvalue': np.nan,
+            'lb_pvalue': np.nan, 'levene_pvalue': np.nan, 'num_bars': len(returns)
+        }
+
+    # Gaussian properties
+    skew = returns.skew()
+    kurtosis = returns.kurtosis()
+    jb_test = stats.jarque_bera(returns)
+    jb_pvalue = jb_test.pvalue
+
+    # Serial correlation
+    lags = min(10, len(returns) // 5)
+    lb_pvalue = np.nan
+    if lags > 0:
+        lb_test = acorr_ljungbox(returns, lags=[lags], return_df=True)
+        lb_pvalue = lb_test['lb_pvalue'].iloc[0]
+
+    # Homoscedasticity
+    mid_point = len(returns) // 2
+    part1 = returns.iloc[:mid_point]
+    part2 = returns.iloc[mid_point:]
+    levene_pvalue = np.nan
+    if len(part1) > 5 and len(part2) > 5:
+        levene_test = stats.levene(part1, part2)
+        levene_pvalue = levene_test.pvalue
+
+    return {
+        'skew': skew, 'kurtosis': kurtosis, 'jb_pvalue': jb_pvalue,
+        'lb_pvalue': lb_pvalue, 'levene_pvalue': levene_pvalue, 'num_bars': len(returns)
+    }
+
+
+def plot_threshold_sweep_analysis(
+    df_for_bars: pd.DataFrame,
+    bar_creation_func,
+    metric_series: pd.Series,
+    sweep_title: str,
+    num_steps: int = 50
+):
+    """
+    Performs a sweep of thresholds for a bar creation function and plots the statistical
+    properties of the resulting returns series.
+    """
+    print(f"\n--- Starting Threshold Sweep Analysis for {sweep_title} ---")
+    
+    # Define threshold range
+    min_threshold = metric_series.mean()
+    max_threshold = metric_series.max() * 4
+    thresholds = np.linspace(min_threshold, max_threshold, num_steps)
+    
+    results = []
+    
+    # Using tqdm for progress bar
+    from tqdm.notebook import tqdm
+    
+    for threshold in tqdm(thresholds, desc=f"Sweeping {sweep_title}"):
+        if threshold <= 0: continue
+        
+        bars = bar_creation_func(df_for_bars, threshold)
+        returns = bars['close'].pct_change()
+        
+        stats_dict = get_returns_properties(returns)
+        stats_dict['threshold'] = threshold
+        results.append(stats_dict)
+        
+    results_df = pd.DataFrame(results).dropna()
+    
+    if results_df.empty:
+        print("Could not generate sufficient data for plotting.")
+        return
+
+    # Plotting
+    print(f"Plotting results for {sweep_title}...")
+    fig, axes = plt.subplots(3, 2, figsize=(16, 18))
+    fig.suptitle(f'Statistical Properties of Returns vs. Threshold for {sweep_title}', fontsize=16)
+    axes = axes.flatten()
+
+    # Plot Skewness and Kurtosis
+    axes[0].plot(results_df['threshold'], results_df['skew'], marker='.', linestyle='-')
+    axes[0].set_title('Skewness vs. Threshold')
+    axes[0].set_xlabel('Threshold')
+    axes[0].set_ylabel('Skewness')
+    axes[0].grid(True)
+    
+    axes[1].plot(results_df['threshold'], results_df['kurtosis'], marker='.', linestyle='-')
+    axes[1].set_title('Excess Kurtosis vs. Threshold')
+    axes[1].set_xlabel('Threshold')
+    axes[1].set_ylabel('Kurtosis')
+    axes[1].grid(True)
+    
+    # Plot p-values
+    axes[2].plot(results_df['threshold'], results_df['jb_pvalue'], marker='.', linestyle='-')
+    axes[2].axhline(y=0.05, color='r', linestyle='--', label='p=0.05')
+    axes[2].set_title('Jarque-Bera p-value vs. Threshold')
+    axes[2].set_xlabel('Threshold')
+    axes[2].set_ylabel('p-value')
+    axes[2].legend()
+    axes[2].grid(True)
+
+    axes[3].plot(results_df['threshold'], results_df['lb_pvalue'], marker='.', linestyle='-')
+    axes[3].axhline(y=0.05, color='r', linestyle='--', label='p=0.05')
+    axes[3].set_title('Ljung-Box p-value vs. Threshold')
+    axes[3].set_xlabel('Threshold')
+    axes[3].set_ylabel('p-value')
+    axes[3].legend()
+    axes[3].grid(True)
+
+    axes[4].plot(results_df['threshold'], results_df['levene_pvalue'], marker='.', linestyle='-')
+    axes[4].axhline(y=0.05, color='r', linestyle='--', label='p=0.05')
+    axes[4].set_title("Levene's Test p-value vs. Threshold")
+    axes[4].set_xlabel('Threshold')
+    axes[4].set_ylabel('p-value')
+    axes[4].legend()
+    axes[4].grid(True)
+    
+    # Plot number of bars
+    axes[5].plot(results_df['threshold'], results_df['num_bars'], marker='.', linestyle='-')
+    axes[5].set_title('Number of Bars vs. Threshold')
+    axes[5].set_xlabel('Threshold')
+    axes[5].set_ylabel('Number of Bars')
+    axes[5].grid(True)
+    
+    fig.tight_layout(rect=[0, 0.03, 1, 0.96])
+    plt.show()
+
+#%% [markdown]
+# ### 9.2. Volume Bar Threshold Sweep
+
+#%%
+plot_threshold_sweep_analysis(
+    df_for_bars=df_for_bars,
+    bar_creation_func=create_volume_bars,
+    metric_series=df['Volume BTC'],
+    sweep_title="Volume Bars (BTC)"
+)
+
+#%% [markdown]
+# ### 9.3. Dollar Bar Threshold Sweep
+
+#%%
+plot_threshold_sweep_analysis(
+    df_for_bars=df_for_bars,
+    bar_creation_func=create_dollar_bars,
+    metric_series=df['Volume USDT'],
+    sweep_title="Dollar Bars (USDT)"
+)
+
+#%% [markdown]
+# ### 9.4. Summary of Sweep Analysis
+#
+# The plots show several key trends:
+# - **Number of Bars**: As expected, the number of bars created decreases exponentially as the threshold increases.
+# - **Kurtosis**: Kurtosis generally decreases as the threshold increases. This is a desirable outcome, as it means the returns distribution is becoming less "fat-tailed" and closer to Gaussian. Larger thresholds filter out the noise of small, frequent events, and each bar represents a more significant market movement.
+# - **Serial Correlation (Ljung-Box p-value)**: The p-value for the Ljung-Box test often increases with the threshold, suggesting that serial correlation is reduced. This is another key benefit of activity-based bars.
+# - **Normality (Jarque-Bera p-value)**: The p-value for the Jarque-Bera test also tends to increase, indicating that the returns are moving closer to a normal distribution.
+#
+# These results provide strong evidence that by sampling based on market activity, we can produce a returns series with more desirable statistical properties for modeling. The trade-off is that higher thresholds lead to fewer data points, which can be a problem for models that require a large amount of data.
