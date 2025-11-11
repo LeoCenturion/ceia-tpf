@@ -141,7 +141,7 @@ def run_study(data, study_name_in_db, n_trials):
     except ValueError:
         print("No successful trials were completed.")
 
-
+# make a function to train with 70% of the data and predict with the other 30 AI! 
 def main():
     """
     Main function to load data and run the Optuna study.
