@@ -37,7 +37,7 @@ def objective(trial: optuna.Trial, data: pd.DataFrame, test_size: float, step_si
     # Chronos2 requires columns: id, timestamp, target
     data_chronos = data.copy()
     data_chronos = data_chronos.reset_index()  # move timestamp from index to column
-    data_chronos.rename(columns={'timestamp': 'timestamp', 'close': 'target'}, inplace=True)
+    data_chronos.rename(columns={'timestamp': 'timestamp', 'Close': 'target'}, inplace=True)
     data_chronos['id'] = 'BTC/USDT'
 
     # === 3. Walk-Forward Validation ===
@@ -161,7 +161,7 @@ def train_and_predict_split(data: pd.DataFrame, context_length: int = 512):
     # === 1. Prepare data for Chronos2 format ===
     data_chronos = data.copy()
     data_chronos = data_chronos.reset_index()
-    data_chronos.rename(columns={'timestamp': 'timestamp', 'close': 'target'}, inplace=True)
+    data_chronos.rename(columns={'timestamp': 'timestamp', 'Close': 'target'}, inplace=True)
     data_chronos['id'] = 'BTC/USDT'
 
     # === 2. Split data ===
