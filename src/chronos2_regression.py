@@ -5,15 +5,20 @@ import mlflow
 import numpy as np
 import optuna
 import pandas as pd
+import torch
 from sklearn.metrics import mean_squared_error
 from tqdm import trange
 
 from backtest_utils import fetch_historical_data
 from chronos import Chronos2Pipeline
 
+# Determine device
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"Using device: {device}")
+
 # Initialize Chronos2 Pipeline globally to avoid reloading the model in each trial
-# Using device_map="auto" will automatically use a GPU if available.
-pipeline = Chronos2Pipeline.from_pretrained("amazon/chronos-2", device_map="auto")
+# Using device_map="auto" is not supported, so we explicitly set the device.
+pipeline = Chronos2Pipeline.from_pretrained("amazon/chronos-2", device_map=device)
 
 
 def objective(trial: optuna.Trial, data: pd.DataFrame, test_size: float, step_size: int, prediction_length: int) -> float:
