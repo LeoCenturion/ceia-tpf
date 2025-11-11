@@ -464,6 +464,7 @@ def run_single_backtest():
 
     manual_backtest(X, y_mapped, model, test_size=0.3, refit_every=params['refit_every'])
 
+# AI add a function to train xgboost with 70% of data and test with the remaining. Use the same features used in this file. Print the confussion matrix and classification scores AI!
 
 if __name__ == "__main__":
     main()  # Uncomment to run the Optuna study
