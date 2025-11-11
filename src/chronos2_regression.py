@@ -1,5 +1,6 @@
 from functools import partial
 
+import matplotlib.pyplot as plt
 import mlflow
 import numpy as np
 import optuna
@@ -141,7 +142,88 @@ def run_study(data, study_name_in_db, n_trials):
     except ValueError:
         print("No successful trials were completed.")
 
-# make a function to train with 70% of the data and predict with the other 30 AI! 
+
+def train_and_predict_split(data: pd.DataFrame, context_length: int = 512):
+    """
+    Trains the Chronos2 model on the first 70% of the data and predicts the remaining 30%.
+
+    Args:
+        data (pd.DataFrame): The input DataFrame with a datetime index and 'close' column.
+        context_length (int): The number of time steps to use as context for the prediction.
+    """
+    print("\n--- Training on 70% and Predicting 30% ---")
+
+    # === 1. Prepare data for Chronos2 format ===
+    data_chronos = data.copy()
+    data_chronos = data_chronos.reset_index()
+    data_chronos.rename(columns={'timestamp': 'timestamp', 'close': 'target'}, inplace=True)
+    data_chronos['id'] = 'BTC/USDT'
+
+    # === 2. Split data ===
+    split_index = int(len(data_chronos) * 0.7)
+    # Use the last `context_length` points of the training data as context
+    context_df = data_chronos.iloc[max(0, split_index - context_length):split_index]
+    actual_df = data_chronos.iloc[split_index:]
+    prediction_length = len(actual_df)
+
+    print(f"Training context size: {len(context_df)}")
+    print(f"Prediction length: {prediction_length}")
+
+    if len(context_df) < 2:
+        print("Error: Not enough data in the context window to make a prediction.")
+        return
+
+    # === 3. Generate predictions ===
+    print("Generating predictions for the test set...")
+    try:
+        # Using default generation parameters, as they are generally robust
+        pred_df = pipeline.predict_df(
+            context_df,
+            prediction_length=prediction_length,
+            quantile_levels=[0.1, 0.5, 0.9],  # Get median and uncertainty bounds
+            id_column="id",
+            timestamp_column="timestamp",
+            target_column="target",
+        )
+    except Exception as e:
+        print(f"Prediction failed with error: {e}")
+        return
+
+    # === 4. Evaluate and Plot ===
+    # Merge predictions with actual values
+    results_df = pd.merge(actual_df[['timestamp', 'target']], pred_df, on='timestamp', how='inner')
+    if results_df.empty:
+        print("Could not merge predictions with actuals. Check timestamp alignment.")
+        return
+
+    # Calculate RMSE on the median forecast
+    rmse = np.sqrt(mean_squared_error(results_df['target'], results_df['0.5']))
+    print(f"\nEvaluation RMSE (on median forecast): {rmse:.4f}")
+
+    # Plotting
+    plt.figure(figsize=(15, 8))
+    plt.plot(data_chronos['timestamp'], data_chronos['target'], label='Full Time Series', color='gray', alpha=0.6)
+    plt.plot(results_df['timestamp'], results_df['target'], label='Actual Values (Test Set)', color='blue')
+    plt.plot(results_df['timestamp'], results_df['0.5'], label='Predicted Median (0.5)', color='orange', linestyle='--')
+    
+    # Plot uncertainty bounds
+    plt.fill_between(
+        results_df['timestamp'],
+        results_df['0.1'],
+        results_df['0.9'],
+        color='orange',
+        alpha=0.2,
+        label='Uncertainty (10th-90th percentile)'
+    )
+
+    plt.title('Chronos2: 70/30 Train/Test Split Prediction')
+    plt.xlabel('Date')
+    plt.ylabel('Price')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+
 def main():
     """
     Main function to load data and run the Optuna study.
@@ -155,7 +237,8 @@ def main():
         start_date="2022-01-01T00:00:00Z"
     )
 
-    run_study(data, STUDY_NAME, N_TRIALS)
+    # run_study(data, STUDY_NAME, N_TRIALS)
+    train_and_predict_split(data)
 
 
 if __name__ == "__main__":
