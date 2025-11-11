@@ -9,7 +9,7 @@ import pandas as pd
 import seaborn as sns
 import xgboost as xgb
 from scipy.stats import pearsonr
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.class_weight import compute_class_weight
 
@@ -464,10 +464,136 @@ def run_single_backtest():
 
     manual_backtest(X, y_mapped, model, test_size=0.3, refit_every=params['refit_every'])
 
-# AI add a function to train xgboost with 70% of data and test with the remaining. Use the same features used in this file. Print the confussion matrix and classification scores AI!
+
+def train_and_evaluate():
+    """
+    Trains an XGBoost model on 70% of the data and evaluates it on the remaining 30%.
+    Prints a confusion matrix and classification report.
+    """
+    print("\n--- Training and Evaluating XGBoost on a 70/30 Split ---")
+
+    # 1. Load Data
+    data = fetch_historical_data(
+        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
+        start_date="2022-01-01T00:00:00Z"
+    )
+
+    # 2. Define Parameters (using a good set from run_single_backtest)
+    params = {
+        'peak_method': 'pct_change_on_ao',
+        'peak_distance': 4,
+        'peak_threshold': 0.5832,
+        'corr_threshold': 0.01,
+        'n_estimators': 250,
+        'learning_rate': 0.05,
+        'max_depth': 9,
+        'subsample': 0.57,
+        'colsample_bytree': 0.92,
+        'gamma': 1.19e-5,
+        'min_child_weight': 10,
+    }
+    print("Using parameters:")
+    for key, value in params.items():
+        print(f"  {key}: {value}")
+
+    # 3. Create Target and Features
+    reversal_data = create_ao_target(
+        data.copy(),
+        method=params['peak_method'],
+        peak_distance=params['peak_distance'],
+        peak_threshold=params['peak_threshold']
+    )
+    y = reversal_data['target']
+    y_mapped = y.map({-1: 0, 0: 1, 1: 2})
+
+    features_df = create_features(data)
+    X = features_df.loc[reversal_data.index]
+    X = X.loc[:, (X != X.iloc[0]).any()]
+
+    # 4. Feature Selection
+    selected_cols = select_features(X, y, corr_threshold=params['corr_threshold'])
+    if selected_cols:
+        X = X[selected_cols]
+
+    if X.empty:
+        print("Feature set is empty. Cannot run evaluation.")
+        return
+
+    # 5. Split data into training and testing sets
+    split_index = int(len(X) * 0.7)
+    X_train, X_test = X.iloc[:split_index], X.iloc[split_index:]
+    y_train, y_test = y_mapped.iloc[:split_index], y_mapped.iloc[split_index:]
+    print(f"Training set size: {len(X_train)}, Test set size: {len(X_test)}")
+
+    # 6. Scale features
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    # 7. Calculate sample weights for class imbalance
+    classes = np.unique(y_train)
+    weights = compute_class_weight(class_weight='balanced', classes=classes, y=y_train)
+    class_weight_dict = dict(zip(classes, weights))
+    sample_weights = y_train.map(class_weight_dict).to_numpy()
+
+    # 8. Train XGBoost model on GPU
+    model_params = {
+        'objective': 'multi:softmax',
+        'num_class': 3,
+        'eval_metric': 'mlogloss',
+        'tree_method': 'hist',
+        'device': 'cuda',
+        'n_estimators': params['n_estimators'],
+        'learning_rate': params['learning_rate'],
+        'max_depth': params['max_depth'],
+        'subsample': params['subsample'],
+        'colsample_bytree': params['colsample_bytree'],
+        'gamma': params['gamma'],
+        'min_child_weight': params['min_child_weight'],
+        'random_state': 42,
+        'n_jobs': -1
+    }
+    model = xgb.XGBClassifier(**model_params)
+
+    print("Training model...")
+    X_train_gpu = cp.asarray(X_train_scaled)
+    y_train_gpu = cp.asarray(y_train)
+    sample_weights_gpu = cp.asarray(sample_weights)
+    model.fit(X_train_gpu, y_train_gpu, sample_weight=sample_weights_gpu)
+
+    # 9. Make predictions on the test set
+    print("Making predictions on the test set...")
+    X_test_gpu = cp.asarray(X_test_scaled)
+    y_pred_gpu = model.predict(X_test_gpu)
+    y_pred = cp.asnumpy(y_pred_gpu)
+
+    # 10. Evaluate and print results
+    print("\n--- Model Evaluation ---")
+    target_names = ['Bottom (-1)', 'Neutral (0)', 'Top (1)']
+    labels = [0, 1, 2]  # Mapped labels
+
+    # Classification Report
+    print("\nClassification Report:")
+    print(classification_report(y_test, y_pred, labels=labels, target_names=target_names, zero_division=0))
+
+    # Confusion Matrix
+    print("\nConfusion Matrix:")
+    cm = confusion_matrix(y_test, y_pred, labels=labels)
+    cm_df = pd.DataFrame(cm, index=target_names, columns=target_names)
+    print(cm_df)
+
+    # Plot Confusion Matrix
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm_df, annot=True, fmt='d', cmap='Blues')
+    plt.title('Confusion Matrix')
+    plt.ylabel('Actual Label')
+    plt.xlabel('Predicted Label')
+    plt.show()
+
 
 if __name__ == "__main__":
-    main()  # Uncomment to run the Optuna study
+    # main()  # Uncomment to run the Optuna study
     # run_single_backtest()
+    train_and_evaluate()
 
 
