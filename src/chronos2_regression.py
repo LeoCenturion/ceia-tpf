@@ -6,7 +6,7 @@ import numpy as np
 import optuna
 import pandas as pd
 import torch
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, classification_report
 from tqdm import trange
 
 from backtest_utils import fetch_historical_data
@@ -147,8 +147,78 @@ def run_study(data, study_name_in_db, n_trials):
     except ValueError:
         print("No successful trials were completed.")
 
-    
-# AI make another function like this one but instead try to predict if the next period's price will go up or down (-1, +1). Then print the classification report AI!
+
+def train_and_predict_direction_split(data: pd.DataFrame, context_length: int = 512):
+    """
+    Trains the Chronos2 model to predict the direction of price change (up/down)
+    on a 70/30 split using a rolling window forecast.
+    """
+    print("\n--- Predicting Price Direction on a 70/30 Split ---")
+
+    # === 1. Prepare data ===
+    data_chronos = data.copy()
+    data_chronos = data_chronos.reset_index()
+    data_chronos.rename(columns={'timestamp': 'timestamp', 'Close': 'target'}, inplace=True)
+    data_chronos['id'] = 'BTC/USDT'
+
+    # === 2. Split data ===
+    split_index = int(len(data_chronos) * 0.7)
+    context_df = data_chronos.iloc[max(0, split_index - context_length):split_index]
+    actual_df = data_chronos.iloc[split_index:]
+
+    # === 3. Rolling Window Prediction for Direction ===
+    print("Generating directional predictions using a rolling window...")
+    y_true = []
+    y_pred = []
+    current_context_df = context_df.copy()
+
+    for i in trange(len(actual_df), desc="Rolling Directional Prediction"):
+        if len(current_context_df) < 2:
+            continue
+
+        last_known_price = current_context_df['target'].iloc[-1]
+
+        try:
+            # Predict one step ahead
+            single_pred_df = pipeline.predict_df(
+                current_context_df,
+                prediction_length=1,
+                quantile_levels=[0.5],  # Only need median for point forecast
+                id_column="id",
+                timestamp_column="timestamp",
+                target_column="target",
+            )
+            
+            predicted_price = single_pred_df['0.5'].iloc[0]
+            
+            # Convert price prediction to directional prediction (+1 for up, -1 for down)
+            predicted_direction = 1 if predicted_price > last_known_price else -1
+            y_pred.append(predicted_direction)
+
+            # Determine actual direction
+            actual_price = actual_df['target'].iloc[i]
+            actual_direction = 1 if actual_price > last_known_price else -1
+            y_true.append(actual_direction)
+
+            # Update context for the next step with the true value
+            next_actual_step = actual_df.iloc[[i]]
+            current_context_df = pd.concat([current_context_df, next_actual_step], ignore_index=True)
+
+        except Exception as e:
+            print(f"Prediction failed at step {i+1} with error: {e}. Stopping.")
+            break
+
+    if not y_true:
+        print("No predictions were made.")
+        return
+
+    # === 4. Evaluate and Print Classification Report ===
+    print("\n--- Classification Report ---")
+    target_names = ['Down (-1)', 'Up (+1)']
+    labels = [-1, 1]
+    print(classification_report(y_true, y_pred, labels=labels, target_names=target_names, zero_division=0))
+
+
 def train_and_predict_split(data: pd.DataFrame, context_length: int = 512):
     """
     Trains the Chronos2 model on the first 70% of the data and predicts the remaining 30%.
@@ -198,7 +268,7 @@ def train_and_predict_split(data: pd.DataFrame, context_length: int = 512):
                 quantile_levels=[0.1, 0.5, 0.9],
                 id_column="id",
                 timestamp_column="timestamp",
-                target="target",
+                target_column="target",
             )
             predictions_list.append(single_pred_df)
 
@@ -266,7 +336,8 @@ def main():
     )
 
     # run_study(data, STUDY_NAME, N_TRIALS)
-    train_and_predict_split(data)
+    # train_and_predict_split(data)
+    train_and_predict_direction_split(data)
 
 
 if __name__ == "__main__":
