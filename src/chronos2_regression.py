@@ -165,7 +165,7 @@ def train_and_predict_split(data: pd.DataFrame, context_length: int = 512):
     data_chronos['id'] = 'BTC/USDT'
 
     # === 2. Split data ===
-    split_index = int(len(data_chronos) * 0.7)
+    split_index = int(len(data_chronos) * 0.9)
     # Use the last `context_length` points of the training data as context
     context_df = data_chronos.iloc[max(0, split_index - context_length):split_index]
     actual_df = data_chronos.iloc[split_index:]
@@ -180,6 +180,7 @@ def train_and_predict_split(data: pd.DataFrame, context_length: int = 512):
 
     # === 3. Generate predictions ===
     print("Generating predictions for the test set...")
+    # AI instead of prediction prediction_lengths points compute the pred_df by doing backtesting with the actual_db. Predict one element at the time, increase the context_df, and then predict the next. Basically a rolling window AI!
     try:
         # Using default generation parameters, as they are generally robust
         pred_df = pipeline.predict_df(
@@ -188,7 +189,7 @@ def train_and_predict_split(data: pd.DataFrame, context_length: int = 512):
             quantile_levels=[0.1, 0.5, 0.9],  # Get median and uncertainty bounds
             id_column="id",
             timestamp_column="timestamp",
-            target_column="target",
+            target="target",
         )
     except Exception as e:
         print(f"Prediction failed with error: {e}")
