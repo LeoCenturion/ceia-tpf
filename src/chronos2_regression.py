@@ -147,7 +147,8 @@ def run_study(data, study_name_in_db, n_trials):
     except ValueError:
         print("No successful trials were completed.")
 
-
+    
+# AI make another function like this one but instead try to predict if the next period's price will go up or down (-1, +1). Then print the classification report AI!
 def train_and_predict_split(data: pd.DataFrame, context_length: int = 512):
     """
     Trains the Chronos2 model on the first 70% of the data and predicts the remaining 30%.
@@ -197,7 +198,7 @@ def train_and_predict_split(data: pd.DataFrame, context_length: int = 512):
                 quantile_levels=[0.1, 0.5, 0.9],
                 id_column="id",
                 timestamp_column="timestamp",
-                target_column="target",
+                target="target",
             )
             predictions_list.append(single_pred_df)
 
