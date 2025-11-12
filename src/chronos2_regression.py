@@ -165,7 +165,7 @@ def train_and_predict_split(data: pd.DataFrame, context_length: int = 512):
     data_chronos['id'] = 'BTC/USDT'
 
     # === 2. Split data ===
-    split_index = int(len(data_chronos) * 0.9)
+    split_index = int(len(data_chronos) * 0.7)
     # Use the last `context_length` points of the training data as context
     context_df = data_chronos.iloc[max(0, split_index - context_length):split_index]
     actual_df = data_chronos.iloc[split_index:]
@@ -178,22 +178,43 @@ def train_and_predict_split(data: pd.DataFrame, context_length: int = 512):
         print("Error: Not enough data in the context window to make a prediction.")
         return
 
-    # === 3. Generate predictions ===
-    print("Generating predictions for the test set...")
-    # AI instead of prediction prediction_lengths points compute the pred_df by doing backtesting with the actual_db. Predict one element at the time, increase the context_df, and then predict the next. Basically a rolling window AI!
-    try:
-        # Using default generation parameters, as they are generally robust
-        pred_df = pipeline.predict_df(
-            context_df,
-            prediction_length=prediction_length,
-            quantile_levels=[0.1, 0.5, 0.9],  # Get median and uncertainty bounds
-            id_column="id",
-            timestamp_column="timestamp",
-            target="target",
-        )
-    except Exception as e:
-        print(f"Prediction failed with error: {e}")
+    # === 3. Generate predictions with a rolling window (expanding context) ===
+    print("Generating predictions for the test set using a rolling window...")
+
+    predictions_list = []
+    current_context_df = context_df.copy()
+
+    for i in trange(len(actual_df), desc="Rolling Window Prediction"):
+        if len(current_context_df) < 2:
+            print(f"Skipping step {i+1} due to insufficient context.")
+            continue
+
+        try:
+            # Predict one step ahead
+            single_pred_df = pipeline.predict_df(
+                current_context_df,
+                prediction_length=1,
+                quantile_levels=[0.1, 0.5, 0.9],
+                id_column="id",
+                timestamp_column="timestamp",
+                target_column="target",
+            )
+            predictions_list.append(single_pred_df)
+
+            # Update context for the next step with the true value from actual_df (expanding window)
+            next_actual_step = actual_df.iloc[[i]]
+            current_context_df = pd.concat([current_context_df, next_actual_step], ignore_index=True)
+
+        except Exception as e:
+            print(f"Prediction failed at step {i+1} with error: {e}. Stopping prediction.")
+            break  # Stop if one prediction fails
+
+    if not predictions_list:
+        print("No predictions were made.")
         return
+
+    # Concatenate all single-step predictions into one DataFrame
+    pred_df = pd.concat(predictions_list, ignore_index=True)
 
     # === 4. Evaluate and Plot ===
     # Merge predictions with actual values
