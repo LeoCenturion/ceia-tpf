@@ -603,13 +603,22 @@ def main():
 
     # Use a partial function to pass the loaded data to the objective function
     objective_with_data = partial(objective, data=data)
-    # AI queue the followign study [peak_method: pct_change_on_ao, peak_distance: 1, peak_threshold: 0.19867630413848203, corr_threshold: 0.5481496133938653, n_estimators: 91, max_depth: 30, min_samples_split: 12, min_samples_leaf: 16] AI!
     study = optuna.create_study(
         direction='maximize',
         study_name=study_name_in_db,
         storage=storage_name,
         load_if_exists=True
     )
+    study.enqueue_trial({
+        'peak_method': 'pct_change_on_ao',
+        'peak_distance': 1,
+        'peak_threshold': 0.19867630413848203,
+        'corr_threshold': 0.5481496133938653,
+        'n_estimators': 91,
+        'max_depth': 30,
+        'min_samples_split': 12,
+        'min_samples_leaf': 16,
+    })
 
     study.optimize(objective_with_data, n_trials=N_TRIALS, n_jobs=-1)
     # 3. Print Study Results
