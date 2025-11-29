@@ -8,7 +8,13 @@
 
 #%%
 import sys
-sys.path.append('..')
+current_dir = os.getcwd()
+# Navigate up one level to the project root (e.g., /path/to/my_project)
+project_root = os.path.abspath(os.path.join(current_dir, '../src'))
+# Add the project root to sys.path so Python can find 'src' as a top-level package
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt

@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "tp final"
+name = "tp_final"
 version = "0.1.0"
 description = ""
 authors = ["leo centurion <centurionm.leo@gmail.com>"]
