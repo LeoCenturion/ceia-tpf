@@ -8,6 +8,7 @@
 
 #%%
 import sys
+import os
 current_dir = os.getcwd()
 # Navigate up one level to the project root (e.g., /path/to/my_project)
 project_root = os.path.abspath(os.path.join(current_dir, '../src'))
