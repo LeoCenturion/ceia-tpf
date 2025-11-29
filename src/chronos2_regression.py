@@ -186,7 +186,7 @@ def train_and_predict_direction_split(data: pd.DataFrame, context_length: int = 
                 quantile_levels=[0.5],  # Only need median for point forecast
                 id_column="id",
                 timestamp_column="timestamp",
-                target_column="target",
+                target="target",
             )
             
             predicted_price = single_pred_df['0.5'].iloc[0]
@@ -268,7 +268,7 @@ def train_and_predict_split(data: pd.DataFrame, context_length: int = 512):
                 quantile_levels=[0.1, 0.5, 0.9],
                 id_column="id",
                 timestamp_column="timestamp",
-                target_column="target",
+                target="target",
             )
             predictions_list.append(single_pred_df)
 

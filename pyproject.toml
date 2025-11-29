@@ -35,6 +35,9 @@ torch = "2.7.1"
 transformers = "4.49.0"
 accelerator = "^2025.9.5"
 autogluon = "^1.4.0"
+tqdm = "^4.67.1"
+chronos = "^0.3"
+chronos-forecasting = "^2.0.1"
 
 
 [build-system]

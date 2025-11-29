@@ -54,13 +54,11 @@ def fetch_historical_data(
     """
     if data_path:
         df = pd.read_csv(data_path)
-        print(f'read csv {df}')
         df.rename(columns={"date": "timestamp", "Volume BTC": "volume"}, inplace=True)
         # s_timestamp = str(int(df['unix'].iloc[0]))
         # unit = 'us' if len(s_timestamp) > 13 else 'ms'
         # df["timestamp"] = pd.to_datetime(df["unix"], unit=unit)
         df["timestamp"] = pd.to_datetime(df["timestamp"])
-        print(f'after rename {df}')
         df.set_index("timestamp", inplace=True)
 
         if start_date:
@@ -201,25 +199,6 @@ def optimize_strategy(data, strategy_class: TrialStrategy, study_name, n_trials=
             # Log artifacts for the last step if available
             if bt:
                 stats._strategy.save_artifacts(trial, stats, bt)
-                # plot_filename = f"backtest_plot_trial_{trial.number}.html"
-                # trades_filename = f"trades_trial_{trial.number}.csv"
-
-                # Save plot
-                # open_browser=False prevents the plot from opening automatically
-                # bt.plot(filename=plot_filename, open_browser=False)
-                # if os.path.exists(plot_filename):
-                #     mlflow.log_artifact(plot_filename)
-                # # Save trades
-                # trades_df = stats['_trades']
-                # if not trades_df.empty:
-                #     trades_df.to_csv(trades_filename, index=False)
-                #     mlflow.log_artifact(trades_filename)
-
-                # # Clean up created files
-                # if os.path.exists(plot_filename):
-                #     os.remove(plot_filename)
-                # if os.path.exists(trades_filename):
-                #     os.remove(trades_filename)
 
         sharpe_ratio = stats.get('Sharpe Ratio', 0)
         if sharpe_ratio is None or np.isnan(sharpe_ratio):

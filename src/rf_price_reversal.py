@@ -499,8 +499,8 @@ def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
     """
     # === 1. Define Hyperparameter Search Space ===
     # Peak detection hyperparameters
-    # peak_method = trial.suggest_categorical('peak_method', ['ao_on_price', 'ao_on_pct_change', 'pct_change_on_ao'])
-    peak_method = trial.suggest_categorical('peak_method', ['ao_on_price', 'ao_on_pct_change', 'pct_change_std'])
+    peak_method = trial.suggest_categorical('peak_method', ['ao_on_price', 'ao_on_pct_change', 'pct_change_on_ao', ])
+    # peak_method = trial.suggest_categorical('peak_method', ['ao_on_price', 'ao_on_pct_change', 'pct_change_std'])
     # peak_method = trial.suggest_categorical('peak_method', [ 'pct_change_on_ao'])
 
     std_fraction = 1.0
@@ -585,7 +585,7 @@ def main():
     """
     Main function to run the Optuna hyperparameter optimization study.
     """
-    N_TRIALS = 50
+    N_TRIALS = 1
 
     # 1. Load Data
     print("Loading historical data...")
@@ -611,7 +611,7 @@ def main():
     )
     study.enqueue_trial({
         'peak_method': 'pct_change_on_ao',
-        'peak_distance': 1,
+        'peak_distance': 24*1,
         'peak_threshold': 0.19867630413848203,
         'corr_threshold': 0.5481496133938653,
         'n_estimators': 91,
