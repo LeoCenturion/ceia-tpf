@@ -189,7 +189,7 @@ def main():
 
 def create_tick_imbalance_bars(
     df: pd.DataFrame,
-    initial_bar_size_estimate: int = 1000,
+    initial_bar_size_estimate: int = 1,
     span_bar_size: int = 20,
     span_tick_imbalance: int = 20,
 ) -> pd.DataFrame:
@@ -225,6 +225,7 @@ def create_tick_imbalance_bars(
 
     df_reset = df.reset_index(drop=True)
 
+    # AI refactor and create a function that returns the signed ticks AI!
     # Pre-compute tick signs: +1 for uptick, -1 for downtick, ffill for no change
     price_diffs = df_reset["close"].diff()
     tick_signs = price_diffs.copy()
@@ -238,9 +239,7 @@ def create_tick_imbalance_bars(
     alpha_bar_size = 2 / (span_bar_size + 1)
 
     # Pre-compute the EWMA of tick imbalances
-    ewma_tick_imbalances = tick_signs.ewm(
-        span=span_tick_imbalance, adjust=False
-    ).mean()
+    ewma_tick_imbalances = tick_signs.ewm(span=span_tick_imbalance, adjust=False).mean()
 
     # EWMA state variables
     ewma_bar_size = float(initial_bar_size_estimate)
