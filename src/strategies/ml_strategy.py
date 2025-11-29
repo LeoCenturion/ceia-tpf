@@ -118,9 +118,9 @@ def mfi(
 
     with np.errstate(divide="ignore", invalid="ignore"):
         money_ratio = positive_mf / negative_mf
-        mfi = 100 - (100 / (1 + money_ratio))
-    mfi.replace([np.inf, -np.inf], 100, inplace=True)
-    return mfi
+        mfi_series = 100 - (100 / (1 + money_ratio))
+    mfi_series.replace([np.inf, -np.inf], 100, inplace=True)
+    return mfi_series
 
 
 def stochastic_oscillator(
@@ -524,7 +524,7 @@ def select_features(
     return selected_features
 
 
-class SVCStrategy(Strategy):
+class SVCStrategy(Strategy):  # pylint: disable=attribute-defined-outside-init
     # SVC Hyperparameters
     kernel = "rbf"
     C = 1.0
@@ -590,7 +590,9 @@ class SVCStrategy(Strategy):
         }
 
 
-class RandomForestClassifierStrategy(Strategy):
+class RandomForestClassifierStrategy(
+    Strategy
+):  # pylint: disable=attribute-defined-outside-init
     # Random Forest Hyperparameters
     n_estimators = 100
     max_depth = 10
@@ -660,7 +662,9 @@ class RandomForestClassifierStrategy(Strategy):
         }
 
 
-class XGBoostPriceReversalStrategy(Strategy):
+class XGBoostPriceReversalStrategy(
+    Strategy
+):  # pylint: disable=attribute-defined-outside-init
     # Parameters from Optuna study
     peak_method = "pct_change_on_ao"
     peak_distance = 4

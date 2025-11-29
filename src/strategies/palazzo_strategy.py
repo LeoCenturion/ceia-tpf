@@ -17,7 +17,7 @@ def aggregate_to_volume_bars(df, volume_threshold=50000):
     current_bar_data = []
     cumulative_volume = 0
 
-    for index, row in df.iterrows():
+    for _, row in df.iterrows():
         current_bar_data.append(row)
         cumulative_volume += row["volume"]
         if cumulative_volume >= volume_threshold:
@@ -86,7 +86,9 @@ def create_features(df):
     return df
 
 
-class XGBoostPriceReversalPalazzoStrategy(Strategy):
+class XGBoostPriceReversalPalazzoStrategy(
+    Strategy
+):  # pylint: disable=attribute-defined-outside-init
     # Default Hyperparameters (to be tuned by Optuna)
     volume_threshold = 37798
     tau = 1.2688331479071624

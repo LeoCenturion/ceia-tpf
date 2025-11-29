@@ -32,7 +32,7 @@ def kalman_filter_indicator(series: np.ndarray) -> np.ndarray:
     return filtered_state_means.flatten()
 
 
-class ProphetStrategy(TrialStrategy):
+class ProphetStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
     """
     Intractable. Prophet doesn't take data when predicting, so if we train every 30 days then all 30 days will have the same prediction.
     If we train every hour then it takes more than a day do backtest with hourly data from 2022 to 2025.
@@ -90,7 +90,7 @@ class ProphetStrategy(TrialStrategy):
         }
 
 
-class ARIMAStrategy(TrialStrategy):
+class ARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
     p = 12
     d = 1
     q = 12
@@ -116,12 +116,12 @@ class ARIMAStrategy(TrialStrategy):
                     order=(self.p, self.d, self.q),
                 )
                 self.model_fit = model.fit()
-            except Exception:  # Catches convergence errors etc.
+            except Exception:  # pylint: disable=broad-exception-caught
                 self.model_fit = None
         elif self.model_fit:
             try:
                 self.model_fit = self.model_fit.append([self.processed_data[-1]])
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 self.model_fit = None
 
         if self.model_fit:
@@ -139,7 +139,7 @@ class ARIMAStrategy(TrialStrategy):
                         sl=price * (1 + self.stop_loss),
                         tp=price * (1 - self.take_profit),
                     )
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 pass  # Ignore forecast errors
 
     @classmethod
@@ -156,11 +156,11 @@ class ARIMAStrategy(TrialStrategy):
             ),
         }
 
-    def save_artifacts(self, trial, stats, bt):
+    def save_artifacts(self, _trial, _stats, _bt):
         return
 
 
-class SARIMAStrategy(TrialStrategy):
+class SARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
     p, d, q = 5, 1, 0
     P, D, Q, s = (
         1,
@@ -188,12 +188,12 @@ class SARIMAStrategy(TrialStrategy):
                     seasonal_order=(self.P, self.D, self.Q, self.s),
                 )
                 self.model_fit = model.fit(disp=False)
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 self.model_fit = None
         elif self.model_fit:
             try:
                 self.model_fit = self.model_fit.append([self.processed_data[-1]])
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 self.model_fit = None
 
         if self.model_fit:
@@ -233,7 +233,9 @@ class SARIMAStrategy(TrialStrategy):
         }
 
 
-class KalmanARIMAStrategy(TrialStrategy):
+class KalmanARIMAStrategy(
+    TrialStrategy
+):  # pylint: disable=attribute-defined-outside-init
     p = 12
     d = 0
     q = 12
@@ -286,12 +288,12 @@ class KalmanARIMAStrategy(TrialStrategy):
                     self.kalman_filtered_data, order=(self.p, self.d, self.q)
                 )
                 self.model_fit = model.fit()
-            except Exception:  # Catches convergence errors etc.
+            except Exception:  # pylint: disable=broad-exception-caught
                 self.model_fit = None
         elif self.model_fit:
             try:
                 self.model_fit = self.model_fit.append([self.kalman_filtered_data[-1]])
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 self.model_fit = None
 
         if self.model_fit:
@@ -344,7 +346,9 @@ def main():
     )
 
 
-class ARIMAXGARCHStrategy(TrialStrategy):
+class ARIMAXGARCHStrategy(
+    TrialStrategy
+):  # pylint: disable=attribute-defined-outside-init
     # ARIMAX params
     p, d, q = 5, 1, 0
     # GARCH params
@@ -382,7 +386,7 @@ class ARIMAXGARCHStrategy(TrialStrategy):
                     order=(self.p, self.d, self.q),
                 )
                 self.arimax_fit = arimax_model.fit()
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 self.arimax_fit = None
                 self.garch_fit = None
         elif self.arimax_fit and self.garch_fit:
@@ -395,7 +399,7 @@ class ARIMAXGARCHStrategy(TrialStrategy):
                 self.arimax_fit = self.arimax_fit.append(
                     [self.processed_data[-1]], exog=np.array([[next_vol]])
                 )
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 self.arimax_fit = None
 
         if self.arimax_fit and self.garch_fit:
@@ -457,7 +461,7 @@ def find_best_arima_params(
                 best_aic = results.aic
                 best_order = order
                 best_model = results
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught
             # Errors can occur for certain parameter combinations
             continue
 
@@ -481,7 +485,7 @@ def kalman_arima_forecast(series: pd.Series, p: int, d: int, q: int) -> float:
         # 3. Generate forecast
         forecast = model_fit.forecast(steps=1)[0]
         return forecast
-    except Exception:  # Catches convergence errors etc.
+    except Exception:  # pylint: disable=broad-exception-caught
         return 0.0
 
 
@@ -528,7 +532,7 @@ if __name__ == "__main__":
     price_change_bars = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1h/BTCUSDT_price_change_bars_0_32.csv"
     hour_bars = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv"
 
-    strategies = {
+    strategies_to_run = {
         "ARIMAStrategy": ARIMAStrategy,
         # "KalmanARIMAStrategy": KalmanARIMAStrategy,
         # "ARIMAXGARCHStrategy": ARIMAXGARCHStrategy,
@@ -536,7 +540,7 @@ if __name__ == "__main__":
     }
 
     run_optimizations(
-        strategies=strategies,
+        strategies=strategies_to_run,
         data_path=hour_bars,
         start_date="2020-01-01T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",

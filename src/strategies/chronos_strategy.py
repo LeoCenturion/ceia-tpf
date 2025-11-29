@@ -8,7 +8,7 @@ from autogluon.timeseries import TimeSeriesPredictor, TimeSeriesDataFrame
 from backtest_utils import TrialStrategy, run_optimizations
 
 
-class ChronosStrategy(TrialStrategy):
+class ChronosStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
     """
     A backtesting strategy using the Chronos time-series model for price prediction.
     """
@@ -68,7 +68,7 @@ class ChronosStrategy(TrialStrategy):
             )
             print(f"[{initial_train_df.index[-1]}] Initial fine-tuning complete.")
             self.periods_since_refit = 0  # Reset counter
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             print(f"[{initial_train_df.index[-1]}] Initial model fitting failed: {e}")
             self.predictor = None
             self.periods_since_refit = np.inf
@@ -111,7 +111,7 @@ class ChronosStrategy(TrialStrategy):
                 )
                 print(f"[{self.data.index[-1]}] Model refit complete.")
                 self.periods_since_refit = 0  # Reset counter
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 print(f"[{self.data.index[-1]}] Model fitting failed: {e}")
                 self.predictor = None  # Ensure predictor is None if fit fails
 
@@ -200,6 +200,7 @@ class PrecomputedChronosStrategy(TrialStrategy):
         """
         Initialize the strategy and load pre-computed predictions.
         """
+        self.predictions_df = pd.DataFrame()
         try:
             # The predictions CSV is expected to have the timestamp as the first column.
             self.predictions_df = pd.read_csv(
@@ -213,7 +214,7 @@ class PrecomputedChronosStrategy(TrialStrategy):
                 f"Error: Predictions file not found at '{self.predictions_file}'. This strategy requires pre-computed predictions."
             )
             self.predictions_df = pd.DataFrame()
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             print(f"Error loading predictions file: {e}")
             self.predictions_df = pd.DataFrame()
 

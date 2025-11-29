@@ -1,7 +1,7 @@
 from backtest_utils import TrialStrategy, run_optimizations, sma
 
 
-class MartingaleStrategy(TrialStrategy):
+class MartingaleStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
     """
     A Martingale betting strategy.
 
@@ -47,7 +47,9 @@ class MartingaleStrategy(TrialStrategy):
         }
 
 
-class DelayedMartingaleStrategy(TrialStrategy):
+class DelayedMartingaleStrategy(
+    TrialStrategy
+):  # pylint: disable=attribute-defined-outside-init
     """
     A delayed Martingale strategy.
 
@@ -104,7 +106,9 @@ class DelayedMartingaleStrategy(TrialStrategy):
         }
 
 
-class AntiMartingaleStrategy(TrialStrategy):
+class AntiMartingaleStrategy(
+    TrialStrategy
+):  # pylint: disable=attribute-defined-outside-init
     """
     An anti-Martingale (reverse Martingale) betting strategy.
 
@@ -162,7 +166,9 @@ class AntiMartingaleStrategy(TrialStrategy):
         }
 
 
-class MartingaleWithTrendFilter(TrialStrategy):
+class MartingaleWithTrendFilter(
+    TrialStrategy
+):  # pylint: disable=attribute-defined-outside-init
     """
     A Martingale strategy that uses a moving average as a trend filter.
     It doubles down on positions when the price moves against the trend,

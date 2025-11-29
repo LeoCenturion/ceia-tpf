@@ -11,7 +11,7 @@ from src.backtest_utils import (
 )
 
 
-class MaCrossover(TrialStrategy):
+class MaCrossover(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
     short_window = 50
     long_window = 200
     stop_loss = 0.05
@@ -40,7 +40,7 @@ class MaCrossover(TrialStrategy):
         }
 
 
-class BollingerBands(TrialStrategy):
+class BollingerBands(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
     bb_window = 20
     bb_std = 2
     stop_loss = 0.05
@@ -70,7 +70,7 @@ class BollingerBands(TrialStrategy):
         }
 
 
-class MACD(TrialStrategy):
+class MACD(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
     fast_span = 12
     slow_span = 26
     signal_span = 9
@@ -102,7 +102,7 @@ class MACD(TrialStrategy):
         }
 
 
-class RSIDivergence(TrialStrategy):
+class RSIDivergence(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
     rsi_window = 14
     divergence_period = 30
     stop_loss = 0.05
@@ -149,7 +149,9 @@ class RSIDivergence(TrialStrategy):
         }
 
 
-class MultiIndicatorStrategy(TrialStrategy):
+class MultiIndicatorStrategy(
+    TrialStrategy
+):  # pylint: disable=attribute-defined-outside-init
     bb_window = 20
     bb_std = 2
     fast_sma_window = 50
@@ -203,7 +205,7 @@ class MultiIndicatorStrategy(TrialStrategy):
         }
 
 
-class SwingTrading(TrialStrategy):
+class SwingTrading(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
     swing_filter_p = 0.025
     trade_mode = "aggressive"  # 'aggressive' or 'conservative'
 
