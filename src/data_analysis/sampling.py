@@ -22,11 +22,12 @@ def cusum_filter(df: pd.DataFrame, h: float, price_col="close"):
     s_neg = 0
 
     # Using simple returns
-    diff = df[price_col].diff().dropna()
-
-    for t, y in diff.items():
-        s_pos = max(0, s_pos + y)
-        s_neg = min(0, s_neg + y)
+    prices = df[price_col]
+    for t, y in prices.items():
+        # AI the variable here should be the expected_value given information until t AI!
+        expected_value = None
+        s_pos = max(0, s_pos + y - expected_value)
+        s_neg = min(0, s_neg + y - expected_value)
 
         if s_pos >= h:
             s_pos = 0
