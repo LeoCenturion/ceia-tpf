@@ -211,7 +211,7 @@ class SARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outsid
                         sl=price * (1 + self.stop_loss),
                         tp=price * (1 - self.take_profit),
                     )
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 pass
 
     @classmethod
@@ -314,7 +314,7 @@ class KalmanARIMAStrategy(
                         sl=price * (1 + self.stop_loss),
                         tp=price * (1 - self.take_profit),
                     )
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 pass  # Ignore forecast errors
 
     @classmethod
@@ -421,7 +421,7 @@ class ARIMAXGARCHStrategy(
                         sl=price * (1 + self.stop_loss),
                         tp=price * (1 - self.take_profit),
                     )
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 pass
 
     @classmethod
