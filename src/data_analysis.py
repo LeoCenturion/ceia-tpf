@@ -99,7 +99,7 @@ def ewm(series, span):
 def std(series, n):
     return pd.Series(series).rolling(n).std()
 
-
+# AI move rsi_indicator and momentum_indicator to ./indicators.py AI!
 def rsi_indicator(series, n=14):
     delta = pd.Series(series).diff()
     gain = delta.where(delta > 0, 0)
