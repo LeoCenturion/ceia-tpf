@@ -241,12 +241,12 @@ def create_tick_imbalance_bars(
     # EWMA state variables
     ewma_bar_size = float(initial_bar_size_estimate)
     ewma_tick_imbalance = 0.0
-
+    # AI can ewma_tick_imbalance be pre computed AI?
     for i, tick_sign in enumerate(tick_signs):
         # Update EWMA of tick imbalance on each tick
-        ewma_tick_imbalance = (
-            (1 - alpha_tick_imbalance) * ewma_tick_imbalance
-        ) + (alpha_tick_imbalance * tick_sign)
+        ewma_tick_imbalance = ((1 - alpha_tick_imbalance) * ewma_tick_imbalance) + (
+            alpha_tick_imbalance * tick_sign
+        )
 
         expected_imbalance_threshold = abs(ewma_bar_size * ewma_tick_imbalance)
         cumulative_imbalance += tick_sign
