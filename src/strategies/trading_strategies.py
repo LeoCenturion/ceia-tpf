@@ -244,6 +244,9 @@ class SwingTrading(TrialStrategy):  # pylint: disable=attribute-defined-outside-
         # For conservative mode, to prevent re-entry in same swing
         self.entry_signal_triggered = False
 
+    def init(self):
+        pass
+
     def next(self):
         if len(self.data) < 2:
             return

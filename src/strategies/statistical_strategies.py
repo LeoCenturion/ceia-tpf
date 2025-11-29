@@ -48,6 +48,9 @@ class ProphetStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outsi
         self.model = None
         self.forecast = None
 
+    def init(self):
+        pass
+
     def next(self):
         if len(self.data.Close) > 1 and len(self.data.Close) % self.refit_period == 0:
             # print(f"Refitting, idx {len(self.data)} len {len(self.data.index[-self.lookback_length:])}")
