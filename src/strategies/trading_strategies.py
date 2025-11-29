@@ -1,6 +1,6 @@
 from backtesting.lib import crossover
 
-from src.backtest_utils import (
+from backtest_utils import (
     TrialStrategy,
     pct_change,
     sma,

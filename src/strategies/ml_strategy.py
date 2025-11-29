@@ -10,7 +10,7 @@ from scipy.stats import pearsonr
 from sklearn.utils.class_weight import compute_class_weight
 
 
-from src.backtest_utils import (
+from backtest_utils import (
     run_optimizations,
     sma,
     ewm,

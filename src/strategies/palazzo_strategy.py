@@ -4,7 +4,7 @@ from backtesting import Strategy
 from sklearn.preprocessing import StandardScaler
 import xgboost as xgb
 
-from src.backtesting import run_optimizations
+from backtesting.backtesting import run_optimizations
 
 # --- Helper functions from src/xgboost_price_reversal_palazzo.py ---
 
