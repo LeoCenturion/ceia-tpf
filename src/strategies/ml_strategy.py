@@ -10,9 +10,9 @@ from scipy.stats import pearsonr
 from sklearn.utils.class_weight import compute_class_weight
 
 
-from backtesting.backtesting import run_optimizations
-from data_analysis.data_analysis import ewm, sma, std
-from data_analysis.indicators import momentum_indicator, rsi_indicator
+from src.backtesting.backtesting import run_optimizations
+from src.data_analysis.data_analysis import ewm, sma, std
+from src.data_analysis.indicators import momentum_indicator, rsi_indicator
 
 
 def _create_features(data):

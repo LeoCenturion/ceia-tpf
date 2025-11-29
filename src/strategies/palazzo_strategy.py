@@ -4,7 +4,7 @@ from backtesting import Strategy
 from sklearn.preprocessing import StandardScaler
 import xgboost as xgb
 
-from backtesting.backtesting import run_optimizations  # pylint: disable=no-name-in-module
+from src.backtesting.backtesting import run_optimizations  # pylint: disable=no-name-in-module
 
 # --- Helper functions from src/xgboost_price_reversal_palazzo.py ---
 

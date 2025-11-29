@@ -13,8 +13,8 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.class_weight import compute_class_weight
 
-from .data_analysis import fetch_historical_data
-from .indicators import (
+from src.data_analysis import fetch_historical_data
+from src.data_analysis.indicators import (
     create_ao_target,
     create_features,
 )

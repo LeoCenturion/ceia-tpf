@@ -38,6 +38,7 @@ autogluon = "^1.4.0"
 tqdm = "^4.67.1"
 chronos = "^0.3"
 chronos-forecasting = "^2.0.1"
+pylint = "^4.0.3"
 
 
 [build-system]
@@ -46,6 +47,20 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 exclude = [
+".git",
+".ruff_cache",
+".venv",
+"venv",
+"__pycache__",
+"build",
+"dist",
+"data_analysis/",
+"data"
+]
+
+[tool.pylint.MASTER]
+# List of modules/directories to ignore
+ignore = [
 ".git",
 ".ruff_cache",
 ".venv",
