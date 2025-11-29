@@ -1,4 +1,5 @@
-from backtest_utils import TrialStrategy, run_optimizations, sma
+from backtesting.backtesting import TrialStrategy, run_optimizations
+from data_analysis.data_analysis import sma
 
 
 class MartingaleStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outside-init

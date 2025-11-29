@@ -1,14 +1,8 @@
 from backtesting.lib import crossover
 
-from backtest_utils import (
-    TrialStrategy,
-    pct_change,
-    sma,
-    ewm,
-    std,
-    rsi_indicator,
-    run_optimizations,
-)
+from backtesting.backtesting import TrialStrategy, run_optimizations
+from data_analysis.data_analysis import ewm, pct_change, sma, std
+from data_analysis.indicators import rsi_indicator
 
 
 class MaCrossover(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
