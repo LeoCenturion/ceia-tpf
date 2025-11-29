@@ -188,23 +188,27 @@ def main():
 
 
 def create_tick_imbalance_bars(
-    df: pd.DataFrame, imbalance_threshold: float
+    df: pd.DataFrame,
+    initial_bar_size_estimate: int = 1000,
+    span_bar_size: int = 20,
+    span_tick_imbalance: int = 20,
 ) -> pd.DataFrame:
-    # AI make the imbalance_threshold the expected accumulative_imbalance.
-    # That can be computed as expected accum_imbalance = expected bar_size * (P(tick is positive) - P(tick is negative))
-    # expected bar_size can be computed as a exponential wheighted moving average of prior bars
-    # P(tick) can be computed as an exponential  weighted moving average of prior ticks
-    # AI!
     """
-    Creates tick imbalance bars (TIBs) from a DataFrame of tick data.
+    Creates tick imbalance bars (TIBs) with a dynamic threshold.
 
-    A new bar is formed whenever the absolute cumulative tick imbalance reaches the threshold.
-    Tick imbalance is calculated as the sum of signed ticks (+1 for upticks, -1 for downticks).
-    If a price does not change, the sign of the previous tick is carried forward.
+    A new bar is formed when the absolute cumulative tick imbalance exceeds a
+    dynamic threshold. The threshold is based on the expected imbalance for the
+    next bar, calculated from EWMA of recent bar sizes and tick imbalances.
+
+    Expected Imbalance = E[T] * E[b_t], where:
+    - E[T] is the EWMA of ticks per bar.
+    - E[b_t] is the EWMA of tick signs (P(b_t=1) - P(b_t=-1)).
 
     Args:
         df (pd.DataFrame): DataFrame with tick data. Must include 'close' price.
-        imbalance_threshold (float): The threshold of absolute tick imbalance to accumulate for each bar.
+        initial_bar_size_estimate (int): Initial estimate for ticks per bar.
+        span_bar_size (int): EWMA span for calculating the expected bar size.
+        span_tick_imbalance (int): EWMA span for calculating the expected tick imbalance.
 
     Returns:
         pd.DataFrame: A DataFrame containing the tick imbalance bars.
@@ -218,26 +222,39 @@ def create_tick_imbalance_bars(
     bars = []
     start_idx = 0
     cumulative_imbalance = 0.0
-    last_tick_sign = 0
 
     df_reset = df.reset_index(drop=True)
+
+    # Pre-compute tick signs: +1 for uptick, -1 for downtick, ffill for no change
     price_diffs = df_reset["close"].diff()
+    tick_signs = price_diffs.copy()
+    tick_signs.loc[price_diffs > 0] = 1
+    tick_signs.loc[price_diffs < 0] = -1
+    tick_signs.loc[price_diffs == 0] = None
+    tick_signs = tick_signs.ffill()
+    tick_signs = tick_signs.fillna(1).astype(int)  # Fill first NaN with 1
 
-    for i in range(len(df_reset)):
-        diff = price_diffs.iloc[i]
-        if pd.isna(diff):
-            tick_sign = 0
-        elif diff > 0:
-            tick_sign = 1
-        elif diff < 0:
-            tick_sign = -1
-        else:
-            tick_sign = last_tick_sign
+    # EWMA parameters
+    alpha_bar_size = 2 / (span_bar_size + 1)
+    alpha_tick_imbalance = 2 / (span_tick_imbalance + 1)
 
-        last_tick_sign = tick_sign
+    # EWMA state variables
+    ewma_bar_size = float(initial_bar_size_estimate)
+    ewma_tick_imbalance = 0.0
+
+    for i, tick_sign in enumerate(tick_signs):
+        # Update EWMA of tick imbalance on each tick
+        ewma_tick_imbalance = (
+            (1 - alpha_tick_imbalance) * ewma_tick_imbalance
+        ) + (alpha_tick_imbalance * tick_sign)
+
+        expected_imbalance_threshold = abs(ewma_bar_size * ewma_tick_imbalance)
         cumulative_imbalance += tick_sign
 
-        if abs(cumulative_imbalance) >= imbalance_threshold:
+        if (
+            expected_imbalance_threshold > 0
+            and abs(cumulative_imbalance) >= expected_imbalance_threshold
+        ):
             bar_slice = df_reset.iloc[start_idx : i + 1]
 
             bars.append(
@@ -253,6 +270,13 @@ def create_tick_imbalance_bars(
                 }
             )
 
+            # Update EWMA of bar size with the size of the bar just formed
+            current_bar_size = i + 1 - start_idx
+            ewma_bar_size = ((1 - alpha_bar_size) * ewma_bar_size) + (
+                alpha_bar_size * current_bar_size
+            )
+
+            # Reset for next bar
             start_idx = i + 1
             cumulative_imbalance = 0.0
 
