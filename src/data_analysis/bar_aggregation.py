@@ -187,6 +187,23 @@ def main():
         print(result_df.to_string())
 
 
+def _get_signed_ticks(price_series: pd.Series) -> pd.Series:
+    """
+    Computes tick signs based on price changes.
+    +1 for an uptick, -1 for a downtick.
+    If price is unchanged, the previous sign is carried forward.
+    """
+    price_diffs = price_series.diff()
+    tick_signs = price_diffs.copy()
+    tick_signs.loc[price_diffs > 0] = 1
+    tick_signs.loc[price_diffs < 0] = -1
+    tick_signs.loc[price_diffs == 0] = None
+    tick_signs = tick_signs.ffill()
+    # Fill the first potential NaN with 1 (assuming an initial uptick)
+    tick_signs = tick_signs.fillna(1).astype(int)
+    return tick_signs
+
+
 def create_tick_imbalance_bars(
     df: pd.DataFrame,
     initial_bar_size_estimate: int = 1,
@@ -225,15 +242,7 @@ def create_tick_imbalance_bars(
 
     df_reset = df.reset_index(drop=True)
 
-    # AI refactor and create a function that returns the signed ticks AI!
-    # Pre-compute tick signs: +1 for uptick, -1 for downtick, ffill for no change
-    price_diffs = df_reset["close"].diff()
-    tick_signs = price_diffs.copy()
-    tick_signs.loc[price_diffs > 0] = 1
-    tick_signs.loc[price_diffs < 0] = -1
-    tick_signs.loc[price_diffs == 0] = None
-    tick_signs = tick_signs.ffill()
-    tick_signs = tick_signs.fillna(1).astype(int)  # Fill first NaN with 1
+    tick_signs = _get_signed_ticks(df_reset["close"])
 
     # EWMA parameters
     alpha_bar_size = 2 / (span_bar_size + 1)
