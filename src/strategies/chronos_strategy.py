@@ -21,11 +21,11 @@ class ChronosStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outsi
         refit_every * 2
     )  # Require at least 2 refit periods of data to train
 
-    # AI refactor this init to be __init__, respect the parent constructor AI!
-    def init(self):
+    def __init__(self, *args, **kwargs):
         """
         Initialize the strategy.
         """
+        super().__init__(*args, **kwargs)
         self.predictor = None
         self.periods_since_refit = np.inf  # Force refit on first valid occasion
         self.predictions_df = pd.DataFrame()

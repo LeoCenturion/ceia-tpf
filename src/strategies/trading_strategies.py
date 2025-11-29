@@ -235,7 +235,6 @@ class SwingTrading(TrialStrategy):  # pylint: disable=attribute-defined-outside-
         if self.swing_direction == -1:
             # 2. Test if downswing continues
             if self.data.Low[-1] < self.current_low:
-                # AI explain ' W0201: Attribute 'current_low' defined outside __init__ (attribute-defined-outside-init)' AI?
                 self.current_low = self.data.Low[-1]
                 # Conservative sell logic: check for breakdown
                 if (
