@@ -106,6 +106,13 @@ class XGBoostPriceReversalPalazzoStrategy(
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.processed_data = None
+        self.volume_bar_indices = None
+        self.model = None
+        self.scaler = None
+        self.in_trade = False
+
+    def init(self):
         # 1. Pre-process data to get volume bars and features.
         # This is computationally intensive and done once per backtest run.
         minute_data = self.data.df.copy()
@@ -129,9 +136,7 @@ class XGBoostPriceReversalPalazzoStrategy(
         }
 
         # 2. Initialize strategy state
-        self.model = None
         self.scaler = StandardScaler()
-        self.in_trade = False
 
     def next(self):
         if not hasattr(self, "processed_data") or self.processed_data.empty:

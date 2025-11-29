@@ -30,7 +30,9 @@ class ChronosStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outsi
         self.periods_since_refit = np.inf  # Force refit on first valid occasion
         self.predictions_df = pd.DataFrame()
         self._last_prediction = None
+        self.backtest_start_index = 0
 
+    def init(self):
         # --- Initial Fine-tuning ---
         full_df = self.data.df
         split_idx = int(len(full_df) * 0.7)
@@ -203,6 +205,8 @@ class PrecomputedChronosStrategy(TrialStrategy):
         """
         super().__init__(*args, **kwargs)
         self.predictions_df = pd.DataFrame()
+
+    def init(self):
         try:
             # The predictions CSV is expected to have the timestamp as the first column.
             self.predictions_df = pd.read_csv(

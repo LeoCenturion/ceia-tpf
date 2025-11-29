@@ -13,6 +13,10 @@ class MaCrossover(TrialStrategy):  # pylint: disable=attribute-defined-outside-i
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.ma_short = None
+        self.ma_long = None
+
+    def init(self):
         price_change = self.I(pct_change, self.data.Close)
         self.ma_short = self.I(sma, price_change, self.short_window)
         self.ma_long = self.I(sma, price_change, self.long_window)
@@ -43,6 +47,12 @@ class BollingerBands(TrialStrategy):  # pylint: disable=attribute-defined-outsid
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.ma = None
+        self.std = None
+        self.upper_band = None
+        self.lower_band = None
+
+    def init(self):
         self.ma = self.I(sma, self.data.Close, self.bb_window)
         self.std = self.I(std, self.data.Close, self.bb_window)
         self.upper_band = self.ma + self.bb_std * self.std
@@ -75,6 +85,10 @@ class MACD(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.macd = None
+        self.signal = None
+
+    def init(self):
         self.macd = self.I(ewm, self.data.Close, self.fast_span) - self.I(
             ewm, self.data.Close, self.slow_span
         )
@@ -107,6 +121,9 @@ class RSIDivergence(TrialStrategy):  # pylint: disable=attribute-defined-outside
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.rsi = None
+
+    def init(self):
         self.rsi = self.I(rsi_indicator, self.data.Close, self.rsi_window)
 
     def next(self):
@@ -158,6 +175,14 @@ class MultiIndicatorStrategy(
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.bb_ma = None
+        self.bb_std_dev = None
+        self.upper_band = None
+        self.lower_band = None
+        self.sma_fast = None
+        self.sma_slow = None
+
+    def init(self):
         # Bollinger Bands
         self.bb_ma = self.I(sma, self.data.Close, self.bb_window)
         self.bb_std_dev = self.I(std, self.data.Close, self.bb_window)

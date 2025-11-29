@@ -105,6 +105,9 @@ class ARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outside
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.model_fit = None
+        self.processed_data = None
+
+    def init(self):
         self.processed_data = self.I(price_difference, self.data.Close)
 
     def next(self):
@@ -178,6 +181,9 @@ class SARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outsid
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.model_fit = None
+        self.processed_data = None
+
+    def init(self):
         self.processed_data = self.I(price_difference, self.data.Close)
 
     def next(self):
@@ -250,12 +256,17 @@ class KalmanARIMAStrategy(
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.model_fit = None
-        self.processed_data = self.I(price_difference, self.data.Close)
-
-        # Kalman Filter initialization for iterative updates
+        self.processed_data = None
         self.kalman_state_mean = 0
         self.kalman_state_covariance = 1
         self.kalman_mean_history = []
+        self.kf = None
+        self.kalman_filtered_data = None
+
+    def init(self):
+        self.processed_data = self.I(price_difference, self.data.Close)
+
+        # Kalman Filter initialization for iterative updates
         self.kf = KalmanFilter(
             initial_state_mean=self.kalman_state_mean,
             initial_state_covariance=self.kalman_state_covariance,
@@ -367,6 +378,9 @@ class ARIMAXGARCHStrategy(
         super().__init__(*args, **kwargs)
         self.arimax_fit = None
         self.garch_fit = None
+        self.processed_data = None
+
+    def init(self):
         self.processed_data = self.I(
             lambda series: price_difference(series) * 10000.0, self.data.Close
         )

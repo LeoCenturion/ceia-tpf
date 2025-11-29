@@ -16,6 +16,9 @@ class MartingaleStrategy(TrialStrategy):  # pylint: disable=attribute-defined-ou
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.trade_size = 0
+
+    def init(self):
         self.trade_size = self.initial_trade_size
 
     def next(self):
@@ -67,8 +70,11 @@ class DelayedMartingaleStrategy(
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.trade_size = self.initial_trade_size
+        self.trade_size = 0
         self.down_periods_counter = 0
+
+    def init(self):
+        self.trade_size = self.initial_trade_size
 
     def next(self):
         # Update consecutive down periods counter
@@ -127,8 +133,11 @@ class AntiMartingaleStrategy(
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.trade_size = self.initial_trade_size
+        self.trade_size = 0
         self.win_streak = 0
+
+    def init(self):
+        self.trade_size = self.initial_trade_size
 
     def next(self):
         # Close any open position from the previous bar.
@@ -185,11 +194,14 @@ class MartingaleWithTrendFilter(
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.ma = self.I(sma, self.data.Close, self.ma_window)
+        self.ma = None
         self.trend = 0  # 1 for up, -1 for down
         self.doubles_count = 0
         self.base_trade_size = 0
         self.is_sizing_trade = False
+
+    def init(self):
+        self.ma = self.I(sma, self.data.Close, self.ma_window)
 
     def next(self):
         # Capture base trade size on the bar after the initial trade

@@ -532,6 +532,13 @@ class SVCStrategy(Strategy):  # pylint: disable=attribute-defined-outside-init
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.model = None
+        self.scaler = None
+        self.features = None
+        self.target = None
+        self.y_true = []
+        self.y_pred = []
+
+    def init(self):
         self.scaler = StandardScaler()
 
         # Feature and target creation
@@ -542,10 +549,6 @@ class SVCStrategy(Strategy):  # pylint: disable=attribute-defined-outside-init
             .bfill()
             .values
         )
-
-        # For F1 score calculation
-        self.y_true = []
-        self.y_pred = []
 
     def next(self):
         # Retrain the model periodically
@@ -602,6 +605,13 @@ class RandomForestClassifierStrategy(
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.model = None
+        self.scaler = None
+        self.features = None
+        self.target = None
+        self.y_true = []
+        self.y_pred = []
+
+    def init(self):
         self.scaler = StandardScaler()
 
         self.features = self.I(_create_features, self.data)
@@ -611,9 +621,6 @@ class RandomForestClassifierStrategy(
             .bfill()
             .values
         )
-
-        self.y_true = []
-        self.y_pred = []
 
     def next(self):
         if (
@@ -682,8 +689,15 @@ class XGBoostPriceReversalStrategy(
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.model = None
-        self.scaler = StandardScaler()
+        self.scaler = None
         self.selected_cols = None
+        self.features_df = None
+        self.target_series = None
+        self.y_true = []
+        self.y_pred = []
+
+    def init(self):
+        self.scaler = StandardScaler()
 
         df = self.data.df
         self.features_df = create_features(df.copy())
@@ -696,9 +710,6 @@ class XGBoostPriceReversalStrategy(
         )
         y = reversal_data["target"]
         self.target_series = y.map({-1: 0, 0: 1, 1: 2}).bfill().ffill()
-
-        self.y_true = []
-        self.y_pred = []
 
     def next(self):
         # Retrain the model periodically
