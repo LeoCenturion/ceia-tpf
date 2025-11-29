@@ -1,7 +1,6 @@
 from src.backtesting.backtesting import TrialStrategy, run_optimizations
 from src.data_analysis.data_analysis import sma
 
-# AI refactor all init methods to be __init__, respect the parent constructor AI!
 
 class MartingaleStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
     """
@@ -15,7 +14,8 @@ class MartingaleStrategy(TrialStrategy):  # pylint: disable=attribute-defined-ou
     initial_trade_size = 0.01  # Percentage of equity
     multiplier = 2.0  # Multiplier for the next trade on loss
 
-    def init(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.trade_size = self.initial_trade_size
 
     def next(self):
@@ -65,7 +65,8 @@ class DelayedMartingaleStrategy(
     multiplier = 2.0  # Multiplier for the next trade on loss
     wait_periods = 3  # Number of consecutive down periods to wait for
 
-    def init(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.trade_size = self.initial_trade_size
         self.down_periods_counter = 0
 
@@ -124,7 +125,8 @@ class AntiMartingaleStrategy(
     multiplier = 2.0  # Multiplier for the next trade on win
     max_win_streak = 5  # Maximum number of consecutive wins before resetting
 
-    def init(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.trade_size = self.initial_trade_size
         self.win_streak = 0
 
@@ -181,7 +183,8 @@ class MartingaleWithTrendFilter(
     initial_trade_size = 0.01  # Percentage of equity
     max_doubles = 3
 
-    def init(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.ma = self.I(sma, self.data.Close, self.ma_window)
         self.trend = 0  # 1 for up, -1 for down
         self.doubles_count = 0
