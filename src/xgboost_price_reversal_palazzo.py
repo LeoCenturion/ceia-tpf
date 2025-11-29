@@ -9,7 +9,7 @@ from sklearn.metrics import accuracy_score, classification_report
 from sklearn.utils.class_weight import compute_class_weight
 import cupy as cp
 import math
-from .backtest_utils import fetch_historical_data, sma, ewm, std, rsi_indicator
+from .data_analysis import fetch_historical_data, sma, ewm, std, rsi_indicator
 
 
 # --- Part 1: Data Simulation and Volume Bar Creation ---

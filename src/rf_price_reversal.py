@@ -14,7 +14,7 @@ from sklearn.metrics import classification_report, accuracy_score
 from sklearn.preprocessing import StandardScaler
 import mplfinance as mpf
 
-from .backtest_utils import fetch_historical_data, sma, ewm, std, rsi_indicator
+from .data_analysis import fetch_historical_data, sma, ewm, std, rsi_indicator
 
 
 def awesome_oscillator(high: pd.Series, low: pd.Series, fast_period: int = 5, slow_period: int = 34) -> pd.Series:
