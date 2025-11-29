@@ -21,13 +21,20 @@ def cusum_filter(df: pd.DataFrame, h: float, price_col="close"):
     s_pos = 0
     s_neg = 0
 
-    # The CUSUM filter is applied to price changes (returns). The expected
-    # value of a return, given past information, is typically assumed to be 0.
-    diff = df[price_col].diff().dropna()
+    # The CUSUM filter is applied to deviations from an expected value.
+    prices = df[price_col]
+    # Calculate the expected value as an expanding window mean of prices.
+    expected_values = prices.expanding().mean()
 
-    for t, y in diff.items():
-        s_pos = max(0, s_pos + y)
-        s_neg = min(0, s_neg + y)
+    # Align prices and expected_values to handle potential NaNs at the start
+    common_index = prices.index.intersection(expected_values.index)
+    aligned_prices = prices[common_index]
+    aligned_expected_values = expected_values[common_index]
+
+    for t, y in aligned_prices.items():
+        expected_value = aligned_expected_values[t]
+        s_pos = max(0, s_pos + y - expected_value)
+        s_neg = min(0, s_neg + y - expected_value)
 
         if s_pos >= h:
             s_pos = 0
