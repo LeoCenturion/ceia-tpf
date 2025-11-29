@@ -8,6 +8,7 @@ import re
 from backtesting import Backtest, Strategy
 from sklearn.metrics import f1_score
 
+#AI take all data pre processing and feature generation code from this file and put it in ./data_analysis.py AI!
 class TrialStrategy(Strategy):
     # trades_df = pd.DataFrame()
 
