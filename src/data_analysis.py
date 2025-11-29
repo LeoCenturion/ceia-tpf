@@ -99,22 +99,6 @@ def ewm(series, span):
 def std(series, n):
     return pd.Series(series).rolling(n).std()
 
-# AI move rsi_indicator and momentum_indicator to ./indicators.py AI!
-def rsi_indicator(series, n=14):
-    delta = pd.Series(series).diff()
-    gain = delta.where(delta > 0, 0)
-    loss = -delta.where(delta < 0, 0)
-
-    avg_gain = sma(gain, n)
-    avg_loss = sma(loss, n)
-
-    rs = avg_gain / avg_loss
-    return 100 - (100 / (1 + rs))
-
-
-def momentum_indicator(series, window=10):
-    return pd.Series(series).diff(window)
-
 
 def adjust_data_to_ubtc(df: pd.DataFrame) -> pd.DataFrame:
     """

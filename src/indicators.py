@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from scipy.signal import find_peaks
-from backtest_utils import sma, ewm, std, rsi_indicator
+from backtest_utils import sma, ewm, std
 
 
 def awesome_oscillator(
@@ -171,6 +171,22 @@ def cci(
     mad = tp.rolling(n).apply(lambda x: np.abs(x - x.mean()).mean(), raw=True)
     cci_series = (tp - tp_sma) / (c * mad).replace(0, 1e-9)
     return cci_series
+
+
+def rsi_indicator(series, n=14):
+    delta = pd.Series(series).diff()
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+
+    avg_gain = sma(gain, n)
+    avg_loss = sma(loss, n)
+
+    rs = avg_gain / avg_loss
+    return 100 - (100 / (1 + rs))
+
+
+def momentum_indicator(series, window=10):
+    return pd.Series(series).diff(window)
 
 
 def _stochastic_series(series: pd.Series, n: int) -> pd.Series:
