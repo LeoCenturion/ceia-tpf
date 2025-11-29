@@ -1,6 +1,7 @@
 from src.backtesting.backtesting import TrialStrategy, run_optimizations
 from src.data_analysis.data_analysis import sma
 
+# AI refactor all init methods to be __init__, respect the parent constructor AI!
 
 class MartingaleStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
     """
