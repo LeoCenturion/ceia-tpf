@@ -3,10 +3,8 @@ import numpy as np
 from backtesting import Strategy
 from sklearn.preprocessing import StandardScaler
 import xgboost as xgb
-from sklearn.utils.class_weight import compute_class_weight
-import cupy as cp
 
-from backtest_utils import run_optimizations
+from src.backtesting import run_optimizations
 
 # --- Helper functions from src/xgboost_price_reversal_palazzo.py ---
 

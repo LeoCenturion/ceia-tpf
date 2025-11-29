@@ -43,3 +43,16 @@ chronos-forecasting = "^2.0.1"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+exclude = [
+".git",
+".ruff_cache",
+".venv",
+"venv",
+"__pycache__",
+"build",
+"dist",
+"data_analysis/",
+"data"
+]
