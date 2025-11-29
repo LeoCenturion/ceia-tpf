@@ -1,3 +1,4 @@
+"""Data fetching and processing utilities."""
 import ccxt
 import pandas as pd
 
@@ -86,18 +87,22 @@ def fetch_historical_data(
 
 # Indicator functions to be used with `self.I`
 def pct_change(series):
+    """Calculate the percentage change of a series."""
     return pd.Series(series).pct_change()
 
 
 def sma(series, n):
+    """Calculate the simple moving average of a series."""
     return pd.Series(series).rolling(n).mean()
 
 
 def ewm(series, span):
+    """Calculate the exponential moving average of a series."""
     return pd.Series(series).ewm(span=span, adjust=False).mean()
 
 
 def std(series, n):
+    """Calculate the rolling standard deviation of a series."""
     return pd.Series(series).rolling(n).std()
 
 

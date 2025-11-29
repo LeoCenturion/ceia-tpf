@@ -1,5 +1,8 @@
-import pandas as pd
+"""
+Functions for creating volume, dollar, and price change bars from tick data.
+"""
 import argparse
+import pandas as pd
 
 
 def _aggregate_to_bars(
@@ -140,7 +143,10 @@ def main():
     parser.add_argument(
         "-o",
         "--output_csv",
-        help="Path to the output CSV file. If not provided, prints to console.",
+        help=(
+            "Path to the output CSV file. "
+            "If not provided, prints to console."
+        ),
     )
 
     args = parser.parse_args()

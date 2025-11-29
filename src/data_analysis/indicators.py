@@ -1,7 +1,9 @@
-import pandas as pd
+"""A collection of technical analysis indicators."""
 import numpy as np
+import pandas as pd
 from scipy.signal import find_peaks
-from src.data_analysis import sma, ewm, std
+
+from src.data_analysis.data_analysis import ewm, sma, std
 
 
 def awesome_oscillator(
@@ -49,9 +51,9 @@ def mfi(
 
     with np.errstate(divide="ignore", invalid="ignore"):
         money_ratio = positive_mf / negative_mf
-        mfi = 100 - (100 / (1 + money_ratio))
-    mfi.replace([np.inf, -np.inf], 100, inplace=True)
-    return mfi
+        mfi_series = 100 - (100 / (1 + money_ratio))
+    mfi_series.replace([np.inf, -np.inf], 100, inplace=True)
+    return mfi_series
 
 
 def stochastic_oscillator(
@@ -67,6 +69,7 @@ def stochastic_oscillator(
 
 # Custom implementations to replace pandas_ta
 def true_range(high: pd.Series, low: pd.Series, close: pd.Series) -> pd.Series:
+    """Calculate the True Range."""
     h_minus_l = high - low
     h_minus_pc = abs(high - close.shift(1))
     l_minus_pc = abs(low - close.shift(1))
@@ -75,12 +78,14 @@ def true_range(high: pd.Series, low: pd.Series, close: pd.Series) -> pd.Series:
 
 
 def atr(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14) -> pd.Series:
+    """Calculate the Average True Range."""
     tr = true_range(high, low, close)
     # Wilder's smoothing is equivalent to an EMA with alpha = 1/n. Span for ewm is approx 2*n - 1
     return ewm(tr, span=2 * n - 1)
 
 
 def willr(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14) -> pd.Series:
+    """Calculate Williams %R."""
     high_n = high.rolling(n).max()
     low_n = low.rolling(n).min()
     wr = -100 * (high_n - close) / (high_n - low_n).replace(0, 1e-9)
@@ -88,10 +93,11 @@ def willr(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14) -> pd.
 
 
 def roc(close: pd.Series, n: int = 10) -> pd.Series:
+    """Calculate the Rate of Change."""
     return (close.diff(n) / close.shift(n)).replace([np.inf, -np.inf], 0) * 100
 
 
-def ultimate_oscillator(
+def ultimate_oscillator(  # pylint: disable=too-many-arguments, too-many-locals
     high: pd.Series,
     low: pd.Series,
     close: pd.Series,
@@ -99,6 +105,7 @@ def ultimate_oscillator(
     medium: int = 14,
     slow: int = 28,
 ):
+    """Calculate the Ultimate Oscillator."""
     close_prev = close.shift(1).fillna(method="bfill")
     bp = close - pd.concat([low, close_prev], axis=1).min(axis=1)
     tr = true_range(high, low, close)
@@ -123,6 +130,7 @@ def ultimate_oscillator(
 def true_strength_index(
     close: pd.Series, fast: int = 13, slow: int = 25, signal: int = 13
 ):
+    """Calculate the True Strength Index."""
     pc = close.diff(1)
     pc_ema_fast = ewm(pc, span=fast)
     pc_ema_slow = ewm(pc_ema_fast, span=slow)
@@ -136,7 +144,10 @@ def true_strength_index(
     return pd.DataFrame({f"TSI_{slow}_{fast}": tsi, f"TSIs_{slow}_{fast}": signal_line})
 
 
-def adx(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14):
+def adx(
+    high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14
+):  # pylint: disable=too-many-locals
+    """Calculate the Average Directional Movement Index."""
     up = high.diff()
     down = -low.diff()
     plus_dm = up.where((up > down) & (up > 0), 0)
@@ -156,6 +167,7 @@ def adx(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14):
 
 
 def aroon(high: pd.Series, low: pd.Series, n: int = 14) -> pd.DataFrame:
+    """Calculate the Aroon Indicator."""
     periods_since_high = high.rolling(n).apply(lambda x: n - 1 - np.argmax(x), raw=True)
     periods_since_low = low.rolling(n).apply(lambda x: n - 1 - np.argmin(x), raw=True)
     aroon_up = 100 * (n - periods_since_high) / n
@@ -190,6 +202,7 @@ def momentum_indicator(series, window=10):
 
 
 def _stochastic_series(series: pd.Series, n: int) -> pd.Series:
+    """Helper function to calculate stochastic over a series."""
     low_n = series.rolling(window=n).min()
     high_n = series.rolling(window=n).max()
     stoch = 100 * ((series - low_n) / (high_n - low_n).replace(0, 1e-9))
@@ -199,6 +212,7 @@ def _stochastic_series(series: pd.Series, n: int) -> pd.Series:
 def stc(
     close: pd.Series, fast_span=23, slow_span=50, stoch_n=10, signal_span=3
 ) -> pd.DataFrame:
+    """Calculate the Schaff Trend Cycle."""
     ema_fast = ewm(close, span=fast_span)
     ema_slow = ewm(close, span=slow_span)
     macd_line = ema_fast - ema_slow
@@ -217,6 +231,7 @@ def stc(
 
 
 def vortex(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14):
+    """Calculate the Vortex Indicator."""
     tr = true_range(high, low, close)
 
     vmp = abs(high - low.shift(1))
@@ -233,6 +248,7 @@ def vortex(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14):
 
 
 def bollinger_bands(close: pd.Series, n: int = 20, std_dev: float = 2.0):
+    """Calculate Bollinger Bands."""
     sma_val = sma(close, n)
     std_val = std(close, n)
     upper = sma_val + std_dev * std_val
@@ -247,7 +263,7 @@ def bollinger_bands(close: pd.Series, n: int = 20, std_dev: float = 2.0):
     )
 
 
-def keltner_channels(
+def keltner_channels(  # pylint: disable=too-many-arguments
     high: pd.Series,
     low: pd.Series,
     close: pd.Series,
@@ -255,6 +271,7 @@ def keltner_channels(
     n_atr: int = 20,
     multiplier: float = 2.0,
 ):
+    """Calculate Keltner Channels."""
     ema_val = ewm(close, span=n_ema)
     atr_val = atr(high, low, close, n=n_atr)
     upper = ema_val + multiplier * atr_val
@@ -265,12 +282,15 @@ def keltner_channels(
 
 
 def donchian_channels(high: pd.Series, low: pd.Series, n: int = 20):
+    """Calculate Donchian Channels."""
     upper = high.rolling(n).max()
     lower = low.rolling(n).min()
     return pd.DataFrame({f"DCU_{n}_{n}": upper, f"DCL_{n}_{n}": lower})
 
 
-def create_features(df: pd.DataFrame) -> pd.DataFrame:
+def create_features(
+    df: pd.DataFrame,
+) -> pd.DataFrame:  # pylint: disable=too-many-locals, too-many-statements
     """
     Creates a set of technical analysis features based on percentage changes and raw price data.
     """
@@ -365,9 +385,8 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
     # EMA features
     emas = [10, 15, 20, 30, 40, 50, 60]
     for e in emas:
-        features[f"above_ema_{e}"] = (df["Close"] > ewm(df["Close"], span=e)).astype(
-            int
-        )
+        is_above_ema = df["Close"] > ewm(df["Close"], span=e)
+        features[f"above_ema_{e}"] = is_above_ema.astype(int)
 
     # Consecutive run feature
     signs = np.sign(close_pct)

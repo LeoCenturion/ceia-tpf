@@ -1,19 +1,27 @@
-import optuna
-import mlflow
-import numpy as np
+"""Backtesting framework with Optuna optimization and MLflow logging."""
 import os
 import re
+
+import mlflow
+import numpy as np
+import optuna
 import pandas as pd
 from backtesting import Backtest, Strategy
 from sklearn.metrics import f1_score
 
-from src.data_analysis import adjust_data_to_ubtc, fetch_historical_data
+from src.data_analysis.data_analysis import (
+    adjust_data_to_ubtc,
+    fetch_historical_data,
+)
 
 
 class TrialStrategy(Strategy):
+    """Base strategy class for Optuna trials with artifact saving."""
+
     # trades_df = pd.DataFrame()
 
     def save_artifacts(self, trial, stats, bt):
+        """Save backtest plot and trades to MLflow."""
         plot_filename = f"backtest_plot_trial_{trial.number}.html"
         trades_filename = f"trades_trial_{trial.number}.csv"
 
@@ -33,7 +41,8 @@ class TrialStrategy(Strategy):
                 os.remove(trades_filename)
 
     @classmethod
-    def get_optuna_params(cls, trial):
+    def get_optuna_params(cls, _trial):
+        """Define the hyperparameter space for Optuna."""
         return {}
 
 
@@ -42,7 +51,7 @@ def sanitize_metric_name(name):
     return re.sub(r"[^a-zA-Z0-9_\-.\s:/]", "", name)
 
 
-def optimize_strategy(
+def optimize_strategy(  # pylint: disable=too-many-arguments
     data, strategy_class: TrialStrategy, study_name, n_trials=100, n_jobs=8
 ):
     """
@@ -76,7 +85,9 @@ def optimize_strategy(
                 mlflow.log_metric(sanitized_key, value)
             # Log artifacts for the last step if available
             if bt:
-                stats._strategy.save_artifacts(trial, stats, bt)
+                stats._strategy.save_artifacts(  # pylint: disable=protected-access
+                    trial, stats, bt
+                )
 
         sharpe_ratio = stats.get("Sharpe Ratio", 0)
         if sharpe_ratio is None or np.isnan(sharpe_ratio):
@@ -97,7 +108,7 @@ def optimize_strategy(
         return None
 
 
-def optimize_classification_strategy(
+def optimize_classification_strategy(  # pylint: disable=too-many-arguments
     data, strategy, study_name, n_trials=100, n_jobs=8
 ):
     """
@@ -185,7 +196,7 @@ def optimize_classification_strategy(
         return None
 
 
-def run_optimizations(
+def run_optimizations(  # pylint: disable=too-many-arguments
     strategies,
     data_path,
     start_date,
@@ -232,7 +243,7 @@ def run_optimizations(
             print(f"Optimization for {name} complete.")
 
 
-def run_classification_optimizations(
+def run_classification_optimizations(  # pylint: disable=too-many-arguments
     strategies,
     data_path,
     start_date,
