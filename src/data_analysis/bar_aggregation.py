@@ -187,6 +187,78 @@ def main():
         print(result_df.to_string())
 
 
-# AI create a function to compute Tick Imbalance Bars AI!
+def create_tick_imbalance_bars(
+    df: pd.DataFrame, imbalance_threshold: float
+) -> pd.DataFrame:
+    """
+    Creates tick imbalance bars (TIBs) from a DataFrame of tick data.
+
+    A new bar is formed whenever the absolute cumulative tick imbalance reaches the threshold.
+    Tick imbalance is calculated as the sum of signed ticks (+1 for upticks, -1 for downticks).
+    If a price does not change, the sign of the previous tick is carried forward.
+
+    Args:
+        df (pd.DataFrame): DataFrame with tick data. Must include 'close' price.
+        imbalance_threshold (float): The threshold of absolute tick imbalance to accumulate for each bar.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing the tick imbalance bars.
+    """
+    if df.empty:
+        return pd.DataFrame()
+
+    if "date" in df.columns and not pd.api.types.is_datetime64_any_dtype(df["date"]):
+        df["date"] = pd.to_datetime(df["date"])
+
+    bars = []
+    start_idx = 0
+    cumulative_imbalance = 0.0
+    last_tick_sign = 0
+
+    df_reset = df.reset_index(drop=True)
+    price_diffs = df_reset["close"].diff()
+
+    for i in range(len(df_reset)):
+        diff = price_diffs.iloc[i]
+        if pd.isna(diff):
+            tick_sign = 0
+        elif diff > 0:
+            tick_sign = 1
+        elif diff < 0:
+            tick_sign = -1
+        else:
+            tick_sign = last_tick_sign
+
+        last_tick_sign = tick_sign
+        cumulative_imbalance += tick_sign
+
+        if abs(cumulative_imbalance) >= imbalance_threshold:
+            bar_slice = df_reset.iloc[start_idx : i + 1]
+
+            bars.append(
+                {
+                    "date": bar_slice["date"].iloc[-1],
+                    "open": bar_slice["open"].iloc[0],
+                    "high": bar_slice["high"].max(),
+                    "low": bar_slice["low"].min(),
+                    "close": bar_slice["close"].iloc[-1],
+                    "Volume BTC": bar_slice["Volume BTC"].sum(),
+                    "Volume USDT": bar_slice["Volume USDT"].sum(),
+                    "tradeCount": bar_slice["tradeCount"].sum(),
+                }
+            )
+
+            start_idx = i + 1
+            cumulative_imbalance = 0.0
+
+    if not bars:
+        return pd.DataFrame()
+
+    result_df = pd.DataFrame(bars)
+    if "date" in result_df.columns:
+        result_df = result_df.set_index("date")
+    return result_df
+
+
 if __name__ == "__main__":
     main()
