@@ -197,10 +197,11 @@ class PrecomputedChronosStrategy(TrialStrategy):
     prediction_column = "mean"  # which prediction column to use, e.g., 'mean', '0.5'
     target_type = "diff"
 
-    def init(self):
+    def __init__(self, *args, **kwargs):
         """
         Initialize the strategy and load pre-computed predictions.
         """
+        super().__init__(*args, **kwargs)
         self.predictions_df = pd.DataFrame()
         try:
             # The predictions CSV is expected to have the timestamp as the first column.

@@ -43,7 +43,8 @@ class ProphetStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outsi
     take_profit = 0.10
     threshold = 0.001
 
-    def init(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.model = None
         self.forecast = None
 
@@ -101,7 +102,8 @@ class ARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outside
     lookback_length = 24 * 30 * 1
     threshold = 1e-5
 
-    def init(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.model_fit = None
         self.processed_data = self.I(price_difference, self.data.Close)
 
@@ -173,7 +175,8 @@ class SARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outsid
     take_profit = 0.10
     threshold = 1e-5
 
-    def init(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.model_fit = None
         self.processed_data = self.I(price_difference, self.data.Close)
 
@@ -244,7 +247,8 @@ class KalmanARIMAStrategy(
     take_profit = 0.10
     threshold = 0.001  # Default threshold: 0.1%
 
-    def init(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.model_fit = None
         self.processed_data = self.I(price_difference, self.data.Close)
 
@@ -359,7 +363,8 @@ class ARIMAXGARCHStrategy(
     take_profit = 0.10
     threshold = 0.5
 
-    def init(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.arimax_fit = None
         self.garch_fit = None
         self.processed_data = self.I(

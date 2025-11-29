@@ -529,7 +529,8 @@ class SVCStrategy(Strategy):  # pylint: disable=attribute-defined-outside-init
     refit_period = 24 * 7  # Refit weekly
     lookback_length = 24 * 30 * 3  # 3 months of hourly data
 
-    def init(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.model = None
         self.scaler = StandardScaler()
 
@@ -598,7 +599,8 @@ class RandomForestClassifierStrategy(
     refit_period = 24 * 7
     lookback_length = 24 * 30 * 3
 
-    def init(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.model = None
         self.scaler = StandardScaler()
 
@@ -677,7 +679,8 @@ class XGBoostPriceReversalStrategy(
     refit_period = 24 * 7
     lookback_length = 24 * 30 * 6  # 6 months of hourly data
 
-    def init(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.model = None
         self.scaler = StandardScaler()
         self.selected_cols = None

@@ -11,7 +11,8 @@ class MaCrossover(TrialStrategy):  # pylint: disable=attribute-defined-outside-i
     stop_loss = 0.05
     take_profit = 0.10
 
-    def init(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         price_change = self.I(pct_change, self.data.Close)
         self.ma_short = self.I(sma, price_change, self.short_window)
         self.ma_long = self.I(sma, price_change, self.long_window)
@@ -40,7 +41,8 @@ class BollingerBands(TrialStrategy):  # pylint: disable=attribute-defined-outsid
     stop_loss = 0.05
     take_profit = 0.10
 
-    def init(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.ma = self.I(sma, self.data.Close, self.bb_window)
         self.std = self.I(std, self.data.Close, self.bb_window)
         self.upper_band = self.ma + self.bb_std * self.std
@@ -71,7 +73,8 @@ class MACD(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
     stop_loss = 0.05
     take_profit = 0.10
 
-    def init(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.macd = self.I(ewm, self.data.Close, self.fast_span) - self.I(
             ewm, self.data.Close, self.slow_span
         )
@@ -102,7 +105,8 @@ class RSIDivergence(TrialStrategy):  # pylint: disable=attribute-defined-outside
     stop_loss = 0.05
     take_profit = 0.10
 
-    def init(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.rsi = self.I(rsi_indicator, self.data.Close, self.rsi_window)
 
     def next(self):
@@ -152,7 +156,8 @@ class MultiIndicatorStrategy(
     slow_sma_window = 100
     trailing_sl_pct = 0.05  # 5% trailing stop loss
 
-    def init(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         # Bollinger Bands
         self.bb_ma = self.I(sma, self.data.Close, self.bb_window)
         self.bb_std_dev = self.I(std, self.data.Close, self.bb_window)
@@ -203,7 +208,8 @@ class SwingTrading(TrialStrategy):  # pylint: disable=attribute-defined-outside-
     swing_filter_p = 0.025
     trade_mode = "aggressive"  # 'aggressive' or 'conservative'
 
-    def init(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.swing_direction = 0  # 1 for up, -1 for down
         self.current_high = 0.0
         self.current_low = float("inf")

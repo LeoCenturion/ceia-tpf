@@ -104,7 +104,8 @@ class XGBoostPriceReversalPalazzoStrategy(
     refit_period = 100  # Refit every 100 volume bars
     lookback_length = 500  # Use 500 volume bars for training
 
-    def init(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         # 1. Pre-process data to get volume bars and features.
         # This is computationally intensive and done once per backtest run.
         minute_data = self.data.df.copy()
