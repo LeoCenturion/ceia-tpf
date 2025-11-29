@@ -190,6 +190,11 @@ def main():
 def create_tick_imbalance_bars(
     df: pd.DataFrame, imbalance_threshold: float
 ) -> pd.DataFrame:
+    # AI make the imbalance_threshold the expected accumulative_imbalance.
+    # That can be computed as expected accum_imbalance = expected bar_size * (P(tick is positive) - P(tick is negative))
+    # expected bar_size can be computed as a exponential wheighted moving average of prior bars
+    # P(tick) can be computed as an exponential  weighted moving average of prior ticks
+    # AI!
     """
     Creates tick imbalance bars (TIBs) from a DataFrame of tick data.
 
