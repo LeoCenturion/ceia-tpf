@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from scipy.signal import find_peaks
-from backtest_utils import sma, ewm, std
+from src.data_analysis import sma, ewm, std
 
 
 def awesome_oscillator(
