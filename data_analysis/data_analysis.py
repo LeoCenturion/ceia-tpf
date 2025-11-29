@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from statsmodels.tsa.stattools import adfuller
 
-from src.data_analysis.bar_aggregation import create_volume_bars, create_dollar_bars, create_price_change_bars
+from src.data_analysis.bar_aggregation import create_volume_bars, create_dollar_bars, create_price_change_bars, create_tick_imbalance_bars
 from scipy import stats
 from statsmodels.stats.diagnostic import acorr_ljungbox
 
@@ -852,7 +852,30 @@ plot_threshold_sweep_analysis(
     sweep_title="Price Change Bars"
 )
 
-# AI add here a new section analyzing the statistical properties of returns after applying create_tick_imbalance_bars AI!
+#%% [markdown]
+# ### 9.5. Analysis of Tick Imbalance Bar Returns
+#
+# Finally, we'll analyze the returns from Tick Imbalance Bars (TIBs). These bars are formed based on the cumulative imbalance of tick signs (+1 for upticks, -1 for downticks), using a dynamic threshold based on the expected imbalance. This method is designed to adapt to changes in market order flow.
+#
+# Note: We are applying this to 1-hour data, where each bar is treated as a single "tick". This analysis is more powerful when applied to high-frequency tick data.
+
+#%%
+print("\nAnalyzing statistical properties of Tick Imbalance Bar returns...")
+
+# Create Tick Imbalance Bars from the hourly data.
+# We'll use an initial bar size estimate of 24 hours (1 day) as a starting point,
+# as the default of 1 would lead to a bar per tick.
+tick_imbalance_bars = create_tick_imbalance_bars(
+    df_for_bars,
+    initial_bar_size_estimate=24
+)
+
+if not tick_imbalance_bars.empty:
+    returns = tick_imbalance_bars['close'].pct_change()
+    analyze_returns_properties(returns, "Tick Imbalance Bars (from 1-hour data)")
+else:
+    print("Could not create Tick Imbalance Bars, possibly due to insufficient data.")
+
 
 #%% [markdown]
 # ## 10. Threshold Sweep Analysis on 1-Minute Data
