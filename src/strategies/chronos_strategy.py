@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 from autogluon.timeseries import TimeSeriesPredictor, TimeSeriesDataFrame
 
-from backtest_utils import TrialStrategy, run_optimizations
+from src.backtest_utils import TrialStrategy, run_optimizations
 
 
 class ChronosStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outside-init

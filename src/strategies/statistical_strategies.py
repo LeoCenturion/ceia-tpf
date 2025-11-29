@@ -7,7 +7,7 @@ from pykalman import KalmanFilter
 import logging
 import itertools
 
-from backtest_utils import TrialStrategy, run_optimizations
+from src.backtest_utils import TrialStrategy, run_optimizations
 
 logging.getLogger("prophet").setLevel(logging.WARNING)
 
