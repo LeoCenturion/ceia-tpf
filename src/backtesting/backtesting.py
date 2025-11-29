@@ -9,7 +9,7 @@ import pandas as pd
 from backtesting import Backtest, Strategy
 from sklearn.metrics import f1_score
 
-from src.data_analysis.data_analysis import (
+from data_analysis.data_analysis import (
     adjust_data_to_ubtc,
     fetch_historical_data,
 )
