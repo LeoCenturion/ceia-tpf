@@ -8,8 +8,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.utils.class_weight import compute_class_weight
 import cupy as cp
-from .data_analysis import fetch_historical_data, sma, ewm, std, rsi_indicator
-
+from src.data_analysis.data_analysis import fetch_historical_data, sma, ewm, std
+from src.data_analysis.indicators import rsi_indicator
 
 # --- Part 1: Data Simulation and Volume Bar Creation ---
 # The paper uses high-frequency data to construct volume bars.

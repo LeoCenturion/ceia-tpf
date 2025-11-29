@@ -8,7 +8,7 @@ import optuna
 import pandas as pd
 from backtesting import Backtest, Strategy
 from sklearn.metrics import f1_score
-
+from abc import  abstractmethod
 from src.data_analysis import (
     adjust_data_to_ubtc,
     fetch_historical_data,
@@ -45,6 +45,13 @@ class TrialStrategy(Strategy):
         """Define the hyperparameter space for Optuna."""
         return {}
 
+    @abstractmethod
+    def init(self):
+        pass
+
+    @abstractmethod
+    def next(self):
+        pass
 
 def sanitize_metric_name(name):
     """Sanitize metric name to be MLflow compliant."""

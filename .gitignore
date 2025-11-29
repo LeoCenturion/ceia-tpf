@@ -14,3 +14,4 @@
 /.ipynb_checkpoints/
 /.pki/
 /AutogluonModels/
+/**/__pycache__/

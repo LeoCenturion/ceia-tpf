@@ -71,3 +71,7 @@ ignore = [
 "data_analysis/",
 "data"
 ]
+
+[MASTER]
+# Add the project root ('.') to sys.path
+init-hook='import sys; sys.path.append(".")'

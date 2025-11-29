@@ -9,7 +9,7 @@ import torch
 from sklearn.metrics import mean_squared_error, classification_report
 from tqdm import trange
 
-from backtest_utils import fetch_historical_data
+from src.data_analysis import fetch_historical_data
 from chronos import Chronos2Pipeline
 
 # Determine device

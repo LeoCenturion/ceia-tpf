@@ -6,7 +6,7 @@ import optuna
 from functools import partial
 import matplotlib.pyplot as plt
 
-from backtest_utils import fetch_historical_data
+from src.data_analysis import fetch_historical_data
 
 
 def run_multimodal_regression_backtest():

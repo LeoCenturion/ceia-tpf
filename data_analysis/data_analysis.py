@@ -14,7 +14,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from statsmodels.tsa.stattools import adfuller
-from src.volume_data_processor import create_volume_bars, create_dollar_bars, create_price_change_bars
+
+from src.data_analysis.volume_data_processor import create_volume_bars, create_dollar_bars, create_price_change_bars
 from scipy import stats
 from statsmodels.stats.diagnostic import acorr_ljungbox
 

@@ -9,7 +9,8 @@ from sklearn.metrics import classification_report, accuracy_score
 from sklearn.preprocessing import StandardScaler
 import mplfinance as mpf
 
-from .data_analysis import fetch_historical_data, sma, ewm, std, rsi_indicator
+from src.data_analysis.data_analysis import fetch_historical_data, sma, ewm, std
+from src.data_analysis.indicators import rsi_indicator
 
 
 def awesome_oscillator(

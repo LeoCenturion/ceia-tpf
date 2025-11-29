@@ -2,12 +2,7 @@ import pandas as pd
 import numpy as np
 import statsmodels.api as sm
 from datetime import timedelta
-import os
-import sys
-
-# Add the parent directory of src to sys.path to allow importing from backtest_utils
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from src.backtest_utils import fetch_historical_data
+from src.data_analysis import fetch_historical_data
 
 
 def calculate_realized_volatility(df: pd.DataFrame, freq: str) -> pd.Series:
@@ -114,8 +109,7 @@ def backtest_har_volatility(
     print(
         f"Fetching {symbol} {timeframe} historical data from {start_date} to {end_date}..."
     )
-    # fetch_historical_data from backtest_utils returns pd.DataFrame
-    # Ensure it's sorted by timestamp if not already
+
     raw_data = fetch_historical_data(symbol, timeframe, start_date, end_date)
 
     if raw_data.empty or "close" not in raw_data.columns:
