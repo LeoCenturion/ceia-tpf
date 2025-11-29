@@ -96,6 +96,7 @@ def sma(series, n):
 def ewm(series, span):
     return pd.Series(series).ewm(span=span, adjust=False).mean()
 
+
 def std(series, n):
     return pd.Series(series).rolling(n).std()
 

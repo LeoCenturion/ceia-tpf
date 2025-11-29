@@ -106,7 +106,7 @@ class XGBoostPriceReversalPalazzoStrategy(Strategy):
         # 1. Pre-process data to get volume bars and features.
         # This is computationally intensive and done once per backtest run.
         minute_data = self.data.df.copy()
-        minute_data.rename(columns={'Close': 'close', 'Volume': 'volume'}, inplace=True)
+        minute_data.rename(columns={"Close": "close", "Volume": "volume"}, inplace=True)
 
         volume_bars = aggregate_to_volume_bars(minute_data, self.volume_threshold)
         if volume_bars.empty:
@@ -120,8 +120,10 @@ class XGBoostPriceReversalPalazzoStrategy(Strategy):
             return
 
         # Set index to map time-based backtest to event-based bars
-        self.processed_data.set_index('close_time', inplace=True, drop=False)
-        self.volume_bar_indices = {timestamp: i for i, timestamp in enumerate(self.processed_data.index)}
+        self.processed_data.set_index("close_time", inplace=True, drop=False)
+        self.volume_bar_indices = {
+            timestamp: i for i, timestamp in enumerate(self.processed_data.index)
+        }
 
         # 2. Initialize strategy state
         self.model = None
@@ -129,7 +131,7 @@ class XGBoostPriceReversalPalazzoStrategy(Strategy):
         self.in_trade = False
 
     def next(self):
-        if not hasattr(self, 'processed_data') or self.processed_data.empty:
+        if not hasattr(self, "processed_data") or self.processed_data.empty:
             return
 
         # Check if the current time bar corresponds to the completion of a volume bar
@@ -153,7 +155,7 @@ class XGBoostPriceReversalPalazzoStrategy(Strategy):
             start_idx = max(0, end_idx - self.lookback_length)
             train_df = self.processed_data.iloc[start_idx:end_idx]
 
-            y_train = train_df['label']
+            y_train = train_df["label"]
             features = [col for col in train_df.columns if "feature_" in col]
             X_train_raw = train_df[features]
 
@@ -163,20 +165,31 @@ class XGBoostPriceReversalPalazzoStrategy(Strategy):
             X_train = self.scaler.fit_transform(X_train_raw)
 
             # Handle class imbalance
-            scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum() if (y_train == 1).sum() > 0 else 1
+            scale_pos_weight = (
+                (y_train == 0).sum() / (y_train == 1).sum()
+                if (y_train == 1).sum() > 0
+                else 1
+            )
 
             self.model = xgb.XGBClassifier(
-                objective="binary:logistic", eval_metric="logloss", tree_method="hist",
-                device="cuda", n_estimators=self.n_estimators, learning_rate=self.learning_rate,
-                max_depth=self.max_depth, subsample=self.subsample, colsample_bytree=self.colsample_bytree,
-                gamma=self.gamma, min_child_weight=self.min_child_weight, seed=42,
+                objective="binary:logistic",
+                eval_metric="logloss",
+                tree_method="hist",
+                device="cuda",
+                n_estimators=self.n_estimators,
+                learning_rate=self.learning_rate,
+                max_depth=self.max_depth,
+                subsample=self.subsample,
+                colsample_bytree=self.colsample_bytree,
+                gamma=self.gamma,
+                min_child_weight=self.min_child_weight,
+                seed=42,
                 scale_pos_weight=scale_pos_weight,
             )
             self.model.fit(X_train, y_train)
 
         # Make prediction if model is trained
         if self.model:
-            
             current_features_df = self.processed_data.iloc[[bar_idx]]
             features = [col for col in current_features_df.columns if "feature_" in col]
             X_current_raw = current_features_df[features]
@@ -191,17 +204,27 @@ class XGBoostPriceReversalPalazzoStrategy(Strategy):
     @classmethod
     def get_optuna_params(cls, trial):
         return {
-            'volume_threshold': trial.suggest_int('volume_threshold', 37798, 37798),
-            'tau': trial.suggest_float('tau', 1.2688331479071624, 1.2688331479071624),
-            'n_estimators': trial.suggest_int('n_estimators', 281, 281),
-            'learning_rate': trial.suggest_float('learning_rate', 0.0010163133112639452, 0.0010163133112639452),
-            'max_depth': trial.suggest_int('max_depth', 7, 7),
-            'subsample': trial.suggest_float('subsample', 0.8486986034061127, 0.8486986034061127),
-            'colsample_bytree': trial.suggest_float('colsample_bytree', 0.7033426743185334, 0.7033426743185334),
-            'gamma': trial.suggest_float('gamma', 2.035537039974458e-05, 2.035537039974458e-05),
-            'min_child_weight': trial.suggest_int('min_child_weight', 10, 10),
-            'refit_period': trial.suggest_int('refit_period', 24, 24, step=25),
-            'lookback_length': trial.suggest_int('lookback_length', 4500, 4500, step=100),
+            "volume_threshold": trial.suggest_int("volume_threshold", 37798, 37798),
+            "tau": trial.suggest_float("tau", 1.2688331479071624, 1.2688331479071624),
+            "n_estimators": trial.suggest_int("n_estimators", 281, 281),
+            "learning_rate": trial.suggest_float(
+                "learning_rate", 0.0010163133112639452, 0.0010163133112639452
+            ),
+            "max_depth": trial.suggest_int("max_depth", 7, 7),
+            "subsample": trial.suggest_float(
+                "subsample", 0.8486986034061127, 0.8486986034061127
+            ),
+            "colsample_bytree": trial.suggest_float(
+                "colsample_bytree", 0.7033426743185334, 0.7033426743185334
+            ),
+            "gamma": trial.suggest_float(
+                "gamma", 2.035537039974458e-05, 2.035537039974458e-05
+            ),
+            "min_child_weight": trial.suggest_int("min_child_weight", 10, 10),
+            "refit_period": trial.suggest_int("refit_period", 24, 24, step=25),
+            "lookback_length": trial.suggest_int(
+                "lookback_length", 4500, 4500, step=100
+            ),
         }
 
 
@@ -213,13 +236,13 @@ def main():
     # This strategy requires high-frequency data (e.g., 1-minute) to build volume bars.
     run_optimizations(
         strategies=strategies,
-        data_path='/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv',
+        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv",
         start_date="2020-01-01T00:00:00Z",
         tracking_uri="sqlite:///mlflow.db",
         experiment_name="Palazzo Strategy v1",
-        timeframe='1m',
+        timeframe="1m",
         n_trials_per_strategy=1,
-        n_jobs=1  # Use a single job for GPU-based training to avoid conflicts
+        n_jobs=1,  # Use a single job for GPU-based training to avoid conflicts
     )
 
 

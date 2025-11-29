@@ -21,24 +21,32 @@ print(f"Using device: {device}")
 pipeline = Chronos2Pipeline.from_pretrained("amazon/chronos-2", device_map=device)
 
 
-def objective(trial: optuna.Trial, data: pd.DataFrame, test_size: float, step_size: int, prediction_length: int) -> float:
+def objective(
+    trial: optuna.Trial,
+    data: pd.DataFrame,
+    test_size: float,
+    step_size: int,
+    prediction_length: int,
+) -> float:
     """
     Optuna objective function for Chronos2 model.
     Performs a walk-forward validation and returns the Root Mean Squared Error.
     """
     # === 1. Define Hyperparameter Search Space ===
-    context_length = trial.suggest_int('context_length', 64, 512, step=32)
-    num_samples = trial.suggest_int('num_samples', 10, 40)
-    temperature = trial.suggest_float('temperature', 0.5, 1.0)
-    top_k = trial.suggest_int('top_k', 20, 50)
-    top_p = trial.suggest_float('top_p', 0.8, 1.0)
+    context_length = trial.suggest_int("context_length", 64, 512, step=32)
+    num_samples = trial.suggest_int("num_samples", 10, 40)
+    temperature = trial.suggest_float("temperature", 0.5, 1.0)
+    top_k = trial.suggest_int("top_k", 20, 50)
+    top_p = trial.suggest_float("top_p", 0.8, 1.0)
 
     # === 2. Prepare data for Chronos2 format ===
     # Chronos2 requires columns: id, timestamp, target
     data_chronos = data.copy()
     data_chronos = data_chronos.reset_index()  # move timestamp from index to column
-    data_chronos.rename(columns={'timestamp': 'timestamp', 'Close': 'target'}, inplace=True)
-    data_chronos['id'] = 'BTC/USDT'
+    data_chronos.rename(
+        columns={"timestamp": "timestamp", "Close": "target"}, inplace=True
+    )
+    data_chronos["id"] = "BTC/USDT"
 
     # === 3. Walk-Forward Validation ===
     split_index = int(len(data_chronos) * (1 - test_size))
@@ -46,7 +54,12 @@ def objective(trial: optuna.Trial, data: pd.DataFrame, test_size: float, step_si
     actuals = []
 
     print(f"Starting walk-forward validation for Trial {trial.number}...")
-    for i in trange(split_index, len(data_chronos) - prediction_length, step_size, desc=f"Trial {trial.number}"):
+    for i in trange(
+        split_index,
+        len(data_chronos) - prediction_length,
+        step_size,
+        desc=f"Trial {trial.number}",
+    ):
         # Define context (training) and forecast (testing) windows
         context_end = i
         context_start = max(0, context_end - context_length)
@@ -76,11 +89,16 @@ def objective(trial: optuna.Trial, data: pd.DataFrame, test_size: float, step_si
             continue
 
         forecast_actual_df = data_chronos.iloc[i:forecast_end]
-        merged_df = pd.merge(forecast_actual_df[['timestamp', 'target']], pred_df[['timestamp', '0.5']], on='timestamp', how='inner')
+        merged_df = pd.merge(
+            forecast_actual_df[["timestamp", "target"]],
+            pred_df[["timestamp", "0.5"]],
+            on="timestamp",
+            how="inner",
+        )
 
         if not merged_df.empty:
-            predictions.extend(merged_df['0.5'].values)
-            actuals.extend(merged_df['target'].values)
+            predictions.extend(merged_df["0.5"].values)
+            actuals.extend(merged_df["target"].values)
 
     if not actuals:
         print("No predictions were made. Pruning trial.")
@@ -114,13 +132,19 @@ def run_study(data, study_name_in_db, n_trials):
 
     print(f"Starting Optuna study: '{study_name_in_db}'. Storage: {storage_name}")
 
-    objective_with_data = partial(objective, data=data, test_size=TEST_SIZE, step_size=STEP_SIZE, prediction_length=PREDICTION_LENGTH)
+    objective_with_data = partial(
+        objective,
+        data=data,
+        test_size=TEST_SIZE,
+        step_size=STEP_SIZE,
+        prediction_length=PREDICTION_LENGTH,
+    )
 
     study = optuna.create_study(
-        direction='minimize',  # We want to minimize RMSE
+        direction="minimize",  # We want to minimize RMSE
         study_name=study_name_in_db,
         storage=storage_name,
-        load_if_exists=True
+        load_if_exists=True,
     )
 
     def mlflow_callback(study, trial):
@@ -158,12 +182,14 @@ def train_and_predict_direction_split(data: pd.DataFrame, context_length: int = 
     # === 1. Prepare data ===
     data_chronos = data.copy()
     data_chronos = data_chronos.reset_index()
-    data_chronos.rename(columns={'timestamp': 'timestamp', 'Close': 'target'}, inplace=True)
-    data_chronos['id'] = 'BTC/USDT'
+    data_chronos.rename(
+        columns={"timestamp": "timestamp", "Close": "target"}, inplace=True
+    )
+    data_chronos["id"] = "BTC/USDT"
 
     # === 2. Split data ===
     split_index = int(len(data_chronos) * 0.7)
-    context_df = data_chronos.iloc[max(0, split_index - context_length):split_index]
+    context_df = data_chronos.iloc[max(0, split_index - context_length) : split_index]
     actual_df = data_chronos.iloc[split_index:]
 
     # === 3. Rolling Window Prediction for Direction ===
@@ -176,7 +202,7 @@ def train_and_predict_direction_split(data: pd.DataFrame, context_length: int = 
         if len(current_context_df) < 2:
             continue
 
-        last_known_price = current_context_df['target'].iloc[-1]
+        last_known_price = current_context_df["target"].iloc[-1]
 
         try:
             # Predict one step ahead
@@ -188,24 +214,26 @@ def train_and_predict_direction_split(data: pd.DataFrame, context_length: int = 
                 timestamp_column="timestamp",
                 target="target",
             )
-            
-            predicted_price = single_pred_df['0.5'].iloc[0]
-            
+
+            predicted_price = single_pred_df["0.5"].iloc[0]
+
             # Convert price prediction to directional prediction (+1 for up, -1 for down)
             predicted_direction = 1 if predicted_price > last_known_price else -1
             y_pred.append(predicted_direction)
 
             # Determine actual direction
-            actual_price = actual_df['target'].iloc[i]
+            actual_price = actual_df["target"].iloc[i]
             actual_direction = 1 if actual_price > last_known_price else -1
             y_true.append(actual_direction)
 
             # Update context for the next step with the true value
             next_actual_step = actual_df.iloc[[i]]
-            current_context_df = pd.concat([current_context_df, next_actual_step], ignore_index=True)
+            current_context_df = pd.concat(
+                [current_context_df, next_actual_step], ignore_index=True
+            )
 
         except Exception as e:
-            print(f"Prediction failed at step {i+1} with error: {e}. Stopping.")
+            print(f"Prediction failed at step {i + 1} with error: {e}. Stopping.")
             break
 
     if not y_true:
@@ -214,9 +242,13 @@ def train_and_predict_direction_split(data: pd.DataFrame, context_length: int = 
 
     # === 4. Evaluate and Print Classification Report ===
     print("\n--- Classification Report ---")
-    target_names = ['Down (-1)', 'Up (+1)']
+    target_names = ["Down (-1)", "Up (+1)"]
     labels = [-1, 1]
-    print(classification_report(y_true, y_pred, labels=labels, target_names=target_names, zero_division=0))
+    print(
+        classification_report(
+            y_true, y_pred, labels=labels, target_names=target_names, zero_division=0
+        )
+    )
 
 
 def train_and_predict_split(data: pd.DataFrame, context_length: int = 512):
@@ -232,13 +264,15 @@ def train_and_predict_split(data: pd.DataFrame, context_length: int = 512):
     # === 1. Prepare data for Chronos2 format ===
     data_chronos = data.copy()
     data_chronos = data_chronos.reset_index()
-    data_chronos.rename(columns={'timestamp': 'timestamp', 'Close': 'target'}, inplace=True)
-    data_chronos['id'] = 'BTC/USDT'
+    data_chronos.rename(
+        columns={"timestamp": "timestamp", "Close": "target"}, inplace=True
+    )
+    data_chronos["id"] = "BTC/USDT"
 
     # === 2. Split data ===
     split_index = int(len(data_chronos) * 0.7)
     # Use the last `context_length` points of the training data as context
-    context_df = data_chronos.iloc[max(0, split_index - context_length):split_index]
+    context_df = data_chronos.iloc[max(0, split_index - context_length) : split_index]
     actual_df = data_chronos.iloc[split_index:]
     prediction_length = len(actual_df)
 
@@ -257,7 +291,7 @@ def train_and_predict_split(data: pd.DataFrame, context_length: int = 512):
 
     for i in trange(len(actual_df), desc="Rolling Window Prediction"):
         if len(current_context_df) < 2:
-            print(f"Skipping step {i+1} due to insufficient context.")
+            print(f"Skipping step {i + 1} due to insufficient context.")
             continue
 
         try:
@@ -274,10 +308,14 @@ def train_and_predict_split(data: pd.DataFrame, context_length: int = 512):
 
             # Update context for the next step with the true value from actual_df (expanding window)
             next_actual_step = actual_df.iloc[[i]]
-            current_context_df = pd.concat([current_context_df, next_actual_step], ignore_index=True)
+            current_context_df = pd.concat(
+                [current_context_df, next_actual_step], ignore_index=True
+            )
 
         except Exception as e:
-            print(f"Prediction failed at step {i+1} with error: {e}. Stopping prediction.")
+            print(
+                f"Prediction failed at step {i + 1} with error: {e}. Stopping prediction."
+            )
             break  # Stop if one prediction fails
 
     if not predictions_list:
@@ -289,34 +327,53 @@ def train_and_predict_split(data: pd.DataFrame, context_length: int = 512):
 
     # === 4. Evaluate and Plot ===
     # Merge predictions with actual values
-    results_df = pd.merge(actual_df[['timestamp', 'target']], pred_df, on='timestamp', how='inner')
+    results_df = pd.merge(
+        actual_df[["timestamp", "target"]], pred_df, on="timestamp", how="inner"
+    )
     if results_df.empty:
         print("Could not merge predictions with actuals. Check timestamp alignment.")
         return
 
     # Calculate RMSE on the median forecast
-    rmse = np.sqrt(mean_squared_error(results_df['target'], results_df['0.5']))
+    rmse = np.sqrt(mean_squared_error(results_df["target"], results_df["0.5"]))
     print(f"\nEvaluation RMSE (on median forecast): {rmse:.4f}")
 
     # Plotting
     plt.figure(figsize=(15, 8))
-    plt.plot(data_chronos['timestamp'], data_chronos['target'], label='Full Time Series', color='gray', alpha=0.6)
-    plt.plot(results_df['timestamp'], results_df['target'], label='Actual Values (Test Set)', color='blue')
-    plt.plot(results_df['timestamp'], results_df['0.5'], label='Predicted Median (0.5)', color='orange', linestyle='--')
-    
-    # Plot uncertainty bounds
-    plt.fill_between(
-        results_df['timestamp'],
-        results_df['0.1'],
-        results_df['0.9'],
-        color='orange',
-        alpha=0.2,
-        label='Uncertainty (10th-90th percentile)'
+    plt.plot(
+        data_chronos["timestamp"],
+        data_chronos["target"],
+        label="Full Time Series",
+        color="gray",
+        alpha=0.6,
+    )
+    plt.plot(
+        results_df["timestamp"],
+        results_df["target"],
+        label="Actual Values (Test Set)",
+        color="blue",
+    )
+    plt.plot(
+        results_df["timestamp"],
+        results_df["0.5"],
+        label="Predicted Median (0.5)",
+        color="orange",
+        linestyle="--",
     )
 
-    plt.title('Chronos2: 70/30 Train/Test Split Prediction')
-    plt.xlabel('Date')
-    plt.ylabel('Price')
+    # Plot uncertainty bounds
+    plt.fill_between(
+        results_df["timestamp"],
+        results_df["0.1"],
+        results_df["0.9"],
+        color="orange",
+        alpha=0.2,
+        label="Uncertainty (10th-90th percentile)",
+    )
+
+    plt.title("Chronos2: 70/30 Train/Test Split Prediction")
+    plt.xlabel("Date")
+    plt.ylabel("Price")
     plt.legend()
     plt.grid(True)
     plt.show()
@@ -329,7 +386,7 @@ def main():
     print("Loading historical data...")
     data = fetch_historical_data(
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
-        start_date="2022-01-01T00:00:00Z"
+        start_date="2022-01-01T00:00:00Z",
     )
 
     # run_study(data, STUDY_NAME, N_TRIALS)

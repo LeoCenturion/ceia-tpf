@@ -412,8 +412,10 @@ def create_price_change_target(
         df.loc[future_pct_change >= (rolling_std * std_fraction), "target"] = 1
         df.loc[future_pct_change <= -(rolling_std * std_fraction), "target"] = -1
     else:
-        raise ValueError(f"Invalid method '{method}' specified for create_price_change_target")
-    
+        raise ValueError(
+            f"Invalid method '{method}' specified for create_price_change_target"
+        )
+
     return df
 
 

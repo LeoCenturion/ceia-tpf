@@ -2,7 +2,9 @@ import pandas as pd
 import argparse
 
 
-def _aggregate_to_bars(df: pd.DataFrame, metric_col: str, threshold: float) -> pd.DataFrame:
+def _aggregate_to_bars(
+    df: pd.DataFrame, metric_col: str, threshold: float
+) -> pd.DataFrame:
     """
     Aggregates tick data into bars based on a metric threshold.
 
@@ -17,8 +19,8 @@ def _aggregate_to_bars(df: pd.DataFrame, metric_col: str, threshold: float) -> p
     if df.empty:
         return pd.DataFrame()
 
-    if "date" in df.columns and not pd.api.types.is_datetime64_any_dtype(df['date']):
-        df['date'] = pd.to_datetime(df['date'])
+    if "date" in df.columns and not pd.api.types.is_datetime64_any_dtype(df["date"]):
+        df["date"] = pd.to_datetime(df["date"])
 
     bars = []
     start_idx = 0
@@ -32,16 +34,18 @@ def _aggregate_to_bars(df: pd.DataFrame, metric_col: str, threshold: float) -> p
         if cumulative_metric >= threshold:
             bar_slice = df_reset.iloc[start_idx : i + 1]
 
-            bars.append({
-                'date': bar_slice['date'].iloc[-1],
-                'open': bar_slice['open'].iloc[0],
-                'high': bar_slice['high'].max(),
-                'low': bar_slice['low'].min(),
-                'close': bar_slice['close'].iloc[-1],
-                'Volume BTC': bar_slice['Volume BTC'].sum(),
-                'Volume USDT': bar_slice['Volume USDT'].sum(),
-                'tradeCount': bar_slice['tradeCount'].sum(),
-            })
+            bars.append(
+                {
+                    "date": bar_slice["date"].iloc[-1],
+                    "open": bar_slice["open"].iloc[0],
+                    "high": bar_slice["high"].max(),
+                    "low": bar_slice["low"].min(),
+                    "close": bar_slice["close"].iloc[-1],
+                    "Volume BTC": bar_slice["Volume BTC"].sum(),
+                    "Volume USDT": bar_slice["Volume USDT"].sum(),
+                    "tradeCount": bar_slice["tradeCount"].sum(),
+                }
+            )
 
             start_idx = i + 1
             cumulative_metric = 0.0
@@ -51,7 +55,7 @@ def _aggregate_to_bars(df: pd.DataFrame, metric_col: str, threshold: float) -> p
 
     result_df = pd.DataFrame(bars)
     if "date" in result_df.columns:
-        result_df = result_df.set_index('date')
+        result_df = result_df.set_index("date")
     return result_df
 
 
@@ -70,7 +74,7 @@ def create_volume_bars(df: pd.DataFrame, volume_threshold: float) -> pd.DataFram
     Returns:
         pd.DataFrame: A DataFrame containing the volume bars with OHLCV data.
     """
-    return _aggregate_to_bars(df, 'Volume BTC', volume_threshold)
+    return _aggregate_to_bars(df, "Volume BTC", volume_threshold)
 
 
 def create_dollar_bars(df: pd.DataFrame, dollar_threshold: float) -> pd.DataFrame:
@@ -88,10 +92,12 @@ def create_dollar_bars(df: pd.DataFrame, dollar_threshold: float) -> pd.DataFram
     Returns:
         pd.DataFrame: A DataFrame containing the dollar bars with OHLCV data.
     """
-    return _aggregate_to_bars(df, 'Volume USDT', dollar_threshold)
+    return _aggregate_to_bars(df, "Volume USDT", dollar_threshold)
 
 
-def create_price_change_bars(df: pd.DataFrame, price_change_threshold: float) -> pd.DataFrame:
+def create_price_change_bars(
+    df: pd.DataFrame, price_change_threshold: float
+) -> pd.DataFrame:
     """
     Creates bars based on cumulative absolute price change.
 
@@ -109,22 +115,34 @@ def create_price_change_bars(df: pd.DataFrame, price_change_threshold: float) ->
     """
     df_copy = df.copy()
     # Calculate fractional change, not percentage
-    df_copy['abs_pct_change'] = df_copy['close'].pct_change().abs()
+    df_copy["abs_pct_change"] = df_copy["close"].pct_change().abs()
     # The first value will be NaN, fill it with 0 so it doesn't break the cumulative sum
-    df_copy['abs_pct_change'] = df_copy['abs_pct_change'].fillna(0)
-    return _aggregate_to_bars(df_copy, 'abs_pct_change', price_change_threshold)
+    df_copy["abs_pct_change"] = df_copy["abs_pct_change"].fillna(0)
+    return _aggregate_to_bars(df_copy, "abs_pct_change", price_change_threshold)
 
 
 def main():
     """
     Main function to run the bar aggregation script from the command line.
     """
-    parser = argparse.ArgumentParser(description="Aggregate time-series data into different bar types.")
+    parser = argparse.ArgumentParser(
+        description="Aggregate time-series data into different bar types."
+    )
     parser.add_argument("input_csv", help="Path to the input CSV file.")
-    parser.add_argument("bar_type", choices=['volume', 'dollar', 'price_change'], help="Type of bar to create.")
-    parser.add_argument("threshold", type=float, help="Threshold value for bar creation.")
-    parser.add_argument("-o", "--output_csv", help="Path to the output CSV file. If not provided, prints to console.")
-    
+    parser.add_argument(
+        "bar_type",
+        choices=["volume", "dollar", "price_change"],
+        help="Type of bar to create.",
+    )
+    parser.add_argument(
+        "threshold", type=float, help="Threshold value for bar creation."
+    )
+    parser.add_argument(
+        "-o",
+        "--output_csv",
+        help="Path to the output CSV file. If not provided, prints to console.",
+    )
+
     args = parser.parse_args()
 
     print(f"Loading data from {args.input_csv}...")
@@ -135,23 +153,25 @@ def main():
         return
 
     # The bar creation functions expect a 'date' column.
-    if 'date' not in df.columns:
-        print(f"Error: Input CSV must contain a 'date' column. Found columns: {df.columns.tolist()}")
+    if "date" not in df.columns:
+        print(
+            f"Error: Input CSV must contain a 'date' column. Found columns: {df.columns.tolist()}"
+        )
         return
 
     print(f"Creating {args.bar_type} bars with threshold {args.threshold}...")
-    
-    if args.bar_type == 'volume':
+
+    if args.bar_type == "volume":
         result_df = create_volume_bars(df, args.threshold)
-    elif args.bar_type == 'dollar':
+    elif args.bar_type == "dollar":
         result_df = create_dollar_bars(df, args.threshold)
-    elif args.bar_type == 'price_change':
+    elif args.bar_type == "price_change":
         result_df = create_price_change_bars(df, args.threshold)
     else:
         # This case should not be reached due to argparse choices
         print(f"Error: Unknown bar type '{args.bar_type}'")
         return
-    
+
     print(f"Successfully created {len(result_df)} bars.")
 
     if args.output_csv:

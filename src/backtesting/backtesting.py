@@ -21,7 +21,7 @@ class TrialStrategy(Strategy):
         if os.path.exists(plot_filename):
             mlflow.log_artifact(plot_filename)
             # Save trades
-        trades_df = stats['_trades']
+        trades_df = stats["_trades"]
         if not trades_df.empty:
             trades_df.to_csv(trades_filename, index=False)
             mlflow.log_artifact(trades_filename)
@@ -31,6 +31,7 @@ class TrialStrategy(Strategy):
                 os.remove(plot_filename)
             if os.path.exists(trades_filename):
                 os.remove(trades_filename)
+
     @classmethod
     def get_optuna_params(cls, trial):
         return {}
@@ -38,11 +39,12 @@ class TrialStrategy(Strategy):
 
 def sanitize_metric_name(name):
     """Sanitize metric name to be MLflow compliant."""
-    return re.sub(r'[^a-zA-Z0-9_\-.\s:/]', '', name)
+    return re.sub(r"[^a-zA-Z0-9_\-.\s:/]", "", name)
 
 
-
-def optimize_strategy(data, strategy_class: TrialStrategy, study_name, n_trials=100, n_jobs=8):
+def optimize_strategy(
+    data, strategy_class: TrialStrategy, study_name, n_trials=100, n_jobs=8
+):
     """
     Optimize strategy hyperparameters using Optuna.
     For each trial, run an expanding window backtest and log the averaged stats to MLflow.
@@ -62,13 +64,13 @@ def optimize_strategy(data, strategy_class: TrialStrategy, study_name, n_trials=
             mlflow.log_params(params)
 
             for key, value in stats.items():
-                print(f' key value {key} {value} {type(value)}')
+                print(f" key value {key} {value} {type(value)}")
                 if isinstance(value, pd.Timestamp):
                     value = value.timestamp()
                 if isinstance(value, pd.Timedelta):
                     value = value.total_seconds()
                 if not np.issubdtype(type(value), np.number):
-                    print('skipping')
+                    print("skipping")
                     continue
                 sanitized_key = sanitize_metric_name(key)
                 mlflow.log_metric(sanitized_key, value)
@@ -76,12 +78,17 @@ def optimize_strategy(data, strategy_class: TrialStrategy, study_name, n_trials=
             if bt:
                 stats._strategy.save_artifacts(trial, stats, bt)
 
-        sharpe_ratio = stats.get('Sharpe Ratio', 0)
+        sharpe_ratio = stats.get("Sharpe Ratio", 0)
         if sharpe_ratio is None or np.isnan(sharpe_ratio):
             return 0.0
         return sharpe_ratio
 
-    study = optuna.create_study(study_name=study_name, direction='maximize', storage="sqlite:///optuna-study.db", load_if_exists=True)
+    study = optuna.create_study(
+        study_name=study_name,
+        direction="maximize",
+        storage="sqlite:///optuna-study.db",
+        load_if_exists=True,
+    )
     study.optimize(objective, n_trials=n_trials, show_progress_bar=True, n_jobs=n_jobs)
     try:
         return study.best_params
@@ -90,7 +97,9 @@ def optimize_strategy(data, strategy_class: TrialStrategy, study_name, n_trials=
         return None
 
 
-def optimize_classification_strategy(data, strategy, study_name, n_trials=100, n_jobs=8):
+def optimize_classification_strategy(
+    data, strategy, study_name, n_trials=100, n_jobs=8
+):
     """
     Optimize a classification-based strategy using Optuna.
     This function is similar to `optimize_strategy` but is tailored for classification
@@ -112,13 +121,13 @@ def optimize_classification_strategy(data, strategy, study_name, n_trials=100, n
             mlflow.log_params(params)
 
             for key, value in stats.items():
-                print(f' key value {key} {value} {type(value)}')
+                print(f" key value {key} {value} {type(value)}")
                 if isinstance(value, pd.Timestamp):
                     value = value.timestamp()
                 if isinstance(value, pd.Timedelta):
                     value = value.total_seconds()
                 if not np.issubdtype(type(value), np.number):
-                    print('skipping')
+                    print("skipping")
                     continue
                 sanitized_key = sanitize_metric_name(key)
                 mlflow.log_metric(sanitized_key, value)
@@ -133,7 +142,7 @@ def optimize_classification_strategy(data, strategy, study_name, n_trials=100, n
                 if os.path.exists(plot_filename):
                     mlflow.log_artifact(plot_filename)
                 # Save trades
-                trades_df = stats['_trades']
+                trades_df = stats["_trades"]
                 if not trades_df.empty:
                     trades_df.to_csv(trades_filename, index=False)
                     mlflow.log_artifact(trades_filename)
@@ -147,18 +156,27 @@ def optimize_classification_strategy(data, strategy, study_name, n_trials=100, n
         # For classification, we might optimize for a metric like F1 score
         # The strategy needs to compute and return this.
         strategy_instance = bt._strategy
-        if hasattr(strategy_instance, 'y_true') and hasattr(strategy_instance, 'y_pred'):
+        if hasattr(strategy_instance, "y_true") and hasattr(
+            strategy_instance, "y_pred"
+        ):
             if len(strategy_instance.y_true) > 0 and len(strategy_instance.y_pred) > 0:
-                f1 = f1_score(strategy_instance.y_true, strategy_instance.y_pred, zero_division=0)
-                stats['F1 Score'] = f1
+                f1 = f1_score(
+                    strategy_instance.y_true, strategy_instance.y_pred, zero_division=0
+                )
+                stats["F1 Score"] = f1
                 mlflow.log_metric("F1 Score", f1)
 
-        f1_val = stats.get('F1 Score', 0)
+        f1_val = stats.get("F1 Score", 0)
         if f1_val is None or np.isnan(f1_val):
             return 0.0
         return f1_val
 
-    study = optuna.create_study(study_name=study_name, direction='maximize', storage="sqlite:///optuna-study.db", load_if_exists=True)
+    study = optuna.create_study(
+        study_name=study_name,
+        direction="maximize",
+        storage="sqlite:///optuna-study.db",
+        load_if_exists=True,
+    )
     study.optimize(objective, n_trials=n_trials, show_progress_bar=True, n_jobs=n_jobs)
     try:
         return study.best_params
@@ -167,7 +185,16 @@ def optimize_classification_strategy(data, strategy, study_name, n_trials=100, n
         return None
 
 
-def run_optimizations(strategies, data_path, start_date, tracking_uri, experiment_name, n_trials_per_strategy=10, n_jobs=1,timeframe='1h'):
+def run_optimizations(
+    strategies,
+    data_path,
+    start_date,
+    tracking_uri,
+    experiment_name,
+    n_trials_per_strategy=10,
+    n_jobs=1,
+    timeframe="1h",
+):
     """
     Run optimization for a set of strategies.
 
@@ -182,14 +209,12 @@ def run_optimizations(strategies, data_path, start_date, tracking_uri, experimen
     mlflow.set_experiment(experiment_name)
 
     data = fetch_historical_data(
-        data_path=data_path,
-        start_date=start_date,
-        timeframe=timeframe
+        data_path=data_path, start_date=start_date, timeframe=timeframe
     )
     data = adjust_data_to_ubtc(data)
     # Get the actual start and end dates from the data
-    actual_start_date = data.index.min().strftime('%Y-%m-%d %H:%M:%S')
-    actual_end_date = data.index.max().strftime('%Y-%m-%d %H:%M:%S')
+    actual_start_date = data.index.min().strftime("%Y-%m-%d %H:%M:%S")
+    actual_end_date = data.index.max().strftime("%Y-%m-%d %H:%M:%S")
 
     for name, strategy in strategies.items():
         # This outer run is for grouping the optimization trials
@@ -197,11 +222,25 @@ def run_optimizations(strategies, data_path, start_date, tracking_uri, experimen
             mlflow.log_param("start_date", actual_start_date)
             mlflow.log_param("end_date", actual_end_date)
             print(f"Optimizing {name}...")
-            optimize_strategy(data, strategy, n_trials=n_trials_per_strategy, study_name=f'{experiment_name}-{name}', n_jobs=n_jobs)
+            optimize_strategy(
+                data,
+                strategy,
+                n_trials=n_trials_per_strategy,
+                study_name=f"{experiment_name}-{name}",
+                n_jobs=n_jobs,
+            )
             print(f"Optimization for {name} complete.")
 
 
-def run_classification_optimizations(strategies, data_path, start_date, tracking_uri, experiment_name, n_trials_per_strategy=10, n_jobs=1):
+def run_classification_optimizations(
+    strategies,
+    data_path,
+    start_date,
+    tracking_uri,
+    experiment_name,
+    n_trials_per_strategy=10,
+    n_jobs=1,
+):
     """
     Run optimization for a set of classification-based strategies.
 
@@ -215,15 +254,12 @@ def run_classification_optimizations(strategies, data_path, start_date, tracking
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(experiment_name)
 
-    data = fetch_historical_data(
-        data_path=data_path,
-        start_date=start_date
-    )
+    data = fetch_historical_data(data_path=data_path, start_date=start_date)
     data = adjust_data_to_ubtc(data)
 
     # Get the actual start and end dates from the data
-    actual_start_date = data.index.min().strftime('%Y-%m-%d %H:%M:%S')
-    actual_end_date = data.index.max().strftime('%Y-%m-%d %H:%M:%S')
+    actual_start_date = data.index.min().strftime("%Y-%m-%d %H:%M:%S")
+    actual_end_date = data.index.max().strftime("%Y-%m-%d %H:%M:%S")
 
     for name, strategy in strategies.items():
         # This outer run is for grouping the optimization trials
@@ -231,6 +267,11 @@ def run_classification_optimizations(strategies, data_path, start_date, tracking
             mlflow.log_param("start_date", actual_start_date)
             mlflow.log_param("end_date", actual_end_date)
             print(f"Optimizing {name}...")
-            optimize_classification_strategy(data, strategy, n_trials=n_trials_per_strategy, study_name=f'{experiment_name}-{name}', n_jobs=n_jobs)
+            optimize_classification_strategy(
+                data,
+                strategy,
+                n_trials=n_trials_per_strategy,
+                study_name=f"{experiment_name}-{name}",
+                n_jobs=n_jobs,
+            )
             print(f"Optimization for {name} complete.")
-

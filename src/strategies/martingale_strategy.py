@@ -103,6 +103,7 @@ class DelayedMartingaleStrategy(TrialStrategy):
             "wait_periods": trial.suggest_int("wait_periods", 2, 5),
         }
 
+
 class AntiMartingaleStrategy(TrialStrategy):
     """
     An anti-Martingale (reverse Martingale) betting strategy.
@@ -159,6 +160,7 @@ class AntiMartingaleStrategy(TrialStrategy):
             "multiplier": trial.suggest_float("multiplier", 1.5, 3.0),
             "max_win_streak": trial.suggest_int("max_win_streak", 3, 10),
         }
+
 
 class MartingaleWithTrendFilter(TrialStrategy):
     """
@@ -223,9 +225,7 @@ class MartingaleWithTrendFilter(TrialStrategy):
                         self.doubles_count += 1
                 elif self.data.Close[-1] < self.data.Close[-2]:  # Price closes lower
                     if abs(self.position.size) > self.base_trade_size > 0:
-                        size_to_close = (
-                            abs(self.position.size) - self.base_trade_size
-                        )
+                        size_to_close = abs(self.position.size) - self.base_trade_size
                         self.buy(size=size_to_close)
                         self.doubles_count = 0
 
@@ -234,9 +234,7 @@ class MartingaleWithTrendFilter(TrialStrategy):
         """Suggest hyperparameters for Optuna optimization."""
         return {
             "ma_window": trial.suggest_int("ma_window", 20, 200),
-            "initial_trade_size": trial.suggest_float(
-                "initial_trade_size", 0.01, 0.1
-            ),
+            "initial_trade_size": trial.suggest_float("initial_trade_size", 0.01, 0.1),
             "max_doubles": trial.suggest_int("max_doubles", 1, 5),
         }
 

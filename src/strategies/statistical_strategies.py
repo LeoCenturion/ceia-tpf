@@ -16,6 +16,7 @@ try:
 except ImportError:
     arch_model = None
 
+
 # Custom indicator for preprocessing
 def price_difference(series: np.ndarray) -> np.ndarray:
     """Calculates (price[i] - price[i-1])/price[i-1]."""
@@ -30,15 +31,18 @@ def kalman_filter_indicator(series: np.ndarray) -> np.ndarray:
     (filtered_state_means, _) = kf.filter(series)
     return filtered_state_means.flatten()
 
+
 class ProphetStrategy(TrialStrategy):
     """
     Intractable. Prophet doesn't take data when predicting, so if we train every 30 days then all 30 days will have the same prediction.
     If we train every hour then it takes more than a day do backtest with hourly data from 2022 to 2025.
     """
-    refit_period = 1 #24 * 30  # Refit the model every N bars
+
+    refit_period = 1  # 24 * 30  # Refit the model every N bars
     stop_loss = 0.05
     take_profit = 0.10
     threshold = 0.001
+
     def init(self):
         self.model = None
         self.forecast = None
@@ -61,11 +65,17 @@ class ProphetStrategy(TrialStrategy):
         price = self.data.Close[-1]
         if self.forecast is not None:
             forecast_price = self.forecast["yhat"].iloc[-1]
-            if forecast_price > price * (1 + self.threshold) and not self.position.is_long:
+            if (
+                forecast_price > price * (1 + self.threshold)
+                and not self.position.is_long
+            ):
                 self.buy(
                     sl=price * (1 - self.stop_loss), tp=price * (1 + self.take_profit)
                 )
-            elif forecast_price < price * (1 - self.threshold) and not self.position.is_short:
+            elif (
+                forecast_price < price * (1 - self.threshold)
+                and not self.position.is_short
+            ):
                 self.sell(
                     sl=price * (1 + self.stop_loss), tp=price * (1 - self.take_profit)
                 )
@@ -74,7 +84,9 @@ class ProphetStrategy(TrialStrategy):
     def get_optuna_params(cls, trial):
         return {
             "refit_period": trial.suggest_categorical("refit_period", [1]),
-            "threshold": trial.suggest_categorical("threshold", [0.1, 0.01, 0.001, 0.0001]),
+            "threshold": trial.suggest_categorical(
+                "threshold", [0.1, 0.01, 0.001, 0.0001]
+            ),
         }
 
 
@@ -88,11 +100,10 @@ class ARIMAStrategy(TrialStrategy):
     threshold = 1e-5
     lookback_length = 24 * 30 * 1
     threshold = 1e-5
+
     def init(self):
         self.model_fit = None
-        self.processed_data = self.I(
-            price_difference, self.data.Close
-        )
+        self.processed_data = self.I(price_difference, self.data.Close)
 
     def next(self):
         price = self.data.Close[-1]
@@ -101,7 +112,8 @@ class ARIMAStrategy(TrialStrategy):
         if len(self.data) % self.refit_period == 0:
             try:
                 model = sm.tsa.ARIMA(
-                    self.processed_data[-self.lookback_length:], order=(self.p, self.d, self.q)
+                    self.processed_data[-self.lookback_length :],
+                    order=(self.p, self.d, self.q),
                 )
                 self.model_fit = model.fit()
             except Exception:  # Catches convergence errors etc.
@@ -120,7 +132,9 @@ class ARIMAStrategy(TrialStrategy):
                         sl=price * (1 - self.stop_loss),
                         tp=price * (1 + self.take_profit),
                     )
-                elif forecast_processed < -self.threshold and not self.position.is_short:
+                elif (
+                    forecast_processed < -self.threshold and not self.position.is_short
+                ):
                     self.sell(
                         sl=price * (1 + self.stop_loss),
                         tp=price * (1 - self.take_profit),
@@ -134,11 +148,17 @@ class ARIMAStrategy(TrialStrategy):
             "p": trial.suggest_int("p", 1, 10),
             "d": trial.suggest_int("d", 0, 2),
             "q": trial.suggest_int("q", 0, 5),
-            "refit_period": trial.suggest_categorical("refit_period", [ 24 * 7, 24 * 30]),
-            "threshold": trial.suggest_categorical("threshold", [0.1, 0.01, 0.001, 0.0001])
+            "refit_period": trial.suggest_categorical(
+                "refit_period", [24 * 7, 24 * 30]
+            ),
+            "threshold": trial.suggest_categorical(
+                "threshold", [0.1, 0.01, 0.001, 0.0001]
+            ),
         }
+
     def save_artifacts(self, trial, stats, bt):
         return
+
 
 class SARIMAStrategy(TrialStrategy):
     p, d, q = 5, 1, 0
@@ -152,11 +172,10 @@ class SARIMAStrategy(TrialStrategy):
     stop_loss = 0.05
     take_profit = 0.10
     threshold = 1e-5
+
     def init(self):
         self.model_fit = None
-        self.processed_data = self.I(
-            price_difference, self.data.Close
-        )
+        self.processed_data = self.I(price_difference, self.data.Close)
 
     def next(self):
         price = self.data.Close[-1]
@@ -185,7 +204,9 @@ class SARIMAStrategy(TrialStrategy):
                         sl=price * (1 - self.stop_loss),
                         tp=price * (1 + self.take_profit),
                     )
-                elif forecast_processed < -self.threshold and not self.position.is_short:
+                elif (
+                    forecast_processed < -self.threshold and not self.position.is_short
+                ):
                     self.sell(
                         sl=price * (1 + self.stop_loss),
                         tp=price * (1 - self.take_profit),
@@ -203,8 +224,12 @@ class SARIMAStrategy(TrialStrategy):
             "D": trial.suggest_int("D", 0, 2),
             "Q": trial.suggest_int("Q", 0, 2),
             "s": trial.suggest_categorical("s", [12, 24, 48]),
-            "refit_period": trial.suggest_categorical("refit_period", [24 * 7, 24 * 30]),
-            "threshold": trial.suggest_categorical("threshold", [0.1, 0.01, 0.001, 0.0001]),
+            "refit_period": trial.suggest_categorical(
+                "refit_period", [24 * 7, 24 * 30]
+            ),
+            "threshold": trial.suggest_categorical(
+                "threshold", [0.1, 0.01, 0.001, 0.0001]
+            ),
         }
 
 
@@ -224,33 +249,42 @@ class KalmanARIMAStrategy(TrialStrategy):
         # Kalman Filter initialization for iterative updates
         self.kalman_state_mean = 0
         self.kalman_state_covariance = 1
-        self.kalman_mean_history =[]
+        self.kalman_mean_history = []
         self.kf = KalmanFilter(
             initial_state_mean=self.kalman_state_mean,
             initial_state_covariance=self.kalman_state_covariance,
-            n_dim_obs=1
+            n_dim_obs=1,
         )
 
         self.kalman_filtered_data = self.I(kalman_filter_indicator, self.processed_data)
+
     def kalman_update(self, series):
-        if len(series) <= 1: # Initialize the Kalman filter
-            self.kalman_state_mean, self.kalman_state_covariance = self.kf.filter(series)
+        if len(series) <= 1:  # Initialize the Kalman filter
+            self.kalman_state_mean, self.kalman_state_covariance = self.kf.filter(
+                series
+            )
             print(self.kalman_state_mean)
             self.kalman_mean_history.append(self.kalman_state_mean[:, 0].flatten())
         else:
-            self.kalman_state_mean, self.kalman_state_covariance = self.kf.filter_update(self.kalman_state_mean,self.kalman_state_covariance,series)
+            self.kalman_state_mean, self.kalman_state_covariance = (
+                self.kf.filter_update(
+                    self.kalman_state_mean, self.kalman_state_covariance, series
+                )
+            )
             print(self.kalman_state_mean)
             self.kalman_mean_history.append(self.kalman_state_mean[:, 0].flatten())
         return self.kalman_mean_history
 
     def next(self):
         price = self.data.Close[-1]
-        
+
         # Refit model periodically and if we have enough data
         if len(self.data) % self.refit_period == 0:
             # print(f"retraining KalmanARIMA. IDX ${len(self.data)}")
             try:
-                model = sm.tsa.ARIMA(self.kalman_filtered_data, order=(self.p, self.d, self.q))
+                model = sm.tsa.ARIMA(
+                    self.kalman_filtered_data, order=(self.p, self.d, self.q)
+                )
                 self.model_fit = model.fit()
             except Exception:  # Catches convergence errors etc.
                 self.model_fit = None
@@ -288,7 +322,9 @@ class KalmanARIMAStrategy(TrialStrategy):
             "d": trial.suggest_int("d", 1, 3),
             "q": trial.suggest_int("q", 3, 7),
             "threshold": trial.suggest_float("threshold", 1e-4, 1e-2, log=True),
-            "refit_period": trial.suggest_categorical("refit_period", [24 * 7, 24 * 30]),
+            "refit_period": trial.suggest_categorical(
+                "refit_period", [24 * 7, 24 * 30]
+            ),
         }
 
 
@@ -318,10 +354,13 @@ class ARIMAXGARCHStrategy(TrialStrategy):
     stop_loss = 0.05
     take_profit = 0.10
     threshold = 0.5
+
     def init(self):
         self.arimax_fit = None
         self.garch_fit = None
-        self.processed_data = self.I(lambda series: price_difference(series)*10000.0, self.data.Close)
+        self.processed_data = self.I(
+            lambda series: price_difference(series) * 10000.0, self.data.Close
+        )
 
     def next(self):
         price = self.data.Close[-1]
@@ -389,12 +428,16 @@ class ARIMAXGARCHStrategy(TrialStrategy):
             "q": trial.suggest_int("q", 0, 5),
             "g_p": trial.suggest_int("g_p", 1, 3),
             "g_q": trial.suggest_int("g_q", 1, 3),
-            "refit_period": trial.suggest_categorical("refit_period", [24 * 7, 24 * 30]),
+            "refit_period": trial.suggest_categorical(
+                "refit_period", [24 * 7, 24 * 30]
+            ),
             "threshold": trial.suggest_categorical("threshold", [0.01, 0.001, 0.0001]),
         }
 
 
-def find_best_arima_params(data: pd.Series, p_range=range(0, 5), d_range=range(0, 3), q_range=range(0, 5)):
+def find_best_arima_params(
+    data: pd.Series, p_range=range(0, 5), d_range=range(0, 3), q_range=range(0, 5)
+):
     """
     Performs a grid search to find the best (p, d, q) parameters for an ARIMA model
     based on the Akaike Information Criterion (AIC).
@@ -442,7 +485,9 @@ def kalman_arima_forecast(series: pd.Series, p: int, d: int, q: int) -> float:
         return 0.0
 
 
-def calculate_chunks_for_coverage(total_data_size: int, chunk_size: int, coverage_percentage: float = 20.0) -> int:
+def calculate_chunks_for_coverage(
+    total_data_size: int, chunk_size: int, coverage_percentage: float = 20.0
+) -> int:
     """
     Calculates the number of chunks required to cover a certain percentage of the dataset.
 
@@ -497,7 +542,7 @@ if __name__ == "__main__":
         tracking_uri="sqlite:///mlflow.db",
         experiment_name="Statistical Strategies",
         n_trials_per_strategy=50,
-        n_jobs=12
+        n_jobs=12,
     )
 
     # run_strategy_backtest(data.iloc[:3000], KalmanARIMAStrategy, threshold = 0.2/100.0)
