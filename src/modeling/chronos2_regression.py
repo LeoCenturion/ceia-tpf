@@ -326,9 +326,6 @@ def main():
     """
     Main function to load data and run the Optuna study.
     """
-    N_TRIALS = 50
-    STUDY_NAME = 'chronos2_btc_price_prediction'
-
     print("Loading historical data...")
     data = fetch_historical_data(
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",

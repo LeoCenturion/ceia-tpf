@@ -8,7 +8,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.utils.class_weight import compute_class_weight
 import cupy as cp
-import math
 from .data_analysis import fetch_historical_data, sma, ewm, std, rsi_indicator
 
 
@@ -556,8 +555,8 @@ def objective(trial: optuna.Trial, minute_data: pd.DataFrame) -> float:
     tau = trial.suggest_float('tau', 0.7, 1.3)
 
     # Feature selection hyperparameter
-    corr_threshold = trial.suggest_float('corr_threshold', 0.01, 0.5)
-    p_value_threshold = trial.suggest_float('p_value_threshold', 0.01, 0.2)
+    trial.suggest_float('corr_threshold', 0.01, 0.5)
+    trial.suggest_float('p_value_threshold', 0.01, 0.2)
 
 
     # Model hyperparameters for XGBoost

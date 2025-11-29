@@ -2,7 +2,6 @@ import argparse
 import pandas as pd
 import mplfinance as mpf
 from binance.client import Client
-import os
 
 # Use environment variables for API keys if needed for non-public data, though not required for klines
 # API_KEY = os.environ.get('BINANCE_API_KEY')

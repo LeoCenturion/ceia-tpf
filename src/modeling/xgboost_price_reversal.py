@@ -473,7 +473,6 @@ def train_and_evaluate():
     print("\n--- Training and Evaluating XGBoost on a 70/30 Split ---")
 
     price_change_bars = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1h/BTCUSDT_price_change_bars_0_32.csv"
-    hour_bars = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv"
     # 1. Load Data
     data = fetch_historical_data(
         data_path=price_change_bars,

@@ -1,23 +1,20 @@
 import pandas as pd
 import numpy as np
-from backtesting import Strategy, Backtest
+from backtesting import Backtest
 from prophet import Prophet
 import statsmodels.api as sm
 from pykalman import KalmanFilter
 import logging
 import itertools
-from backtest_utils import TrialStrategy
+
+from backtest_utils import TrialStrategy, run_optimizations
+
 logging.getLogger("prophet").setLevel(logging.WARNING)
 
 try:
     from arch import arch_model
 except ImportError:
     arch_model = None
-from backtest_utils import (
-    run_optimizations,
-    fetch_historical_data,
-    adjust_data_to_ubtc,
-)
 
 # Custom indicator for preprocessing
 def price_difference(series: np.ndarray) -> np.ndarray:

@@ -3,10 +3,9 @@ import os
 import mlflow
 import pandas as pd
 import numpy as np
-from backtesting import Strategy, Backtest
 from autogluon.timeseries import TimeSeriesPredictor, TimeSeriesDataFrame
 
-from backtest_utils import TrialStrategy, fetch_historical_data, run_optimizations
+from backtest_utils import TrialStrategy, run_optimizations
 
 
 class ChronosStrategy(TrialStrategy):

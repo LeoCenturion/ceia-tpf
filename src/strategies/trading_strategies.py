@@ -1,5 +1,3 @@
-import mlflow
-from backtesting import Strategy
 from backtesting.lib import crossover
 
 from src.backtest_utils import (
@@ -9,9 +7,6 @@ from src.backtest_utils import (
     ewm,
     std,
     rsi_indicator,
-    fetch_historical_data,
-    adjust_data_to_ubtc,
-    optimize_strategy,
     run_optimizations,
 )
 

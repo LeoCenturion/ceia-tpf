@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
-from datetime import datetime, timedelta
+from datetime import timedelta
 import os
 import sys
 

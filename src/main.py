@@ -2,7 +2,7 @@ import os
 import time
 import pandas as pd
 from binance.client import Client
-from binance.enums import *
+from binance.enums import ORDER_TYPE_MARKET, SIDE_BUY, SIDE_SELL
 import csv
 from datetime import datetime
 import random
