@@ -7,6 +7,8 @@
 # ## 1. Load Data and Libraries
 
 #%%
+%load_ext autoreload
+%autoreload 2
 import sys
 import os
 current_dir = os.getcwd()
@@ -866,7 +868,7 @@ print("\nAnalyzing statistical properties of Tick Imbalance Bar returns...")
 # Create Tick Imbalance Bars from the hourly data.
 # We'll use an initial bar size estimate of 24 hours (1 day) as a starting point,
 # as the default of 1 would lead to a bar per tick.
-tick_imbalance_bars = create_tick_imbalance_bars(
+tick_imbalance_bars, _ = create_tick_imbalance_bars(
     df_for_bars,
     initial_bar_size_estimate=24
 )
