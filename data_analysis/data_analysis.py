@@ -877,7 +877,7 @@ if not tick_imbalance_bars.empty:
 else:
     print("Could not create Tick Imbalance Bars, possibly due to insufficient data.")
 
-
+# AI plot the tick sum, the threshold and the points where it was sampled AI!
 #%% [markdown]
 # ## 10. Threshold Sweep Analysis on 1-Minute Data
 #
