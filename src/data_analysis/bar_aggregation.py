@@ -210,7 +210,7 @@ def create_tick_imbalance_bars(
     initial_bar_size_estimate: int = 1,
     span_bar_size: int = 20,
     span_tick_imbalance: int = 20,
-) -> Tuple[pd.DataFrame, pd.Series]:
+) -> Tuple[pd.DataFrame, pd.Series, pd.Series]:
     """
     Creates tick imbalance bars (TIBs) with a dynamic threshold.
 
@@ -229,18 +229,20 @@ def create_tick_imbalance_bars(
         span_tick_imbalance (int): EWMA span for calculating the expected tick imbalance.
 
     Returns:
-        tuple[pd.DataFrame, pd.Series]: A tuple containing:
+        tuple[pd.DataFrame, pd.Series, pd.Series]: A tuple containing:
             - A DataFrame of the tick imbalance bars.
-            - A Series of the imbalance thresholds over time, indexed like the input df.
+            - A Series of the imbalance thresholds over time.
+            - A Series of the cumulative imbalance over time.
     """
     if df.empty:
-        return pd.DataFrame(), pd.Series(dtype=float)
+        return pd.DataFrame(), pd.Series(dtype=float), pd.Series(dtype=float)
 
     if "date" in df.columns and not pd.api.types.is_datetime64_any_dtype(df["date"]):
         df["date"] = pd.to_datetime(df["date"])
 
     bars = []
     thresholds_over_time = []
+    cumulative_imbalances_over_time = []
     start_idx = 0
     cumulative_imbalance = 0.0
 
@@ -262,6 +264,7 @@ def create_tick_imbalance_bars(
         expected_imbalance_threshold = abs(ewma_bar_size * ewma_tick_imbalance)
         thresholds_over_time.append(expected_imbalance_threshold)
         cumulative_imbalance += tick_sign
+        cumulative_imbalances_over_time.append(cumulative_imbalance)
 
         if (
             expected_imbalance_threshold > 0
@@ -292,14 +295,17 @@ def create_tick_imbalance_bars(
             cumulative_imbalance = 0.0
 
     thresholds_series = pd.Series(thresholds_over_time, index=df.index, dtype=float)
+    cumulative_imbalance_series = pd.Series(
+        cumulative_imbalances_over_time, index=df.index, dtype=float
+    )
 
     if not bars:
-        return pd.DataFrame(), thresholds_series
+        return pd.DataFrame(), thresholds_series, cumulative_imbalance_series
 
     result_df = pd.DataFrame(bars)
     if "date" in result_df.columns:
         result_df = result_df.set_index("date")
-    return result_df, thresholds_series
+    return result_df, thresholds_series, cumulative_imbalance_series
 
 
 if __name__ == "__main__":

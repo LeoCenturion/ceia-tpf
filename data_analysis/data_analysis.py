@@ -866,7 +866,7 @@ print("\nAnalyzing statistical properties of Tick Imbalance Bar returns...")
 # Create Tick Imbalance Bars from the hourly data.
 # We'll use an initial bar size estimate of 24 hours (1 day) as a starting point,
 # as the default of 1 would lead to a bar per tick.
-tick_imbalance_bars, _ = create_tick_imbalance_bars(
+tick_imbalance_bars, thresholds, cum_imb = create_tick_imbalance_bars(
     df_for_bars,
     initial_bar_size_estimate=24
 )
@@ -877,7 +877,47 @@ if not tick_imbalance_bars.empty:
 else:
     print("Could not create Tick Imbalance Bars, possibly due to insufficient data.")
 
-# AI plot the tick sum, the threshold and the points where it was sampled AI!
+#%%
+# Plot the cumulative imbalance, the dynamic thresholds, and the bar sampling points
+if not tick_imbalance_bars.empty:
+    print("Plotting Tick Imbalance Bar sampling process...")
+
+    # Limit plot to a smaller window for readability if the dataset is large
+    plot_window = df_for_bars.index[:5000] # Plot first ~5000 data points
+
+    plt.figure(figsize=(15, 8))
+    
+    # Plot cumulative imbalance
+    plt.plot(plot_window, cum_imb.loc[plot_window], label='Cumulative Tick Imbalance', color='black', linewidth=1)
+    
+    # Plot dynamic thresholds
+    plt.plot(plot_window, thresholds.loc[plot_window], label='Upper Threshold', color='red', linestyle='--', linewidth=0.8)
+    plt.plot(plot_window, -thresholds.loc[plot_window], label='Lower Threshold', color='blue', linestyle='--', linewidth=0.8)
+
+    # Mark the points where bars were sampled
+    sample_points = tick_imbalance_bars.index
+    sample_points_in_window = sample_points[sample_points.isin(plot_window)]
+    
+    if not sample_points_in_window.empty:
+        plt.scatter(
+            sample_points_in_window, 
+            cum_imb.loc[sample_points_in_window], 
+            color='lime', 
+            marker='o', 
+            s=50, 
+            label='Bar Sampled',
+            zorder=5 # Plot on top
+        )
+
+    plt.title('Tick Imbalance Bar Sampling Process (First 5000 Ticks)')
+    plt.xlabel('Timestamp')
+    plt.ylabel('Cumulative Tick Imbalance')
+    plt.legend()
+    plt.grid(True, which="both", ls="--", alpha=0.5)
+    plt.show()
+else:
+    print("No Tick Imbalance Bars were created, skipping plot.")
+
 #%% [markdown]
 # ## 10. Threshold Sweep Analysis on 1-Minute Data
 #
