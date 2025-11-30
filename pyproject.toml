@@ -75,3 +75,18 @@ ignore = [
 [MASTER]
 # Add the project root ('.') to sys.path
 init-hook='import sys; sys.path.append(".")'
+
+[tool.pyright]
+include = ["src", "data_analysis"]
+exclude = [
+    "**/node_modules",
+    "**/__pycache__",
+    ".venv",
+    "venv",
+    "dist",
+    "build",
+    ".cache"
+]
+# If you are using a virtual environment in the root
+venvPath = "."
+venv = ".venv"

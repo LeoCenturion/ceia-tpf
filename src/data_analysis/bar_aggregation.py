@@ -205,6 +205,7 @@ def _get_signed_ticks(price_series: pd.Series) -> pd.Series:
     return tick_signs
 
 
+# AI
 def create_tick_imbalance_bars(
     df: pd.DataFrame,
     initial_bar_size_estimate: int = 1,
