@@ -212,7 +212,7 @@ def create_tick_imbalance_bars(
     initial_bar_size_estimate: int = 1,
     span_bar_size: int = 20,
     span_tick_imbalance: int = 20,
-    span_run_length: int = 20,
+    window_run_length: int = 20,
 ) -> Tuple[pd.DataFrame, pd.Series, pd.Series]:
     """
     Creates tick imbalance bars (TIBs) with a configurable threshold strategy.
@@ -222,12 +222,12 @@ def create_tick_imbalance_bars(
         threshold_type (str): The threshold strategy to use. One of:
             - 'static': Use a fixed `static_threshold`.
             - 'dynamic_imbalance': E[T] * E[b_t] (EWMA of bar sizes and tick imbalances).
-            - 'dynamic_runs': E[run] * E[b_t] (EWMA of run lengths and tick imbalances).
+            - 'dynamic_runs': E[run] * E[b_t] (Rolling average of run lengths and tick imbalances).
         static_threshold (float): Fixed threshold for the 'static' strategy.
         initial_bar_size_estimate (int): Initial estimate for ticks per bar for 'dynamic_imbalance'.
         span_bar_size (int): EWMA span for calculating E[T].
         span_tick_imbalance (int): EWMA span for calculating E[b_t].
-        span_run_length (int): EWMA span for calculating expected run length.
+        window_run_length (int): Rolling window size for calculating expected run length.
 
     Returns:
         tuple[pd.DataFrame, pd.Series, pd.Series]: A tuple containing:
@@ -251,19 +251,15 @@ def create_tick_imbalance_bars(
     tick_signs = _get_signed_ticks(df_reset["close"])
 
     # --- Pre-computation for dynamic thresholds ---
-    ewma_tick_imbalances = tick_signs.ewm(
-        span=span_tick_imbalance, adjust=False
-    ).mean()
-    dynamic_run_thresholds = None
+    ewma_tick_imbalances = tick_signs.ewm(span=span_tick_imbalance, adjust=False).mean()
+    dynamic_run_thresholds = pd.Series(dtype=float)
 
     if threshold_type == "dynamic_runs":
         same_as_prev_tick = (tick_signs == tick_signs.shift(1)).astype(int)
-        ewma_prob_same_tick = same_as_prev_tick.ewm(
-            span=span_run_length, adjust=False
-        ).mean()
+        prob_same_tick = same_as_prev_tick.rolling(window=window_run_length).mean()
         # Clamp probability to avoid division by zero
-        ewma_prob_same_tick.clip(upper=0.999999, inplace=True)
-        expected_run_length = 1 / (1 - ewma_prob_same_tick)
+        prob_same_tick.clip(upper=0.999999, inplace=True)
+        expected_run_length = 1 / (1 - prob_same_tick)
         dynamic_run_thresholds = (expected_run_length * ewma_tick_imbalances).abs()
 
     # --- EWMA state variables (for dynamic_imbalance) ---
