@@ -205,7 +205,9 @@ def _get_signed_ticks(price_series: pd.Series) -> pd.Series:
     return tick_signs
 
 
-# AI
+# AI I want the threshold strategy to be configurable. For example
+# I want to be able to pass a static threshold, compute the expected imbalance as it is doing now,
+# and one where Expected Imbalance is computed as the expected run length computed based on b_t AI!
 def create_tick_imbalance_bars(
     df: pd.DataFrame,
     initial_bar_size_estimate: int = 1,
