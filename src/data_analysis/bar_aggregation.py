@@ -205,31 +205,29 @@ def _get_signed_ticks(price_series: pd.Series) -> pd.Series:
     return tick_signs
 
 
-# AI I want the threshold strategy to be configurable. For example
-# I want to be able to pass a static threshold, compute the expected imbalance as it is doing now,
-# and one where Expected Imbalance is computed as the expected run length computed based on b_t AI!
 def create_tick_imbalance_bars(
     df: pd.DataFrame,
+    threshold_type: str = "dynamic_imbalance",
+    static_threshold: float = 100.0,
     initial_bar_size_estimate: int = 1,
     span_bar_size: int = 20,
     span_tick_imbalance: int = 20,
+    span_run_length: int = 20,
 ) -> Tuple[pd.DataFrame, pd.Series, pd.Series]:
     """
-    Creates tick imbalance bars (TIBs) with a dynamic threshold.
-
-    A new bar is formed when the absolute cumulative tick imbalance exceeds a
-    dynamic threshold. The threshold is based on the expected imbalance for the
-    next bar, calculated from EWMA of recent bar sizes and tick imbalances.
-
-    Expected Imbalance = E[T] * E[b_t], where:
-    - E[T] is the EWMA of ticks per bar.
-    - E[b_t] is the EWMA of tick signs (P(b_t=1) - P(b_t=-1)).
+    Creates tick imbalance bars (TIBs) with a configurable threshold strategy.
 
     Args:
         df (pd.DataFrame): DataFrame with tick data. Must include 'close' price.
-        initial_bar_size_estimate (int): Initial estimate for ticks per bar.
-        span_bar_size (int): EWMA span for calculating the expected bar size.
-        span_tick_imbalance (int): EWMA span for calculating the expected tick imbalance.
+        threshold_type (str): The threshold strategy to use. One of:
+            - 'static': Use a fixed `static_threshold`.
+            - 'dynamic_imbalance': E[T] * E[b_t] (EWMA of bar sizes and tick imbalances).
+            - 'dynamic_runs': E[run] * E[b_t] (EWMA of run lengths and tick imbalances).
+        static_threshold (float): Fixed threshold for the 'static' strategy.
+        initial_bar_size_estimate (int): Initial estimate for ticks per bar for 'dynamic_imbalance'.
+        span_bar_size (int): EWMA span for calculating E[T].
+        span_tick_imbalance (int): EWMA span for calculating E[b_t].
+        span_run_length (int): EWMA span for calculating expected run length.
 
     Returns:
         tuple[pd.DataFrame, pd.Series, pd.Series]: A tuple containing:
@@ -250,21 +248,41 @@ def create_tick_imbalance_bars(
     cumulative_imbalance = 0.0
 
     df_reset = df.reset_index(drop=True)
-
     tick_signs = _get_signed_ticks(df_reset["close"])
 
-    # EWMA parameters
+    # --- Pre-computation for dynamic thresholds ---
+    ewma_tick_imbalances = tick_signs.ewm(
+        span=span_tick_imbalance, adjust=False
+    ).mean()
+    dynamic_run_thresholds = None
+
+    if threshold_type == "dynamic_runs":
+        same_as_prev_tick = (tick_signs == tick_signs.shift(1)).astype(int)
+        ewma_prob_same_tick = same_as_prev_tick.ewm(
+            span=span_run_length, adjust=False
+        ).mean()
+        # Clamp probability to avoid division by zero
+        ewma_prob_same_tick.clip(upper=0.999999, inplace=True)
+        expected_run_length = 1 / (1 - ewma_prob_same_tick)
+        dynamic_run_thresholds = (expected_run_length * ewma_tick_imbalances).abs()
+
+    # --- EWMA state variables (for dynamic_imbalance) ---
+    ewma_bar_size = float(initial_bar_size_estimate)
     alpha_bar_size = 2 / (span_bar_size + 1)
 
-    # Pre-compute the EWMA of tick imbalances
-    ewma_tick_imbalances = tick_signs.ewm(span=span_tick_imbalance, adjust=False).mean()
-
-    # EWMA state variables
-    ewma_bar_size = float(initial_bar_size_estimate)
-
+    # --- Main loop ---
     for i, tick_sign in enumerate(tick_signs):
-        ewma_tick_imbalance = ewma_tick_imbalances.iloc[i]
-        expected_imbalance_threshold = abs(ewma_bar_size * ewma_tick_imbalance)
+        # Determine threshold for the current tick
+        if threshold_type == "static":
+            expected_imbalance_threshold = static_threshold
+        elif threshold_type == "dynamic_imbalance":
+            ewma_tick_imbalance = ewma_tick_imbalances.iloc[i]
+            expected_imbalance_threshold = abs(ewma_bar_size * ewma_tick_imbalance)
+        elif threshold_type == "dynamic_runs":
+            expected_imbalance_threshold = dynamic_run_thresholds.iloc[i]
+        else:
+            raise ValueError(f"Unknown threshold_type: {threshold_type}")
+
         thresholds_over_time.append(expected_imbalance_threshold)
         cumulative_imbalance += tick_sign
         cumulative_imbalances_over_time.append(cumulative_imbalance)
@@ -287,11 +305,12 @@ def create_tick_imbalance_bars(
                 }
             )
 
-            # Update EWMA of bar size with the size of the bar just formed
-            current_bar_size = i + 1 - start_idx
-            ewma_bar_size = ((1 - alpha_bar_size) * ewma_bar_size) + (
-                alpha_bar_size * current_bar_size
-            )
+            # Update state if using dynamic_imbalance
+            if threshold_type == "dynamic_imbalance":
+                current_bar_size = i + 1 - start_idx
+                ewma_bar_size = ((1 - alpha_bar_size) * ewma_bar_size) + (
+                    alpha_bar_size * current_bar_size
+                )
 
             # Reset for next bar
             start_idx = i + 1
