@@ -7,8 +7,6 @@
 # ## 1. Load Data and Libraries
 
 #%%
-%load_ext autoreload
-%autoreload 2
 import sys
 import os
 current_dir = os.getcwd()
