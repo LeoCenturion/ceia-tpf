@@ -252,15 +252,20 @@ def create_tick_imbalance_bars(
 
     # --- Pre-computation for dynamic thresholds ---
     ewma_tick_imbalances = tick_signs.ewm(span=span_tick_imbalance, adjust=False).mean()
-    dynamic_run_thresholds = pd.Series(dtype=float)
+    dynamic_run_thresholds = pd.Series()
 
     if threshold_type == "dynamic_runs":
-        same_as_prev_tick = (tick_signs == tick_signs.shift(1)).astype(int)
-        prob_same_tick = same_as_prev_tick.rolling(window=window_run_length).mean()
-        # Clamp probability to avoid division by zero
-        prob_same_tick.clip(upper=0.999999, inplace=True)
-        expected_run_length = 1 / (1 - prob_same_tick)
-        dynamic_run_thresholds = (expected_run_length * ewma_tick_imbalances).abs()
+        changes = tick_signs != tick_signs.shift()
+        group_ids = changes.cumsum()
+
+        def compute_quantile(window):
+            runs = window.groupby(group_ids).agg(["count", "first"])
+            runs.columns = ["length", "sign"]
+            return runs["length"].quantile(0.5)
+
+        dynamic_run_thresholds = group_ids.rolling(window_run_length).apply(
+            compute_quantile
+        )
 
     # --- EWMA state variables (for dynamic_imbalance) ---
     ewma_bar_size = float(initial_bar_size_estimate)
