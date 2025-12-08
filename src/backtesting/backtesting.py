@@ -297,58 +297,73 @@ def run_classification_optimizations(  # pylint: disable=too-many-arguments
             print(f"Optimization for {name} complete.")
 
 
-def run_combinatorial_cv(  # pylint: disable=too-many-arguments, too-many-locals
-    data, strategy_class, params, n_splits=5, n_test_splits=1
-):
-    """
-    Perform combinatorial cross-validation.
 
-    This function splits the data into `n_splits` folds and then runs
-    backtests on combinations of these folds. It's useful for assessing
-    strategy robustness.
+#AI write a function to do combinatorially symetric cross validation:
+# This process assumes you have already generated your Matrix M (dimensions T×N), where T is the number of time periods and N is the number of strategy configurations (trials).
+# Step 1: Partition the Data (The "Combinatorial" Setup)
 
-    :param data: The OHLCV data.
-    :param strategy_class: The strategy class to test.
-    :param params: Hyperparameters for the strategy.
-    :param n_splits: The number of folds to split the data into.
-    :param n_test_splits: The number of folds to use for testing in each combination.
-    :return: A dictionary with aggregated backtest statistics.
-    """
-    kf = KFold(n_splits=n_splits, shuffle=False)
-    splits = [data.iloc[test_index] for _, test_index in kf.split(data)]
+# Divide your Matrix M row-wise into an even number S of sub-matrices (blocks).
 
-    split_indices = list(range(n_splits))
-    test_split_combinations = list(
-        itertools.combinations(split_indices, n_test_splits)
-    )
+#     Typical values for S: 16 or 20.
 
-    all_stats = []
-    print(f"Running {len(test_split_combinations)} backtests for combinatorial CV...")
-    for i, test_indices in enumerate(test_split_combinations):
-        print(
-            f"Running fold {i + 1}/{len(test_split_combinations)} with test splits {test_indices}"
-        )
+#     The blocks must be of equal size to ensuring symmetry.
 
-        test_data_parts = [splits[j] for j in test_indices]
-        test_data = pd.concat(test_data_parts).sort_index()
+#     This creates the building blocks for your cross-validation.
 
-        bt = Backtest(test_data, strategy_class, cash=10000, commission=0.001)
-        stats = bt.run(**params)
-        all_stats.append(stats)
+# Step 2: Generate Combinations
 
-    # Aggregate results
-    stats_df = pd.DataFrame(all_stats)
+# Form all possible combinations where you split these S blocks into two equal groups of size S/2.
 
-    # Select only numeric columns for aggregation
-    numeric_stats_df = stats_df.select_dtypes(include=np.number)
+#     Training Set (J): Composed of S/2 blocks combined together.
 
-    mean_stats = numeric_stats_df.mean().to_dict()
-    std_stats = numeric_stats_df.std().to_dict()
+#     Testing Set (Jˉ): Composed of the remaining S/2 blocks.
 
-    results = {}
-    for key, value in mean_stats.items():
-        results[key] = value
-    for key, value in std_stats.items():
-        results[f"{key} (Std.)"] = value
+# The total number of combinations (splits) is given by the binomial coefficient:
+# C=(S/2S​)
 
-    return results
+# Example: If S=16, you have (816​)=12,870 unique splits.
+# Step 3: The Evaluation Loop
+
+# For each of the C combinations (c=1…C), perform the following operations:
+# A. In-Sample Optimization (Find the "Best")
+
+#     Take the Training Set J.
+
+#     Calculate the performance metric (e.g., Sharpe Ratio) for every strategy column n (n=1…N) using only the data in J.
+
+#     Identify the strategy with the highest performance. Let's call the index of this "star" strategy n∗.
+
+#         Note: This simulates the process of a researcher picking the best backtest result.
+
+# B. Out-of-Sample Verification (Check Reality)
+
+#     Take the Testing Set Jˉ (the data not seen in step A).
+
+#     Calculate the performance metric for every strategy column using only the data in Jˉ. This gives you a vector of performances Rˉ.
+
+#     Extract the specific performance of the "star" strategy (n∗) from this set. Let's call this Rˉn∗​.
+
+# C. Calculate Relative Rank (The "Logit")
+
+# Determine how well the "star" strategy performed relative to the field in the Out-of-Sample test.
+
+#     Rank Rˉn∗​ among all values in Rˉ.
+
+#     Calculate the relative rank ωc​:
+#     ωc​=N+1Rank(Rˉn∗​)​
+
+#         ωc​≈1.0: The strategy remained the best OOS.
+
+#         ωc​≈0.5: The strategy performed average OOS.
+
+#         ωc​≈0.0: The strategy was the worst OOS.
+
+# Step 4: Aggregate and Calculate PBO
+
+# After running the loop for all C combinations, you will have a list of relative ranks Ω={ω1​,ω2​,…,ωC​}.
+
+# The Probability of Backtest Overfitting (PBO) is defined as the probability that the strategy selected as optimal In-Sample performs below the median of all strategies Out-of-Sample.
+
+# Calculate the frequency of ranks below 0.5:
+# PBO=Total Count CCount of ωc​<0.5​
+# AI!
