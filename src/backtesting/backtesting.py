@@ -1,6 +1,7 @@
 """Backtesting framework with Optuna optimization and MLflow logging."""
 import os
 import re
+import itertools
 
 import mlflow
 import numpy as np
@@ -8,6 +9,7 @@ import optuna
 import pandas as pd
 from backtesting import Backtest, Strategy
 from sklearn.metrics import f1_score
+from sklearn.model_selection import KFold
 from abc import  abstractmethod
 from src.data_analysis import (
     adjust_data_to_ubtc,
@@ -295,4 +297,58 @@ def run_classification_optimizations(  # pylint: disable=too-many-arguments
             print(f"Optimization for {name} complete.")
 
 
-# AI add a function to perform combinatorially symetric cross validation AI! 
+def run_combinatorial_cv(  # pylint: disable=too-many-arguments, too-many-locals
+    data, strategy_class, params, n_splits=5, n_test_splits=1
+):
+    """
+    Perform combinatorial cross-validation.
+
+    This function splits the data into `n_splits` folds and then runs
+    backtests on combinations of these folds. It's useful for assessing
+    strategy robustness.
+
+    :param data: The OHLCV data.
+    :param strategy_class: The strategy class to test.
+    :param params: Hyperparameters for the strategy.
+    :param n_splits: The number of folds to split the data into.
+    :param n_test_splits: The number of folds to use for testing in each combination.
+    :return: A dictionary with aggregated backtest statistics.
+    """
+    kf = KFold(n_splits=n_splits, shuffle=False)
+    splits = [data.iloc[test_index] for _, test_index in kf.split(data)]
+
+    split_indices = list(range(n_splits))
+    test_split_combinations = list(
+        itertools.combinations(split_indices, n_test_splits)
+    )
+
+    all_stats = []
+    print(f"Running {len(test_split_combinations)} backtests for combinatorial CV...")
+    for i, test_indices in enumerate(test_split_combinations):
+        print(
+            f"Running fold {i + 1}/{len(test_split_combinations)} with test splits {test_indices}"
+        )
+
+        test_data_parts = [splits[j] for j in test_indices]
+        test_data = pd.concat(test_data_parts).sort_index()
+
+        bt = Backtest(test_data, strategy_class, cash=10000, commission=0.001)
+        stats = bt.run(**params)
+        all_stats.append(stats)
+
+    # Aggregate results
+    stats_df = pd.DataFrame(all_stats)
+
+    # Select only numeric columns for aggregation
+    numeric_stats_df = stats_df.select_dtypes(include=np.number)
+
+    mean_stats = numeric_stats_df.mean().to_dict()
+    std_stats = numeric_stats_df.std().to_dict()
+
+    results = {}
+    for key, value in mean_stats.items():
+        results[key] = value
+    for key, value in std_stats.items():
+        results[f"{key} (Std.)"] = value
+
+    return results
