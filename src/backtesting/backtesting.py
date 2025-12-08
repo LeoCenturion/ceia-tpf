@@ -298,72 +298,94 @@ def run_classification_optimizations(  # pylint: disable=too-many-arguments
 
 
 
-#AI write a function to do combinatorially symetric cross validation:
-# This process assumes you have already generated your Matrix M (dimensions T×N), where T is the number of time periods and N is the number of strategy configurations (trials).
-# Step 1: Partition the Data (The "Combinatorial" Setup)
+def combinatorial_symmetric_cv(performance_matrix: pd.DataFrame, S: int = 16):
+    """
+    Calculates the Probability of Backtest Overfitting (PBO) using combinatorial
+    symmetric cross-validation, as described by Bailey, Borwein, Lopez de Prado, and Zhu.
 
-# Divide your Matrix M row-wise into an even number S of sub-matrices (blocks).
+    This process evaluates the likelihood that a strategy selected as optimal in-sample
+    will underperform out-of-sample.
 
-#     Typical values for S: 16 or 20.
+    Args:
+        performance_matrix (pd.DataFrame): A DataFrame (T x N) of strategy returns,
+            where T is the number of time periods and N is the number of strategy
+            configurations (trials).
+        S (int): The number of even splits (blocks) to partition the data into.
+            Must be an even number.
 
-#     The blocks must be of equal size to ensuring symmetry.
+    Returns:
+        tuple: A tuple containing:
+            - float: The Probability of Backtest Overfitting (PBO).
+            - np.ndarray: An array of relative ranks (omega) for each combination.
+    """
+    if S % 2 != 0:
+        raise ValueError("S must be an even number.")
 
-#     This creates the building blocks for your cross-validation.
+    T, N = performance_matrix.shape
+    if T < S:
+        raise ValueError(
+            f"Number of time periods T ({T}) must be greater than or equal to S ({S})."
+        )
 
-# Step 2: Generate Combinations
+    # Step 1: Partition the Data
+    # Ensure blocks are of equal size for symmetry.
+    if T % S != 0:
+        print(f"Warning: Data length {T} is not divisible by S {S}. Trimming data.")
+        performance_matrix = performance_matrix.iloc[: T - (T % S)]
+        T = performance_matrix.shape[0]
 
-# Form all possible combinations where you split these S blocks into two equal groups of size S/2.
+    block_size = T // S
+    blocks = [
+        performance_matrix.iloc[i * block_size : (i + 1) * block_size]
+        for i in range(S)
+    ]
 
-#     Training Set (J): Composed of S/2 blocks combined together.
+    # Step 2: Generate Combinations
+    block_indices = list(range(S))
+    training_set_indices_combinations = list(
+        itertools.combinations(block_indices, S // 2)
+    )
 
-#     Testing Set (Jˉ): Composed of the remaining S/2 blocks.
+    omega_values = []
+    num_combinations = len(training_set_indices_combinations)
+    print(f"Running {num_combinations} combinations for CSCV...")
 
-# The total number of combinations (splits) is given by the binomial coefficient:
-# C=(S/2S​)
+    # Step 3: The Evaluation Loop
+    for i, training_indices in enumerate(training_set_indices_combinations):
+        if (i + 1) % 1000 == 0:
+            print(f"Processing combination {i + 1}/{num_combinations}...")
 
-# Example: If S=16, you have (816​)=12,870 unique splits.
-# Step 3: The Evaluation Loop
+        training_blocks = [blocks[j] for j in training_indices]
+        training_set = pd.concat(training_blocks)
 
-# For each of the C combinations (c=1…C), perform the following operations:
-# A. In-Sample Optimization (Find the "Best")
+        testing_indices = [idx for idx in block_indices if idx not in training_indices]
+        testing_blocks = [blocks[j] for j in testing_indices]
+        testing_set = pd.concat(testing_blocks)
 
-#     Take the Training Set J.
+        # A. In-Sample Optimization (using Sharpe Ratio as performance metric)
+        in_sample_returns = training_set
+        in_sample_std = in_sample_returns.std()
+        in_sample_sharpe = (in_sample_returns.mean() / in_sample_std).fillna(0)
+        best_strategy_column = in_sample_sharpe.idxmax()
 
-#     Calculate the performance metric (e.g., Sharpe Ratio) for every strategy column n (n=1…N) using only the data in J.
+        # B. Out-of-Sample Verification
+        out_of_sample_returns = testing_set
+        out_of_sample_std = out_of_sample_returns.std()
+        out_of_sample_sharpe = (
+            out_of_sample_returns.mean() / out_of_sample_std
+        ).fillna(0)
 
-#     Identify the strategy with the highest performance. Let's call the index of this "star" strategy n∗.
+        # C. Calculate Relative Rank ("Logit")
+        ranks = out_of_sample_sharpe.rank(ascending=False, method="first")
+        rank_of_best_strategy = ranks[best_strategy_column]
 
-#         Note: This simulates the process of a researcher picking the best backtest result.
+        omega = rank_of_best_strategy / (N + 1)
+        omega_values.append(omega)
 
-# B. Out-of-Sample Verification (Check Reality)
+    # Step 4: Aggregate and Calculate PBO
+    omega_values = np.array(omega_values)
+    pbo = (
+        np.sum(omega_values < 0.5) / len(omega_values) if len(omega_values) > 0 else 0
+    )
 
-#     Take the Testing Set Jˉ (the data not seen in step A).
-
-#     Calculate the performance metric for every strategy column using only the data in Jˉ. This gives you a vector of performances Rˉ.
-
-#     Extract the specific performance of the "star" strategy (n∗) from this set. Let's call this Rˉn∗​.
-
-# C. Calculate Relative Rank (The "Logit")
-
-# Determine how well the "star" strategy performed relative to the field in the Out-of-Sample test.
-
-#     Rank Rˉn∗​ among all values in Rˉ.
-
-#     Calculate the relative rank ωc​:
-#     ωc​=N+1Rank(Rˉn∗​)​
-
-#         ωc​≈1.0: The strategy remained the best OOS.
-
-#         ωc​≈0.5: The strategy performed average OOS.
-
-#         ωc​≈0.0: The strategy was the worst OOS.
-
-# Step 4: Aggregate and Calculate PBO
-
-# After running the loop for all C combinations, you will have a list of relative ranks Ω={ω1​,ω2​,…,ωC​}.
-
-# The Probability of Backtest Overfitting (PBO) is defined as the probability that the strategy selected as optimal In-Sample performs below the median of all strategies Out-of-Sample.
-
-# Calculate the frequency of ranks below 0.5:
-# PBO=Total Count CCount of ωc​<0.5​
-# AI!
+    return pbo, omega_values
