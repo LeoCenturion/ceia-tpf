@@ -35,7 +35,54 @@ def create_fixed_time_horizon_labels(
 
     return labels
 
-# AI add a function for labeling with dynamic threthold. I.e. compute the volatility with a rolling window and let the threthold be a fraction of sigma AI!
+
+def create_volatility_adjusted_labels(
+    close: pd.Series, look_forward: int, vol_window: int, vol_multiplier: float
+) -> pd.Series:
+    """
+    Creates labels based on a fixed-time horizon with dynamic, volatility-adjusted thresholds.
+
+    For each point, it calculates rolling volatility and sets the profit-take and
+    stop-loss thresholds as a multiple of this volatility. A label is then assigned
+    based on the return after a fixed `look_forward` period.
+
+    - 1: If the return is >= (volatility * vol_multiplier).
+    - -1: If the return is <= -(volatility * vol_multiplier).
+    - 0: Otherwise.
+
+    Args:
+        close (pd.Series): Series of closing prices.
+        look_forward (int): The number of periods to look forward for the return calculation.
+        vol_window (int): The window size for calculating rolling volatility.
+        vol_multiplier (float): The multiplier for volatility to set thresholds.
+
+    Returns:
+        pd.Series: A series of labels (1, -1, 0) with the same index as `close`.
+    """
+    # Calculate daily returns to compute volatility
+    returns = close.pct_change()
+
+    # Calculate rolling volatility
+    volatility = returns.rolling(window=vol_window).std()
+
+    # Calculate dynamic thresholds
+    pt_threshold = volatility * vol_multiplier
+    sl_threshold = -volatility * vol_multiplier
+
+    # Calculate future returns
+    future_returns = close.shift(-look_forward) / close - 1
+
+    # Create labels
+    labels = pd.Series(0, index=close.index, dtype=int)
+    labels.loc[future_returns >= pt_threshold] = 1
+    labels.loc[future_returns <= sl_threshold] = -1
+
+    # Events that didn't reach either threshold are labeled 0.
+    # The last `look_forward` periods cannot be labeled.
+    labels.iloc[-look_forward:] = np.nan
+
+    return labels
+
 
 def create_triple_barrier_labels(
     close: pd.Series,
