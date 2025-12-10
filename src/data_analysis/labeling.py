@@ -35,6 +35,7 @@ def create_fixed_time_horizon_labels(
 
     return labels
 
+# AI add a function for labeling with dynamic threthold. I.e. compute the volatility with a rolling window and let the threthold be a fraction of sigma AI!
 
 def create_triple_barrier_labels(
     close: pd.Series,
