@@ -331,5 +331,116 @@ def create_tick_imbalance_bars(
     return result_df, thresholds_series, cumulative_imbalance_series
 
 
+def create_volume_imbalance_bars(
+    df: pd.DataFrame,
+    volume_col: str = "Volume BTC",
+    initial_bar_volume_estimate: float = None,
+    span_bar_volume: int = 20,
+    span_tick_imbalance: int = 20,
+) -> Tuple[pd.DataFrame, pd.Series, pd.Series]:
+    """
+    Creates volume imbalance bars (VIBs) with a dynamic threshold.
+
+    A new bar is formed when the cumulative volume imbalance exceeds a dynamic
+    threshold. Volume imbalance is the sum of tick-signed volumes.
+
+    Expected Imbalance = E[V] * |E[b_t]|, where:
+    - E[V] is the EWMA of total volume per bar.
+    - E[b_t] is the EWMA of tick signs (P(b_t=1) - P(b_t=-1)).
+
+    Args:
+        df (pd.DataFrame): DataFrame with tick data. Must include 'close' and volume column.
+        volume_col (str): The name of the volume column to use (e.g., 'Volume BTC').
+        initial_bar_volume_estimate (float): Initial estimate for volume per bar.
+            If None, it's estimated as 1% of the total volume.
+        span_bar_volume (int): EWMA span for calculating E[V].
+        span_tick_imbalance (int): EWMA span for calculating E[b_t].
+
+    Returns:
+        tuple[pd.DataFrame, pd.Series, pd.Series]: A tuple containing:
+            - A DataFrame of the volume imbalance bars.
+            - A Series of the imbalance thresholds over time.
+            - A Series of the cumulative volume imbalance over time.
+    """
+    if df.empty:
+        return pd.DataFrame(), pd.Series(dtype=float), pd.Series(dtype=float)
+
+    if "date" in df.columns and not pd.api.types.is_datetime64_any_dtype(df["date"]):
+        df["date"] = pd.to_datetime(df["date"])
+
+    bars = []
+    thresholds_over_time = []
+    cumulative_imbalances_over_time = []
+    start_idx = 0
+    cumulative_imbalance = 0.0
+
+    df_reset = df.reset_index(drop=True)
+    tick_signs = _get_signed_ticks(df_reset["close"])
+
+    # --- Initial estimate for bar volume if not provided ---
+    if initial_bar_volume_estimate is None:
+        initial_bar_volume_estimate = df_reset[volume_col].sum() / 100
+
+    # --- Pre-computation for dynamic thresholds ---
+    ewma_tick_imbalances = tick_signs.ewm(
+        span=span_tick_imbalance, adjust=False
+    ).mean()
+
+    # --- EWMA state variables ---
+    ewma_bar_volume = float(initial_bar_volume_estimate)
+    alpha_bar_volume = 2 / (span_bar_volume + 1)
+
+    # --- Main loop ---
+    for i, tick_sign in enumerate(tick_signs):
+        ewma_tick_imbalance = ewma_tick_imbalances.iloc[i]
+        expected_imbalance_threshold = abs(ewma_bar_volume * ewma_tick_imbalance)
+        thresholds_over_time.append(expected_imbalance_threshold)
+
+        signed_volume = df_reset.at[i, volume_col] * tick_sign
+        cumulative_imbalance += signed_volume
+        cumulative_imbalances_over_time.append(cumulative_imbalance)
+
+        if (
+            expected_imbalance_threshold > 0
+            and abs(cumulative_imbalance) >= expected_imbalance_threshold
+        ):
+            bar_slice = df_reset.iloc[start_idx : i + 1]
+            bars.append(
+                {
+                    "date": bar_slice["date"].iloc[-1],
+                    "open": bar_slice["open"].iloc[0],
+                    "high": bar_slice["high"].max(),
+                    "low": bar_slice["low"].min(),
+                    "close": bar_slice["close"].iloc[-1],
+                    "Volume BTC": bar_slice["Volume BTC"].sum(),
+                    "Volume USDT": bar_slice["Volume USDT"].sum(),
+                    "tradeCount": bar_slice["tradeCount"].sum(),
+                }
+            )
+
+            # Update EWMA of bar volume with the volume of the bar just formed
+            current_bar_volume = bar_slice[volume_col].sum()
+            ewma_bar_volume = ((1 - alpha_bar_volume) * ewma_bar_volume) + (
+                alpha_bar_volume * current_bar_volume
+            )
+
+            # Reset for next bar
+            start_idx = i + 1
+            cumulative_imbalance = 0.0
+
+    thresholds_series = pd.Series(thresholds_over_time, index=df.index, dtype=float)
+    cumulative_imbalance_series = pd.Series(
+        cumulative_imbalances_over_time, index=df.index, dtype=float
+    )
+
+    if not bars:
+        return pd.DataFrame(), thresholds_series, cumulative_imbalance_series
+
+    result_df = pd.DataFrame(bars)
+    if "date" in result_df.columns:
+        result_df = result_df.set_index("date")
+    return result_df, thresholds_series, cumulative_imbalance_series
+
+
 if __name__ == "__main__":
     main()

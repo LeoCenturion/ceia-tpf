@@ -89,7 +89,7 @@ def create_triple_barrier_labels(
     volatility: pd.Series,
     look_forward: int,
     pt_sl_multipliers: tuple,
-    label_timeout_by_sign: bool = False,
+    label_timeout_by_sign: bool = True,
 ) -> pd.Series:
     """
     Creates labels using the triple-barrier method (dynamic labeling).
