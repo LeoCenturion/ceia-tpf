@@ -5,7 +5,7 @@ import pandas as pd
 
 def create_fixed_time_horizon_labels(
     close: pd.Series, look_forward: int, pt_pct: float, sl_pct: float
-) -> pd.Series:
+) -> pd.DataFrame:
     """
     Creates labels based on a fixed-time horizon method (fixed labeling).
 
@@ -21,11 +21,12 @@ def create_fixed_time_horizon_labels(
         sl_pct (float): The percentage threshold for a negative label (e.g., 0.02 for 2%).
 
     Returns:
-        pd.Series: A series of labels (1, -1, 0) with the same index as `close`.
+        pd.DataFrame: A DataFrame with 'label' and 'event_end_time' columns,
+            indexed by the event start time.
     """
     future_returns = close.shift(-look_forward) / close - 1
 
-    labels = pd.Series(0, index=close.index, dtype=int)
+    labels = pd.Series(0, index=close.index, dtype=float)
     labels.loc[future_returns >= pt_pct] = 1
     labels.loc[future_returns <= -sl_pct] = -1
 
@@ -33,12 +34,20 @@ def create_fixed_time_horizon_labels(
     # The last `look_forward` periods cannot be labeled as their future is unknown.
     labels.iloc[-look_forward:] = np.nan
 
-    return labels
+    # Create event end times
+    end_times = pd.Series(close.index, index=close.index).shift(-look_forward)
+
+    # Combine into a DataFrame
+    results = pd.DataFrame({"label": labels, "event_end_time": end_times})
+    results.dropna(subset=["label"], inplace=True)
+    results["label"] = results["label"].astype(int)
+
+    return results
 
 
 def create_volatility_adjusted_labels(
     close: pd.Series, look_forward: int, vol_window: int, vol_multiplier: float
-) -> pd.Series:
+) -> pd.DataFrame:
     """
     Creates labels based on a fixed-time horizon with dynamic, volatility-adjusted thresholds.
 
@@ -57,7 +66,8 @@ def create_volatility_adjusted_labels(
         vol_multiplier (float): The multiplier for volatility to set thresholds.
 
     Returns:
-        pd.Series: A series of labels (1, -1, 0) with the same index as `close`.
+        pd.DataFrame: A DataFrame with 'label' and 'event_end_time' columns,
+            indexed by the event start time.
     """
     # Calculate daily returns to compute volatility
     returns = close.pct_change()
@@ -73,7 +83,7 @@ def create_volatility_adjusted_labels(
     future_returns = close.shift(-look_forward) / close - 1
 
     # Create labels
-    labels = pd.Series(0, index=close.index, dtype=int)
+    labels = pd.Series(0, index=close.index, dtype=float)
     labels.loc[future_returns >= pt_threshold] = 1
     labels.loc[future_returns <= sl_threshold] = -1
 
@@ -81,7 +91,15 @@ def create_volatility_adjusted_labels(
     # The last `look_forward` periods cannot be labeled.
     labels.iloc[-look_forward:] = np.nan
 
-    return labels
+    # Create event end times
+    end_times = pd.Series(close.index, index=close.index).shift(-look_forward)
+
+    # Combine into a DataFrame
+    results = pd.DataFrame({"label": labels, "event_end_time": end_times})
+    results.dropna(subset=["label"], inplace=True)
+    results["label"] = results["label"].astype(int)
+
+    return results
 
 
 def create_triple_barrier_labels(
@@ -90,7 +108,7 @@ def create_triple_barrier_labels(
     look_forward: int,
     pt_sl_multipliers: tuple,
     label_timeout_by_sign: bool = True,
-) -> pd.Series:
+) -> pd.DataFrame:
     """
     Creates labels using the triple-barrier method (dynamic labeling).
 
@@ -116,15 +134,20 @@ def create_triple_barrier_labels(
             If False, the label is 0.
 
     Returns:
-        pd.Series: A series of labels (1, -1, 0) with the same index as `close`.
+        pd.DataFrame: A DataFrame with 'label' and 'event_end_time' columns,
+            indexed by the event start time. The label is an integer (1, -1, 0),
+            and event_end_time is the timestamp when a barrier was hit.
     """
     pt_mult, sl_mult = pt_sl_multipliers
-    labels = pd.Series(np.nan, index=close.index)
+    results = pd.DataFrame(
+        index=close.index, columns=["label", "event_end_time"], dtype=object
+    )
 
     # Align volatility index with close index to prevent mismatches
     volatility = volatility.reindex(close.index).fillna(method="ffill")
 
     for i in range(len(close) - look_forward):
+        entry_time = close.index[i]
         entry_price = close.iloc[i]
         vol = volatility.iloc[i]
 
@@ -143,23 +166,30 @@ def create_triple_barrier_labels(
         touch_lower = path[path <= lower_barrier]
         time_to_lower = touch_lower.index[0] if not touch_lower.empty else None
 
-        # Determine label based on which barrier was hit first
+        label = 0
+        event_end_time = pd.NaT
+
+        # Determine label and end time based on which barrier was hit first
         if time_to_upper is None and time_to_lower is None:
             # Vertical barrier hit
+            event_end_time = path.index[-1]
             if label_timeout_by_sign:
                 final_return = (path.iloc[-1] / entry_price) - 1
-                labels.iloc[i] = int(np.sign(final_return))
+                label = int(np.sign(final_return))
             else:
-                labels.iloc[i] = 0
+                label = 0
         elif time_to_upper is not None and (
             time_to_lower is None or time_to_upper <= time_to_lower
         ):
-            labels.iloc[i] = 1  # Upper barrier hit
+            label = 1
+            event_end_time = time_to_upper
         elif time_to_lower is not None and (
             time_to_upper is None or time_to_lower < time_to_upper
         ):
-            labels.iloc[i] = -1  # Lower barrier hit
-        else:
-            labels.iloc[i] = 0  # Should not be reached, but as a fallback, timeout.
+            label = -1
+            event_end_time = time_to_lower
 
-    return labels
+        results.loc[entry_time, "label"] = label
+        results.loc[entry_time, "event_end_time"] = event_end_time
+
+    return results.dropna().astype({"label": int})
