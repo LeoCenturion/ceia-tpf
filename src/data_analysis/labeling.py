@@ -84,6 +84,9 @@ def create_volatility_adjusted_labels(
     return labels
 
 
+# AI make it possible to change the labling of the vertical barrier hit:
+# if hit first set 1 if return is positive or -1 if negative
+# make it configurable via parameter AI!
 def create_triple_barrier_labels(
     close: pd.Series,
     volatility: pd.Series,
