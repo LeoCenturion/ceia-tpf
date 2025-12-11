@@ -46,3 +46,47 @@ def cusum_filter(df: pd.DataFrame, h: float, price_col="close"):
             t_events.append(t)
 
     return pd.DatetimeIndex(t_events)
+
+
+def count_concurrent_labels(
+    event_end_times: pd.Series, price_series_index: pd.DatetimeIndex
+) -> pd.Series:
+    """
+    Computes the number of concurrent labels at each point in time.
+
+    This is useful for understanding the degree of overlap in labeled events, which
+    can inform sample weighting in machine learning models.
+
+    Args:
+        event_end_times (pd.Series): A series where the index is the timestamp of the
+            event start, and the values are the timestamps of the event end.
+            This series should not contain NaT/NaN values for end times.
+        price_series_index (pd.DatetimeIndex): The index of the original price series,
+            representing all potential observation points.
+
+    Returns:
+        pd.Series: A series indexed by `price_series_index`, where each value
+            is the count of active labels at that point in time.
+    """
+    # Drop events with no end time
+    event_end_times = event_end_times.dropna()
+
+    # Create a DataFrame to track starts and ends of events
+    starts = pd.Series(1, index=event_end_times.index)
+    ends = pd.Series(-1, index=event_end_times.values)
+
+    # Combine starts and ends into a single series
+    concurrency_events = pd.concat([starts, ends]).sort_index()
+
+    # Calculate cumulative sum to get the count of active events at any time
+    concurrency_count = concurrency_events.cumsum()
+
+    # Align with the full price series index
+    concurrency_series = concurrency_count.reindex(price_series_index).fillna(
+        method="ffill"
+    )
+
+    # The first values might be NaN if the first event starts after the price series begins.
+    concurrency_series = concurrency_series.fillna(0)
+
+    return concurrency_series.astype(int)
