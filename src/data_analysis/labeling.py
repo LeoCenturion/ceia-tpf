@@ -84,14 +84,12 @@ def create_volatility_adjusted_labels(
     return labels
 
 
-# AI make it possible to change the labling of the vertical barrier hit:
-# if hit first set 1 if return is positive or -1 if negative
-# make it configurable via parameter AI!
 def create_triple_barrier_labels(
     close: pd.Series,
     volatility: pd.Series,
     look_forward: int,
     pt_sl_multipliers: tuple,
+    label_timeout_by_sign: bool = False,
 ) -> pd.Series:
     """
     Creates labels using the triple-barrier method (dynamic labeling).
@@ -104,7 +102,8 @@ def create_triple_barrier_labels(
     The label is determined by which barrier is hit first.
     - 1: Upper barrier hit first.
     - -1: Lower barrier hit first.
-    - 0: Vertical barrier hit first (timeout).
+    - 0: Vertical barrier hit first (timeout), if `label_timeout_by_sign` is False.
+    - sign(return): If `label_timeout_by_sign` is True and vertical barrier is hit.
 
     Args:
         close (pd.Series): Series of closing prices.
@@ -112,6 +111,9 @@ def create_triple_barrier_labels(
         look_forward (int): Maximum holding period (vertical barrier).
         pt_sl_multipliers (tuple): A tuple of (profit_take_multiplier, stop_loss_multiplier).
             These are multiplied by volatility to set the barriers.
+        label_timeout_by_sign (bool): If True, when the vertical barrier is hit,
+            the label is set to 1 for a positive return and -1 for a negative return.
+            If False, the label is 0.
 
     Returns:
         pd.Series: A series of labels (1, -1, 0) with the same index as `close`.
@@ -143,7 +145,12 @@ def create_triple_barrier_labels(
 
         # Determine label based on which barrier was hit first
         if time_to_upper is None and time_to_lower is None:
-            labels.iloc[i] = 0  # Vertical barrier hit
+            # Vertical barrier hit
+            if label_timeout_by_sign:
+                final_return = (path.iloc[-1] / entry_price) - 1
+                labels.iloc[i] = int(np.sign(final_return))
+            else:
+                labels.iloc[i] = 0
         elif time_to_upper is not None and (
             time_to_lower is None or time_to_upper <= time_to_lower
         ):
