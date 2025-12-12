@@ -21,6 +21,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from statsmodels.tsa.stattools import adfuller
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
 
 from src.data_analysis.bar_aggregation import create_volume_bars, create_dollar_bars, create_price_change_bars, create_tick_imbalance_bars
 from scipy import stats
@@ -984,8 +987,143 @@ plot_threshold_sweep_analysis(
 #
 # The analysis on 1-minute data generally confirms the findings from the hourly data: using activity-based bars tends to improve the statistical properties of the returns series. However, the scale of the thresholds is much smaller due to the finer time resolution. The trends of decreasing kurtosis and serial correlation with increasing thresholds remain consistent, reinforcing the validity of this sampling technique across different timeframes.
 
-# AI add a new section applying tsne to several feature sets:
-# - use as features the pct_change of the last 7 periods, the pct_change of the volume of the last 7 periods, the volatillity using a moving window, the closing price, the last maximum colsing price, days since the last maximum,  diferencia porcentual entre el moving average de 100 periodos y el moving average de 200 periodos
-# compute that feature set for time bars, volume bars, and dollar bars
-# apply PCA and tsne and plot the results AI!
+#%% [markdown]
+# ## 11. t-SNE Analysis of Feature Sets
+#
+# In this section, we explore the structure of the market data by visualizing a rich feature set using t-SNE (t-Distributed Stochastic Neighbor Embedding). The goal is to see if different market regimes or predictable patterns form distinct clusters in a low-dimensional space.
+#
+# We will create a feature set for time, volume, and dollar bars, and then use PCA for initial dimensionality reduction followed by t-SNE for visualization. The points in the resulting 2D plot will be colored by the sign of the return in the next period to see if the features can help separate future positive and negative price movements.
+
+#%% [markdown]
+# ### 11.1. Helper Functions for Feature Engineering and Visualization
+
+#%%
+def create_feature_set(bars_df: pd.DataFrame, vol_col: str = 'Volume BTC', window: int = 20):
+    """
+    Creates a feature set from a given bar DataFrame.
+    """
+    features = pd.DataFrame(index=bars_df.index)
+    close = bars_df['close']
+    volume = bars_df[vol_col]
+
+    # 1. Lagged percentage changes for price and volume (7 periods)
+    for i in range(1, 8):
+        features[f'price_pct_change_lag_{i}'] = close.pct_change(periods=i)
+        features[f'volume_pct_change_lag_{i}'] = volume.pct_change(periods=i)
+
+    # 2. Volatility
+    features['volatility'] = close.pct_change().rolling(window=window).std()
+
+    # 3. Closing price
+    features['close_price'] = close
+
+    # 4. Last maximum closing price and periods since last max
+    features['max_close'] = close.cummax()
+    is_new_max = close == features['max_close']
+    max_indices = pd.Series(close.index, index=close.index).where(is_new_max).ffill()
+
+    positions = pd.Series(np.arange(len(close)), index=close.index)
+    max_positions = max_indices.map(positions.get)
+    features['periods_since_max'] = positions - max_positions
+
+    # 5. MA percentage difference
+    ma_100 = sma(close, 100)
+    ma_200 = sma(close, 200)
+    features['ma_diff_pct'] = (ma_100 - ma_200) / ma_200
+
+    # Create target variable for coloring (sign of next return)
+    target = np.sign(close.pct_change().shift(-1))
+    
+    # Replace infinite values that might arise from division by zero
+    features.replace([np.inf, -np.inf], np.nan, inplace=True)
+    
+    # Drop rows with NaNs created by feature engineering
+    combined = features.join(target.rename('target')).dropna()
+    
+    return combined.drop('target', axis=1), combined['target']
+
+
+def run_tsne_analysis(features: pd.DataFrame, target: pd.Series, title: str):
+    """
+    Performs PCA and t-SNE on features and plots the result.
+    """
+    print(f"Running t-SNE analysis for {title}...")
+    if features.empty:
+        print("Feature set is empty. Skipping analysis.")
+        return
+
+    # 1. Scale features
+    scaler = StandardScaler()
+    features_scaled = scaler.fit_transform(features)
+
+    # 2. Apply PCA to reduce dimensionality first (helps t-SNE)
+    pca = PCA(n_components=10, random_state=42)
+    features_pca = pca.fit_transform(features_scaled)
+    print(f"Explained variance by 10 PCA components: {np.sum(pca.explained_variance_ratio_):.2%}")
+
+    # 3. Apply t-SNE
+    tsne = TSNE(n_components=2, perplexity=30, n_iter=1000, random_state=42)
+    features_tsne = tsne.fit_transform(features_pca)
+
+    # 4. Plot results
+    plt.figure(figsize=(12, 8))
+    plot_df = pd.DataFrame(data=features_tsne, columns=['tsne_1', 'tsne_2'])
+    plot_df['target'] = target.values
+    
+    sns.scatterplot(
+        x='tsne_1', y='tsne_2',
+        hue='target',
+        palette={1.0: 'green', 0.0: 'grey', -1.0: 'red'},
+        data=plot_df,
+        alpha=0.6,
+        legend='full'
+    )
+    
+    plt.title(f't-SNE Visualization of Features for {title}')
+    plt.xlabel('t-SNE Component 1')
+    plt.ylabel('t-SNE Component 2')
+    
+    # Update legend
+    h, l = plt.gca().get_legend_handles_labels()
+    legend_labels = {'1.0': 'Positive Next Return', '0.0': 'Zero Next Return', '-1.0': 'Negative Next Return'}
+    plt.legend(h, [legend_labels.get(label, label) for label in l], title="Next Return")
+
+    plt.grid(True)
+    plt.show()
+
+#%% [markdown]
+# ### 11.2. t-SNE on Time Bar Features
+# We first apply the analysis to the standard 1-hour time bars.
+
+#%%
+# We will use the hourly data 'df'
+features_time, target_time = create_feature_set(df)
+run_tsne_analysis(features_time, target_time, "1-Hour Time Bars")
+
+#%% [markdown]
+# ### 11.3. t-SNE on Volume Bar Features
+# Next, we apply the analysis to volume bars, which sample based on market activity (BTC traded).
+
+#%%
+# We use the volume bars created earlier
+features_volume, target_volume = create_feature_set(volume_bars, vol_col='Volume BTC')
+run_tsne_analysis(features_volume, target_volume, "Volume Bars")
+
+#%% [markdown]
+# ### 11.4. t-SNE on Dollar Bar Features
+# Finally, we repeat the analysis for dollar bars, which sample based on the value traded (USDT).
+
+#%%
+# We use the dollar bars created earlier
+features_dollar, target_dollar = create_feature_set(dollar_bars, vol_col='Volume USDT')
+run_tsne_analysis(features_dollar, target_dollar, "Dollar Bars")
+
+#%% [markdown]
+# ### 11.5. Analysis of t-SNE Results
+#
+# The t-SNE plots visualize the structure within the high-dimensional feature space. If distinct, well-separated clusters appear, it suggests that the market exhibits different regimes that are captured by our features. If the colors (representing future returns) are separated into different regions of the plot, it indicates that the feature set has some predictive power.
+#
+# Typically, financial data is very noisy, so perfectly separated clusters are rare. However, even subtle patterns, such as regions with a higher density of one color, can provide valuable insights for model development. The comparison across bar types can also reveal which sampling method leads to a feature space with more discernible structures.
+
+#%%
 
