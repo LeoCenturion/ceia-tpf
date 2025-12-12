@@ -78,6 +78,9 @@ def count_concurrent_labels(
     # Combine starts and ends into a single series
     concurrency_events = pd.concat([starts, ends]).sort_index()
 
+    # Group by index to consolidate multiple events at the same timestamp
+    concurrency_events = concurrency_events.groupby(level=0).sum()
+
     # Calculate cumulative sum to get the count of active events at any time
     concurrency_count = concurrency_events.cumsum()
 
