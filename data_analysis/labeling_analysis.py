@@ -11,6 +11,13 @@
 # %%
 import sys
 import os
+current_dir = os.getcwd()
+# Navigate up one level to the project root (e.g., /path/to/my_project)
+project_root = os.path.abspath(os.path.join(current_dir, '../src'))
+# Add the project root to sys.path so Python can find 'src' as a top-level package
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -46,7 +53,7 @@ sns.set_style("whitegrid")
 # We load historical BTC/USDT daily data for our analysis.
 
 # %%
-DATA_PATH = "data/BTCUSDT_consolidated_klines.csv"
+DATA_PATH = '/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1h/BTCUSDT_consolidated_klines.csv'
 START_DATE = "2022-01-01"
 data = fetch_historical_data(data_path=DATA_PATH, start_date=START_DATE, timeframe="1d")
 data = adjust_data_to_ubtc(data)
@@ -64,8 +71,8 @@ print(f"Number of data points: {len(data)}")
 
 # %%
 # Common parameters
-LOOK_FORWARD = 20  # 20 days
-VOL_WINDOW = 20    # 20-day rolling volatility
+LOOK_FORWARD = 5  # 20 days
+VOL_WINDOW = 30    # 20-day rolling volatility
 
 # --- Strategy 1: Fixed-Time Horizon Labels ---
 print("Generating Fixed-Time Horizon Labels...")
