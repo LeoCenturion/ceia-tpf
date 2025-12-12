@@ -983,3 +983,9 @@ plot_threshold_sweep_analysis(
 # ### 10.4. Summary of 1-Minute Data Analysis
 #
 # The analysis on 1-minute data generally confirms the findings from the hourly data: using activity-based bars tends to improve the statistical properties of the returns series. However, the scale of the thresholds is much smaller due to the finer time resolution. The trends of decreasing kurtosis and serial correlation with increasing thresholds remain consistent, reinforcing the validity of this sampling technique across different timeframes.
+
+# AI add a new section applying tsne to several feature sets:
+# - use as features the pct_change of the last 7 periods, the pct_change of the volume of the last 7 periods, the volatillity using a moving window, the closing price, the last maximum colsing price, days since the last maximum,  diferencia porcentual entre el moving average de 100 periodos y el moving average de 200 periodos
+# compute that feature set for time bars, volume bars, and dollar bars
+# apply PCA and tsne and plot the results AI!
+
