@@ -267,3 +267,11 @@ def machine_learning_cycle(raw_tick_data, model, config):
 
     return model, scores
 
+# AI add a main function and take the data from
+# fetch_historical_data(
+#         symbol="BTC/USDT",
+#         timeframe="1m",
+#         # start_date="2025-09-01T00:00:00Z",
+#         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv",
+#     )
+#AI!
