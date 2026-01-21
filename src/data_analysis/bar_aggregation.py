@@ -15,7 +15,7 @@ def _aggregate_to_bars(
 
     Args:
         df (pd.DataFrame): Input DataFrame with tick data.
-        metric_col (str): The column to use for thresholding (e.g., 'Volume BTC' or 'Volume USDT').
+        metric_col (str): The column to use for thresholding (e.g., 'Volume' or 'Volume USDT').
         threshold (float): The threshold value for creating a new bar.
 
     Returns:
@@ -24,14 +24,11 @@ def _aggregate_to_bars(
     if df.empty:
         return pd.DataFrame()
 
-    if "date" in df.columns and not pd.api.types.is_datetime64_any_dtype(df["date"]):
-        df["date"] = pd.to_datetime(df["date"])
-
     bars = []
     start_idx = 0
     cumulative_metric = 0.0
 
-    df_reset = df.reset_index(drop=True)
+    df_reset = df.reset_index()
 
     for i in range(len(df_reset)):
         cumulative_metric += df_reset.at[i, metric_col]
@@ -41,12 +38,12 @@ def _aggregate_to_bars(
 
             bars.append(
                 {
-                    "date": bar_slice["date"].iloc[-1],
-                    "open": bar_slice["open"].iloc[0],
-                    "high": bar_slice["high"].max(),
-                    "low": bar_slice["low"].min(),
-                    "close": bar_slice["close"].iloc[-1],
-                    "Volume BTC": bar_slice["Volume BTC"].sum(),
+                    "timestamp": bar_slice["timestamp"].iloc[-1],
+                    "Open": bar_slice["Open"].iloc[0],
+                    "High": bar_slice["High"].max(),
+                    "Low": bar_slice["Low"].min(),
+                    "Close": bar_slice["Close"].iloc[-1],
+                    "Volume": bar_slice["Volume"].sum(),
                     "Volume USDT": bar_slice["Volume USDT"].sum(),
                     "tradeCount": bar_slice["tradeCount"].sum(),
                 }
@@ -59,8 +56,8 @@ def _aggregate_to_bars(
         return pd.DataFrame()
 
     result_df = pd.DataFrame(bars)
-    if "date" in result_df.columns:
-        result_df = result_df.set_index("date")
+    if "timestamp" in result_df.columns:
+        result_df = result_df.set_index("timestamp")
     return result_df
 
 
@@ -69,8 +66,8 @@ def create_volume_bars(df: pd.DataFrame, volume_threshold: float) -> pd.DataFram
     Creates volume bars from a DataFrame of tick data.
 
     A new bar is created whenever the cumulative volume traded reaches the volume_threshold.
-    The input DataFrame should have columns including: date, open, high, low, close,
-    'Volume BTC', 'Volume USDT', and tradeCount.
+    The input DataFrame should have columns including: timestamp, Open, High, Low, Close,
+    'Volume', 'Volume USDT', and tradeCount.
 
     Args:
         df (pd.DataFrame): DataFrame with tick data.
@@ -79,7 +76,7 @@ def create_volume_bars(df: pd.DataFrame, volume_threshold: float) -> pd.DataFram
     Returns:
         pd.DataFrame: A DataFrame containing the volume bars with OHLCV data.
     """
-    return _aggregate_to_bars(df, "Volume BTC", volume_threshold)
+    return _aggregate_to_bars(df, "Volume", volume_threshold)
 
 
 def create_dollar_bars(df: pd.DataFrame, dollar_threshold: float) -> pd.DataFrame:
@@ -87,8 +84,8 @@ def create_dollar_bars(df: pd.DataFrame, dollar_threshold: float) -> pd.DataFram
     Creates dollar bars from a DataFrame of tick data.
 
     A new bar is created whenever the cumulative dollar value traded reaches the dollar_threshold.
-    The input DataFrame should have columns including: date, open, high, low, close,
-    'Volume BTC', 'Volume USDT', and tradeCount.
+    The input DataFrame should have columns including: timestamp, Open, High, Low, Close,
+    'Volume', 'Volume USDT', and tradeCount.
 
     Args:
         df (pd.DataFrame): DataFrame with tick data.
@@ -106,10 +103,10 @@ def create_price_change_bars(
     """
     Creates bars based on cumulative absolute price change.
 
-    A new bar is formed whenever the cumulative absolute percentage change of the close price
+    A new bar is formed whenever the cumulative absolute percentage change of the Close price
     reaches the price_change_threshold. The change is calculated as a fraction (e.g., 0.01 for 1%).
-    The input DataFrame should have columns including: date, open, high, low, close,
-    'Volume BTC', 'Volume USDT', and tradeCount.
+    The input DataFrame should have columns including: timestamp, Open, High, Low, Close,
+    'Volume', 'Volume USDT', and tradeCount.
 
     Args:
         df (pd.DataFrame): DataFrame with tick or bar data.
@@ -120,7 +117,7 @@ def create_price_change_bars(
     """
     df_copy = df.copy()
     # Calculate fractional change, not percentage
-    df_copy["abs_pct_change"] = df_copy["close"].pct_change().abs()
+    df_copy["abs_pct_change"] = df_copy["Close"].pct_change().abs()
     # The first value will be NaN, fill it with 0 so it doesn't break the cumulative sum
     df_copy["abs_pct_change"] = df_copy["abs_pct_change"].fillna(0)
     return _aggregate_to_bars(df_copy, "abs_pct_change", price_change_threshold)
@@ -157,10 +154,11 @@ def main():
         print(f"Error: Input file not found at {args.input_csv}")
         return
 
-    # The bar creation functions expect a 'date' column.
-    if "date" not in df.columns:
+    # The bar creation functions expect a 'timestamp' column.
+    # In the main function, the index is not set, so we check columns.
+    if "timestamp" not in df.columns:
         print(
-            f"Error: Input CSV must contain a 'date' column. Found columns: {df.columns.tolist()}"
+            f"Error: Input CSV must contain a 'timestamp' column. Found columns: {df.columns.tolist()}"
         )
         return
 
@@ -218,7 +216,7 @@ def create_tick_imbalance_bars(
     Creates tick imbalance bars (TIBs) with a configurable threshold strategy.
 
     Args:
-        df (pd.DataFrame): DataFrame with tick data. Must include 'close' price.
+        df (pd.DataFrame): DataFrame with tick data. Must include 'Close' price.
         threshold_type (str): The threshold strategy to use. One of:
             - 'static': Use a fixed `static_threshold`.
             - 'dynamic_imbalance': E[T] * E[b_t] (EWMA of bar sizes and tick imbalances).
@@ -238,17 +236,14 @@ def create_tick_imbalance_bars(
     if df.empty:
         return pd.DataFrame(), pd.Series(dtype=float), pd.Series(dtype=float)
 
-    if "date" in df.columns and not pd.api.types.is_datetime64_any_dtype(df["date"]):
-        df["date"] = pd.to_datetime(df["date"])
-
     bars = []
     thresholds_over_time = []
     cumulative_imbalances_over_time = []
     start_idx = 0
     cumulative_imbalance = 0.0
 
-    df_reset = df.reset_index(drop=True)
-    tick_signs = _get_signed_ticks(df_reset["close"])
+    df_reset = df.reset_index()
+    tick_signs = _get_signed_ticks(df_reset["Close"])
 
     # --- Pre-computation for dynamic thresholds ---
     ewma_tick_imbalances = tick_signs.ewm(span=span_tick_imbalance, adjust=False).mean()
@@ -295,12 +290,12 @@ def create_tick_imbalance_bars(
             bar_slice = df_reset.iloc[start_idx : i + 1]
             bars.append(
                 {
-                    "date": bar_slice["date"].iloc[-1],
-                    "open": bar_slice["open"].iloc[0],
-                    "high": bar_slice["high"].max(),
-                    "low": bar_slice["low"].min(),
-                    "close": bar_slice["close"].iloc[-1],
-                    "Volume BTC": bar_slice["Volume BTC"].sum(),
+                    "timestamp": bar_slice["timestamp"].iloc[-1],
+                    "Open": bar_slice["Open"].iloc[0],
+                    "High": bar_slice["High"].max(),
+                    "Low": bar_slice["Low"].min(),
+                    "Close": bar_slice["Close"].iloc[-1],
+                    "Volume": bar_slice["Volume"].sum(),
                     "Volume USDT": bar_slice["Volume USDT"].sum(),
                     "tradeCount": bar_slice["tradeCount"].sum(),
                 }
@@ -326,14 +321,14 @@ def create_tick_imbalance_bars(
         return pd.DataFrame(), thresholds_series, cumulative_imbalance_series
 
     result_df = pd.DataFrame(bars)
-    if "date" in result_df.columns:
-        result_df = result_df.set_index("date")
+    if "timestamp" in result_df.columns:
+        result_df = result_df.set_index("timestamp")
     return result_df, thresholds_series, cumulative_imbalance_series
 
 
 def create_volume_imbalance_bars(
     df: pd.DataFrame,
-    volume_col: str = "Volume BTC",
+    volume_col: str = "Volume",
     initial_bar_volume_estimate: float = None,
     span_bar_volume: int = 20,
     span_tick_imbalance: int = 20,
@@ -349,8 +344,8 @@ def create_volume_imbalance_bars(
     - E[b_t] is the EWMA of tick signs (P(b_t=1) - P(b_t=-1)).
 
     Args:
-        df (pd.DataFrame): DataFrame with tick data. Must include 'close' and volume column.
-        volume_col (str): The name of the volume column to use (e.g., 'Volume BTC').
+        df (pd.DataFrame): DataFrame with tick data. Must include 'Close' and volume column.
+        volume_col (str): The name of the volume column to use (e.g., 'Volume').
         initial_bar_volume_estimate (float): Initial estimate for volume per bar.
             If None, it's estimated as 1% of the total volume.
         span_bar_volume (int): EWMA span for calculating E[V].
@@ -365,17 +360,14 @@ def create_volume_imbalance_bars(
     if df.empty:
         return pd.DataFrame(), pd.Series(dtype=float), pd.Series(dtype=float)
 
-    if "date" in df.columns and not pd.api.types.is_datetime64_any_dtype(df["date"]):
-        df["date"] = pd.to_datetime(df["date"])
-
     bars = []
     thresholds_over_time = []
     cumulative_imbalances_over_time = []
     start_idx = 0
     cumulative_imbalance = 0.0
 
-    df_reset = df.reset_index(drop=True)
-    tick_signs = _get_signed_ticks(df_reset["close"])
+    df_reset = df.reset_index()
+    tick_signs = _get_signed_ticks(df_reset["Close"])
 
     # --- Initial estimate for bar volume if not provided ---
     if initial_bar_volume_estimate is None:
@@ -407,12 +399,12 @@ def create_volume_imbalance_bars(
             bar_slice = df_reset.iloc[start_idx : i + 1]
             bars.append(
                 {
-                    "date": bar_slice["date"].iloc[-1],
-                    "open": bar_slice["open"].iloc[0],
-                    "high": bar_slice["high"].max(),
-                    "low": bar_slice["low"].min(),
-                    "close": bar_slice["close"].iloc[-1],
-                    "Volume BTC": bar_slice["Volume BTC"].sum(),
+                    "timestamp": bar_slice["timestamp"].iloc[-1],
+                    "Open": bar_slice["Open"].iloc[0],
+                    "High": bar_slice["High"].max(),
+                    "Low": bar_slice["Low"].min(),
+                    "Close": bar_slice["Close"].iloc[-1],
+                    "Volume": bar_slice["Volume"].sum(),
                     "Volume USDT": bar_slice["Volume USDT"].sum(),
                     "tradeCount": bar_slice["tradeCount"].sum(),
                 }
@@ -437,8 +429,8 @@ def create_volume_imbalance_bars(
         return pd.DataFrame(), thresholds_series, cumulative_imbalance_series
 
     result_df = pd.DataFrame(bars)
-    if "date" in result_df.columns:
-        result_df = result_df.set_index("date")
+    if "timestamp" in result_df.columns:
+        result_df = result_df.set_index("timestamp")
     return result_df, thresholds_series, cumulative_imbalance_series
 
 

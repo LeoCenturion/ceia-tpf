@@ -242,6 +242,19 @@ def machine_learning_cycle(raw_tick_data, model, config):
     # Step 1: Data Structuring
     bars = step_1_data_structuring(raw_tick_data, config["dollar_threshold"])
 
+    # The bar aggregation functions return columns with capital letters. The rest of
+    # the pipeline expects lowercase.
+    bars.rename(
+        columns={
+            "Open": "open",
+            "High": "high",
+            "Low": "low",
+            "Close": "close",
+            "Volume": "volume",
+        },
+        inplace=True,
+    )
+
     # Step 2: Feature Engineering
     orthogonal_features = step_2_feature_engineering(bars)
 
