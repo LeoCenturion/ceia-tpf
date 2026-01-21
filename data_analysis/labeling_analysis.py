@@ -101,7 +101,7 @@ volatility = close.pct_change().rolling(window=VOL_WINDOW).std()
 triple_barrier_labels_df = create_triple_barrier_labels(
     close=close,
     volatility=volatility,
-    look_forward=LOOK_FORWARD,
+    look_forward=31,
     pt_sl_multipliers=(2.0, 2.0),  # Profit/Stop at 2x sigma
     label_timeout_by_sign=True,
 )
