@@ -1,10 +1,12 @@
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score
 from statsmodels.tsa.stattools import adfuller
 
 from src.data_analysis.bar_aggregation import create_dollar_bars
+from src.data_analysis.data_analysis import fetch_historical_data
 from src.data_analysis.indicators import create_features
 from src.modeling import PurgedKFold
 
@@ -267,11 +269,49 @@ def machine_learning_cycle(raw_tick_data, model, config):
 
     return model, scores
 
-# AI add a main function and take the data from
-# fetch_historical_data(
-#         symbol="BTC/USDT",
-#         timeframe="1m",
-#         # start_date="2025-09-01T00:00:00Z",
-#         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv",
-#     )
-#AI!
+
+def main():
+    """
+    Main function to run the ML pipeline.
+    """
+    raw_tick_data = fetch_historical_data(
+        symbol="BTC/USDT",
+        timeframe="1m",
+        # start_date="2025-09-01T00:00:00Z",
+        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv",
+    )
+    # The pipeline expects lowercase column names and a datetime index
+    raw_tick_data.rename(
+        columns={
+            "Timestamp": "timestamp",
+            "Open": "open",
+            "High": "high",
+            "Low": "low",
+            "Close": "close",
+            "Volume": "volume",
+        },
+        inplace=True,
+    )
+    raw_tick_data["timestamp"] = pd.to_datetime(raw_tick_data["timestamp"])
+    raw_tick_data.set_index("timestamp", inplace=True)
+
+    model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
+    config = {
+        "dollar_threshold": 5_000_000,
+        "horizon": 5,
+        "pt": 1,
+        "sl": 1,
+        "min_ret": 0.0005,
+        "n_splits": 3,
+        "pct_embargo": 0.01,
+    }
+
+    trained_model, scores = machine_learning_cycle(raw_tick_data, model, config)
+
+    print(f"Model: {trained_model}")
+    print(f"Cross-validation F1 scores: {scores}")
+    print(f"Average F1 score: {np.mean(scores)}")
+
+
+if __name__ == "__main__":
+    main()
