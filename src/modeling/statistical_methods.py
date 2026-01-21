@@ -288,7 +288,7 @@ def main():
         # start_date="2025-09-01T00:00:00Z",
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv",
     )
-    # The pipeline expects lowercase column names and a datetime index
+
     raw_tick_data.rename(
         columns={
             "Timestamp": "timestamp",
@@ -300,6 +300,7 @@ def main():
         },
         inplace=True,
     )
+    print(raw_tick_data.head())
     raw_tick_data["timestamp"] = pd.to_datetime(raw_tick_data["timestamp"])
     raw_tick_data.set_index("timestamp", inplace=True)
 
