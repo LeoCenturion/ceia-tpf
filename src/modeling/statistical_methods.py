@@ -289,16 +289,16 @@ def main():
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv",
     )
 
-    raw_tick_data.rename(
-        columns={
-            "Open": "open",
-            "High": "high",
-            "Low": "low",
-            "Close": "close",
-            "Volume": "volume",
-        },
-        inplace=True,
-    )
+    # raw_tick_data.rename(
+    #     columns={
+    #         "Open": "open",
+    #         "High": "high",
+    #         "Low": "low",
+    #         "Close": "close",
+    #         "Volume": "volume",
+    #     },
+    #     inplace=True,
+    # )
     print(raw_tick_data.head())
     raw_tick_data.index = pd.to_datetime(raw_tick_data.index)
 
