@@ -291,7 +291,6 @@ def main():
 
     raw_tick_data.rename(
         columns={
-            "Timestamp": "timestamp",
             "Open": "open",
             "High": "high",
             "Low": "low",
@@ -301,8 +300,7 @@ def main():
         inplace=True,
     )
     print(raw_tick_data.head())
-    raw_tick_data["timestamp"] = pd.to_datetime(raw_tick_data["timestamp"])
-    raw_tick_data.set_index("timestamp", inplace=True)
+    raw_tick_data.index = pd.to_datetime(raw_tick_data.index)
 
     model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
     config = {
