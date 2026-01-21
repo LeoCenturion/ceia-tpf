@@ -1,4 +1,4 @@
-# AI write a machine learning cicle like the follwing:
+# AI write a machine learning cicle like the follwing: ...
 # // PART I: DATA ANALYSIS (Data Curators & Feature Analysts)
 # FUNCTION Step_1_Data_Structuring(raw_tick_data):
 #     // Avoid standard Time Bars; use Information-Driven Bars to synchronize with market activity [3, 4].
@@ -25,9 +25,7 @@
 #     // Weight samples by uniqueness and absolute return attribution [14, 15].
 #     sample_weights = Compute_Sample_Weights(labels, uniqueness)
 #     RETURN labels, sample_weights
-
 # For cross validation use PurgedKFold
 # For feature engineering use all features used in create_features
-
-# AI!
+#... AI!
 
