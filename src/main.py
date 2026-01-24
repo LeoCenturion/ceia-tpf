@@ -1,6 +1,14 @@
 import os
 import time
 import pandas as pd
+from src.constants import (
+    OPEN_COL,
+    HIGH_COL,
+    LOW_COL,
+    CLOSE_COL,
+    VOLUME_COL,
+    TIMESTAMP_COL,
+)
 from binance.client import Client
 from binance.enums import ORDER_TYPE_MARKET, SIDE_BUY, SIDE_SELL
 import csv
@@ -93,12 +101,12 @@ def get_historical_data(symbol, interval, lookback):
     df = pd.DataFrame(
         klines,
         columns=[
-            "timestamp",
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
+            TIMESTAMP_COL,
+            OPEN_COL.lower(),
+            HIGH_COL.lower(),
+            LOW_COL.lower(),
+            CLOSE_COL.lower(),
+            VOLUME_COL.lower(),
             "close_time",
             "quote_asset_volume",
             "number_of_trades",
@@ -107,8 +115,8 @@ def get_historical_data(symbol, interval, lookback):
             "ignore",
         ],
     )
-    df["close"] = pd.to_numeric(df["close"])
-    df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+    df[CLOSE_COL.lower()] = pd.to_numeric(df[CLOSE_COL.lower()])
+    df[TIMESTAMP_COL] = pd.to_datetime(df[TIMESTAMP_COL], unit="ms")
     return df
 
 
@@ -117,8 +125,8 @@ def macd_strategy(df: pd.DataFrame, short_window=12, long_window=26, signal_wind
     MACD trading strategy.
     Returns 'BUY', 'SELL' or 'HOLD'.
     """
-    df["short_ema"] = df["close"].ewm(span=short_window, adjust=False).mean()
-    df["long_ema"] = df["close"].ewm(span=long_window, adjust=False).mean()
+    df["short_ema"] = df[CLOSE_COL.lower()].ewm(span=short_window, adjust=False).mean()
+    df["long_ema"] = df[CLOSE_COL.lower()].ewm(span=long_window, adjust=False).mean()
     df["macd"] = df["short_ema"] - df["long_ema"]
     df["signal_line"] = df["macd"].ewm(span=signal_window, adjust=False).mean()
 
@@ -287,7 +295,7 @@ def main(strategy_func, trade_amount, max_capital):
                     continue
 
                 signal = strategy_func(df)
-                current_price = df["close"].iloc[-1]
+                current_price = df[CLOSE_COL.lower()].iloc[-1]
                 current_position_value = open_position_quantity * current_price
                 position_open_str = (
                     f"Yes, size: {open_position_quantity:.6f} BTC ({current_position_value:.2f} USDT)"
@@ -355,7 +363,7 @@ def main(strategy_func, trade_amount, max_capital):
             try:
                 df_latest = get_historical_data(symbol, timeframe, "1 minute ago UTC")
                 if not df_latest.empty:
-                    current_price_for_shutdown = df_latest["close"].iloc[-1]
+                    current_price_for_shutdown = df_latest[CLOSE_COL.lower()].iloc[-1]
             except Exception as e:
                 print(
                     f"Warning: Could not get current price for min_notional check on shutdown: {e}. Proceeding without check."

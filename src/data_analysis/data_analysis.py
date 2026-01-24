@@ -1,6 +1,15 @@
 """Data fetching and processing utilities."""
+
 import ccxt
 import pandas as pd
+from src.constants import (
+    OPEN_COL,
+    HIGH_COL,
+    LOW_COL,
+    CLOSE_COL,
+    VOLUME_COL,
+    TIMESTAMP_COL,
+)
 
 
 def fetch_historical_data(
@@ -73,11 +82,11 @@ def fetch_historical_data(
     # The backtesting library requires uppercase column names
     df.rename(
         columns={
-            "open": "Open",
-            "high": "High",
-            "low": "Low",
-            "close": "Close",
-            "volume": "Volume",
+            "open": OPEN_COL,
+            "high": HIGH_COL,
+            "low": LOW_COL,
+            "close": CLOSE_COL,
+            "volume": VOLUME_COL,
         },
         inplace=True,
     )
@@ -113,7 +122,7 @@ def adjust_data_to_ubtc(df: pd.DataFrame) -> pd.DataFrame:
     This function divides the OHLC prices by 1,000,000.
     """
     df_copy = df.copy()
-    for col in ["Open", "High", "Low", "Close"]:
+    for col in [OPEN_COL, HIGH_COL, LOW_COL, CLOSE_COL]:
         if col in df_copy.columns:
             df_copy[col] = df_copy[col] / 1_000_000
     return df_copy

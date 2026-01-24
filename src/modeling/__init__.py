@@ -66,13 +66,9 @@ class PurgedKFold(_BaseKFold):
             # --- Training set after test set ---
             latest_end_in_test = self.t1.iloc[test_indices].max()
 
-            first_start_after_test_idx = self.t1.index.searchsorted(
-                latest_end_in_test
-            )
+            first_start_after_test_idx = self.t1.index.searchsorted(latest_end_in_test)
 
-            train_indices_after = indices[
-                first_start_after_test_idx + embargo_size :
-            ]
+            train_indices_after = indices[first_start_after_test_idx + embargo_size :]
 
             train_indices = np.concatenate((train_indices_before, train_indices_after))
             yield train_indices, test_indices

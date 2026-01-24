@@ -1,6 +1,14 @@
 import argparse
 import pandas as pd
 import mplfinance as mpf
+from src.constants import (
+    OPEN_COL,
+    HIGH_COL,
+    LOW_COL,
+    CLOSE_COL,
+    VOLUME_COL,
+    TIMESTAMP_COL,
+)
 from binance.client import Client
 
 # Use environment variables for API keys if needed for non-public data, though not required for klines
@@ -19,12 +27,12 @@ def get_historical_data(symbol, interval, start_str, end_str):
     df = pd.DataFrame(
         klines,
         columns=[
-            "timestamp",
-            "Open",
-            "High",
-            "Low",
-            "Close",
-            "Volume",
+            TIMESTAMP_COL,
+            OPEN_COL,
+            HIGH_COL,
+            LOW_COL,
+            CLOSE_COL,
+            VOLUME_COL,
             "close_time",
             "quote_asset_volume",
             "number_of_trades",
@@ -35,13 +43,13 @@ def get_historical_data(symbol, interval, start_str, end_str):
     )
 
     # Convert to numeric and set index
-    for col in ["Open", "High", "Low", "Close", "Volume"]:
+    for col in [OPEN_COL, HIGH_COL, LOW_COL, CLOSE_COL, VOLUME_COL]:
         df[col] = pd.to_numeric(df[col])
 
-    df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
-    df.set_index("timestamp", inplace=True)
+    df[TIMESTAMP_COL] = pd.to_datetime(df[TIMESTAMP_COL], unit="ms")
+    df.set_index(TIMESTAMP_COL, inplace=True)
 
-    return df[["Open", "High", "Low", "Close", "Volume"]]
+    return df[[OPEN_COL, HIGH_COL, LOW_COL, CLOSE_COL, VOLUME_COL]]
 
 
 def plot_trades(transactions_file, symbol):
@@ -58,11 +66,11 @@ def plot_trades(transactions_file, symbol):
         print("Transactions file is empty. Nothing to plot.")
         return
 
-    trades_df["timestamp"] = pd.to_datetime(trades_df["timestamp"])
+    trades_df[TIMESTAMP_COL] = pd.to_datetime(trades_df[TIMESTAMP_COL])
 
     # Determine date range for fetching kline data
-    start_date = trades_df["timestamp"].min() - pd.Timedelta(hours=1)
-    end_date = trades_df["timestamp"].max() + pd.Timedelta(hours=1)
+    start_date = trades_df[TIMESTAMP_COL].min() - pd.Timedelta(hours=1)
+    end_date = trades_df[TIMESTAMP_COL].max() + pd.Timedelta(hours=1)
 
     print(f"Fetching historical data for {symbol} from {start_date} to {end_date}...")
 

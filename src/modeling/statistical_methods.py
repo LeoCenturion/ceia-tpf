@@ -17,7 +17,14 @@ from src.data_analysis.bar_aggregation import create_dollar_bars
 from src.data_analysis.data_analysis import fetch_historical_data
 from src.data_analysis.indicators import create_features
 from src.modeling import PurgedKFold
-
+from src.constants import (
+    OPEN_COL,
+    HIGH_COL,
+    LOW_COL,
+    CLOSE_COL,
+    VOLUME_COL,
+    TIMESTAMP_COL,
+)
 
 # Part I: Data Analysis
 # Step 1: Data Structuring
@@ -52,14 +59,14 @@ def frac_diff_ffd(series, d, thres=1e-5):
     width = len(w) - 1
     df = {}
     for name in series.columns:
-        series_f = series[[name]].fillna(method="ffill").dropna()
+        series_f = series[name].ffill().dropna()
         df_ = pd.Series(0, index=series_f.index, name=name)
 
         for i in range(width, series_f.shape[0]):
             loc0, loc1 = series_f.index[i - width], series_f.index[i]
             if not np.isfinite(series.loc[loc1, name]):
                 continue
-            df_[loc1] = np.dot(w.T, series_f.loc[loc0:loc1])[0, 0]
+            df_[loc1] = np.dot(w.T, series_f.loc[loc0:loc1])[0]
         df[name] = df_.copy(deep=True)
     df = pd.concat(df, axis=1)
     return df
@@ -70,11 +77,21 @@ def find_minimum_d(series):
     Find minimum d for stationarity using ADF test.
     """
     for d in np.linspace(0, 1, 11):
-        d_series = frac_diff_ffd(series, d, thres=1e-5).dropna()
-        if not d_series.empty:
-            p_val = adfuller(d_series, maxlag=1, regression="c", autolag=None)[1]
-            if p_val < 0.05:
-                return d
+        d_series_df = frac_diff_ffd(series, d, thres=1e-5).dropna()
+        if d_series_df.empty:
+            continue
+
+        all_stationary = True
+        for col_name in d_series_df.columns:
+            p_val = adfuller(
+                d_series_df[col_name], maxlag=1, regression="c", autolag=None
+            )[1]
+            if p_val >= 0.05:
+                all_stationary = False
+                break  # This d is not sufficient, try the next one
+
+        if all_stationary:
+            return d  # Found a d that makes all columns stationary
     return 1.0
 
 
@@ -129,6 +146,8 @@ def get_events(close, t_events, pt_sl, target, min_ret, t1=None):
     """
     Get Triple-Barrier events.
     """
+    # Align target index with t_events index
+    target = target.reindex(t_events, method='ffill')
     target = target.loc[t_events]
     target = target[target > min_ret]
     if t1 is None:
@@ -171,8 +190,7 @@ def get_num_co_events(close_idx, t1, molecule):
     t1 = t1.fillna(close_idx[-1])
     t1 = t1[t1.index.isin(molecule)]
     t1 = t1.loc[molecule]
-    iloc = close_idx.searchsorted(np.array([t1.index[0], t1.iloc[0]]))[0]
-    count = pd.Series(0, index=close_idx[iloc : close_idx.searchsorted(t1.max()) + 1])
+    count = pd.Series(0, index=close_idx[t1.index[0] : t1.max()])
     for t_in, t_out in t1.items():
         count.loc[t_in:t_out] += 1
     return count.loc[molecule]
@@ -205,7 +223,7 @@ def step_3_labeling_and_weighting(bars, config):
     """
     Apply Triple-Barrier method, compute uniqueness, and sample weights.
     """
-    close = bars["close"]
+    close = bars[CLOSE_COL]
     vol = get_daily_vol(close)
     cusum_events = bars.index  # Simplified event trigger
     t1 = get_t1(close, cusum_events, num_days=config["horizon"])
@@ -226,9 +244,7 @@ def step_3_labeling_and_weighting(bars, config):
     num_co_events = get_num_co_events(
         close.index, events_for_weights["t1"], labels.index
     )
-    sample_weights = get_sample_weights(
-        events_for_weights["t1"], num_co_events, close
-    )
+    sample_weights = get_sample_weights(events_for_weights["t1"], num_co_events, close)
 
     return labels, sample_weights
 
@@ -242,19 +258,6 @@ def machine_learning_cycle(raw_tick_data, model, config):
     # Step 1: Data Structuring
     bars = step_1_data_structuring(raw_tick_data, config["dollar_threshold"])
 
-    # The bar aggregation functions return columns with capital letters. The rest of
-    # the pipeline expects lowercase.
-    bars.rename(
-        columns={
-            "Open": "open",
-            "High": "high",
-            "Low": "low",
-            "Close": "close",
-            "Volume": "volume",
-        },
-        inplace=True,
-    )
-
     # Step 2: Feature Engineering
     orthogonal_features = step_2_feature_engineering(bars)
 
@@ -262,31 +265,35 @@ def machine_learning_cycle(raw_tick_data, model, config):
     labels, sample_weights = step_3_labeling_and_weighting(bars, config)
 
     # Align data
-    combined = pd.concat(
-        [labels, orthogonal_features, sample_weights], axis=1
-    ).dropna()
+    combined = pd.concat([labels, orthogonal_features, sample_weights], axis=1).dropna()
     X = combined[orthogonal_features.columns]
     y = combined["bin"]
     sample_weights_series = combined["sample_weight"]
     t1_series = combined["t1"]
 
     # Part II: Modeling
-    # Cross-validation with PurgedKFold
+    # Manual Cross-validation with PurgedKFold
     cv = PurgedKFold(
         n_splits=config["n_splits"], t1=t1_series, pct_embargo=config["pct_embargo"]
     )
 
-    scores = cross_val_score(
-        model,
-        X,
-        y,
-        cv=cv,
-        scoring="f1_weighted",
-        fit_params={"sample_weight": sample_weights_series.values},
-    )
+    scores = []
+    for train_idx, test_idx in cv.split(X, y, groups=t1_series):
+        X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+        y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+        sample_weight_train = sample_weights_series.iloc[train_idx]
 
-    # Train final model on all data
-    model.fit(X, y, sample_weight=sample_weights_series.values)
+        # Ensure model is a fresh instance for each fold if it's stateful
+        # For RandomForestClassifier, it's generally fine to reuse if not stateful, but good practice to clone
+        # For simplicity here, we assume it's stateless or reinitialized in some way outside this loop.
+        # If the model state needs to be reset, use `sklearn.base.clone(model)`.
+
+        model.fit(X_train, y_train, sample_weight=sample_weight_train.values)
+        y_pred = model.predict(X_test)
+
+        # Calculate F1 score for the current fold
+        from sklearn.metrics import f1_score
+        scores.append(f1_score(y_test, y_pred, average="weighted"))
 
     return model, scores
 
@@ -298,7 +305,7 @@ def main():
     raw_tick_data = fetch_historical_data(
         symbol="BTC/USDT",
         timeframe="1m",
-        # start_date="2025-09-01T00:00:00Z",
+        start_date="2025-09-01T00:00:00Z",
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv",
     )
 

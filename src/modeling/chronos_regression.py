@@ -7,6 +7,14 @@ from functools import partial
 import matplotlib.pyplot as plt
 
 from src.data_analysis import fetch_historical_data
+from src.constants import (
+    OPEN_COL,
+    HIGH_COL,
+    LOW_COL,
+    CLOSE_COL,
+    VOLUME_COL,
+    TIMESTAMP_COL,
+)
 
 
 def run_multimodal_regression_backtest():
@@ -26,8 +34,8 @@ def run_multimodal_regression_backtest():
 
     # 2. Prepare Features and Target
     print("Preparing features (Open, Close, High, Low) and target (next Close)...")
-    features_df = data[["Open", "High", "Low", "Close"]].copy()
-    target = data["Close"].shift(-1)
+    features_df = data[[OPEN_COL, HIGH_COL, LOW_COL, CLOSE_COL]].copy()
+    target = data[CLOSE_COL].shift(-1)
     target.name = "target_close_price"
 
     final_df = pd.concat([features_df, target], axis=1).dropna()
@@ -93,7 +101,7 @@ def run_multimodal_regression_backtest():
 
         predictions_df_list.append(
             {
-                "timestamp": y.index[current_data_index],
+                TIMESTAMP_COL: y.index[current_data_index],
                 "actual_close": actual_price,
                 "predicted_close": predicted_price,
                 "periods_since_refit": periods_since_refit,
@@ -107,7 +115,7 @@ def run_multimodal_regression_backtest():
                 f"Processed {i - split_index + 1}/{len(final_df) - split_index} steps..."
             )
 
-    results_df = pd.DataFrame(predictions_df_list).set_index("timestamp")
+    results_df = pd.DataFrame(predictions_df_list).set_index(TIMESTAMP_COL)
 
     # 5. Save results to disk
     output_path = "regression_backtest_results.csv"
@@ -171,14 +179,14 @@ def run_timeseries_regression_backtest():
 
     # 2. Prepare Features and Target
     print("Preparing features (Open, Close, High, Low) and target (next Close)...")
-    features_df = data[["Open", "High", "Low", "Close"]].copy()
-    target = data["Close"].shift(-1)
+    features_df = data[[OPEN_COL, HIGH_COL, LOW_COL, CLOSE_COL]].copy()
+    target = data[CLOSE_COL].shift(-1)
     target.name = "target"
 
     final_df = pd.concat([features_df, target], axis=1).dropna()
     X = final_df.drop(columns=["target"])
     X["item_id"] = "series_0"
-    X["timestamp"] = X.index.values
+    X[TIMESTAMP_COL] = X.index.values
     y = final_df["target"]
 
     # 3. Define Backtesting Parameters
@@ -212,7 +220,7 @@ def run_timeseries_regression_backtest():
             train_data = TimeSeriesDataFrame.from_data_frame(
                 df,
                 id_column="item_id",
-                timestamp_column="timestamp",  # The index is automatically named 'timestamp'
+                timestamp_column=TIMESTAMP_COL,  # The index is automatically named 'timestamp'
             )
             predictor = TimeSeriesPredictor(prediction_length=1, verbosity=0, freq="1h")
             predictor.fit(
@@ -238,7 +246,7 @@ def run_timeseries_regression_backtest():
 
         predictions_df_list.append(
             {
-                "timestamp": y.index[current_data_index],
+                TIMESTAMP_COL: y.index[current_data_index],
                 "actual_close": actual_price,
                 "predicted_close": predicted_price,
                 "periods_since_refit": periods_since_refit,
@@ -252,7 +260,7 @@ def run_timeseries_regression_backtest():
                 f"Processed {i - split_index + 1}/{len(final_df) - split_index} steps..."
             )
 
-    results_df = pd.DataFrame(predictions_df_list).set_index("timestamp")
+    results_df = pd.DataFrame(predictions_df_list).set_index(TIMESTAMP_COL)
 
     # 5. Save results to disk
     output_path = "regression_backtest_results.csv"
@@ -316,14 +324,14 @@ def objective(trial, data):
     refit_every = trial.suggest_int("refit_every_hours", 294, 294)
 
     # 2. Prepare Features and Target
-    features_df = data[["Open", "High", "Low", "Close"]].copy()
-    target = data["Close"].shift(-1)
+    features_df = data[[OPEN_COL, HIGH_COL, LOW_COL, CLOSE_COL]].copy()
+    target = data[CLOSE_COL].shift(-1)
     target.name = "target"
 
     final_df = pd.concat([features_df, target], axis=1).dropna()
     X = final_df.drop(columns=["target"])
     X["item_id"] = "series_0"
-    X["timestamp"] = X.index.values
+    X[TIMESTAMP_COL] = X.index.values
     y = final_df["target"]
 
     # Combine into a single DataFrame for AutoGluon to avoid repeated concatenation
@@ -350,7 +358,7 @@ def objective(trial, data):
             )
             train_df = autogluon_df.iloc[:current_data_index]
             train_data = TimeSeriesDataFrame.from_data_frame(
-                train_df, id_column="item_id", timestamp_column="timestamp"
+                train_df, id_column="item_id", timestamp_column=TIMESTAMP_COL
             )
             predictor = TimeSeriesPredictor(prediction_length=1, verbosity=0, freq="1h")
             try:
@@ -374,7 +382,7 @@ def objective(trial, data):
 
         actual_price = y.iloc[current_data_index]
         log_entry = {
-            "timestamp": y.index[current_data_index],
+            TIMESTAMP_COL: y.index[current_data_index],
             "actual_close": actual_price,
             "hours_since_last_refit": periods_since_refit,
         }
@@ -390,7 +398,7 @@ def objective(trial, data):
 
         periods_since_refit += 1
 
-    results_df = pd.DataFrame(predictions_df_list).set_index("timestamp")
+    results_df = pd.DataFrame(predictions_df_list).set_index(TIMESTAMP_COL)
 
     # Save predictions to a CSV for each trial
     predictions_filename = f"predictions_trial_{trial.number}.csv"

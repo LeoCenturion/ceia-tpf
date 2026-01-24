@@ -52,9 +52,7 @@ class MartingaleStrategy(TrialStrategy):  # pylint: disable=attribute-defined-ou
         }
 
 
-class DelayedMartingaleStrategy(
-    TrialStrategy
-):  # pylint: disable=attribute-defined-outside-init
+class DelayedMartingaleStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
     """
     A delayed Martingale strategy.
 
@@ -115,9 +113,7 @@ class DelayedMartingaleStrategy(
         }
 
 
-class AntiMartingaleStrategy(
-    TrialStrategy
-):  # pylint: disable=attribute-defined-outside-init
+class AntiMartingaleStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
     """
     An anti-Martingale (reverse Martingale) betting strategy.
 
@@ -179,9 +175,7 @@ class AntiMartingaleStrategy(
         }
 
 
-class MartingaleWithTrendFilter(
-    TrialStrategy
-):  # pylint: disable=attribute-defined-outside-init
+class MartingaleWithTrendFilter(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
     """
     A Martingale strategy that uses a moving average as a trend filter.
     It doubles down on positions when the price moves against the trend,

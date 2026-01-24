@@ -164,9 +164,7 @@ class RSIDivergence(TrialStrategy):  # pylint: disable=attribute-defined-outside
         }
 
 
-class MultiIndicatorStrategy(
-    TrialStrategy
-):  # pylint: disable=attribute-defined-outside-init
+class MultiIndicatorStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
     bb_window = 20
     bb_std = 2
     fast_sma_window = 50

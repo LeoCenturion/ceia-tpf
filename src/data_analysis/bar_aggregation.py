@@ -5,6 +5,14 @@ Functions for creating volume, dollar, and price change bars from tick data.
 import argparse
 from typing import Tuple
 import pandas as pd
+from src.constants import (
+    OPEN_COL,
+    HIGH_COL,
+    LOW_COL,
+    CLOSE_COL,
+    VOLUME_COL,
+    TIMESTAMP_COL,
+)
 
 
 def _aggregate_to_bars(
@@ -38,12 +46,12 @@ def _aggregate_to_bars(
 
             bars.append(
                 {
-                    "timestamp": bar_slice["timestamp"].iloc[-1],
-                    "Open": bar_slice["Open"].iloc[0],
-                    "High": bar_slice["High"].max(),
-                    "Low": bar_slice["Low"].min(),
-                    "Close": bar_slice["Close"].iloc[-1],
-                    "Volume": bar_slice["Volume"].sum(),
+                    TIMESTAMP_COL: bar_slice[TIMESTAMP_COL].iloc[-1],
+                    OPEN_COL: bar_slice[OPEN_COL].iloc[0],
+                    HIGH_COL: bar_slice[HIGH_COL].max(),
+                    LOW_COL: bar_slice[LOW_COL].min(),
+                    CLOSE_COL: bar_slice[CLOSE_COL].iloc[-1],
+                    VOLUME_COL: bar_slice[VOLUME_COL].sum(),
                     "Volume USDT": bar_slice["Volume USDT"].sum(),
                     "tradeCount": bar_slice["tradeCount"].sum(),
                 }
@@ -56,8 +64,8 @@ def _aggregate_to_bars(
         return pd.DataFrame()
 
     result_df = pd.DataFrame(bars)
-    if "timestamp" in result_df.columns:
-        result_df = result_df.set_index("timestamp")
+    if TIMESTAMP_COL in result_df.columns:
+        result_df = result_df.set_index(TIMESTAMP_COL)
     return result_df
 
 
@@ -76,7 +84,7 @@ def create_volume_bars(df: pd.DataFrame, volume_threshold: float) -> pd.DataFram
     Returns:
         pd.DataFrame: A DataFrame containing the volume bars with OHLCV data.
     """
-    return _aggregate_to_bars(df, "Volume", volume_threshold)
+    return _aggregate_to_bars(df, VOLUME_COL, volume_threshold)
 
 
 def create_dollar_bars(df: pd.DataFrame, dollar_threshold: float) -> pd.DataFrame:
@@ -117,7 +125,7 @@ def create_price_change_bars(
     """
     df_copy = df.copy()
     # Calculate fractional change, not percentage
-    df_copy["abs_pct_change"] = df_copy["Close"].pct_change().abs()
+    df_copy["abs_pct_change"] = df_copy[CLOSE_COL].pct_change().abs()
     # The first value will be NaN, fill it with 0 so it doesn't break the cumulative sum
     df_copy["abs_pct_change"] = df_copy["abs_pct_change"].fillna(0)
     return _aggregate_to_bars(df_copy, "abs_pct_change", price_change_threshold)
@@ -156,7 +164,7 @@ def main():
 
     # The bar creation functions expect a 'timestamp' column.
     # In the main function, the index is not set, so we check columns.
-    if "timestamp" not in df.columns:
+    if TIMESTAMP_COL not in df.columns:
         print(
             f"Error: Input CSV must contain a 'timestamp' column. Found columns: {df.columns.tolist()}"
         )
@@ -321,8 +329,8 @@ def create_tick_imbalance_bars(
         return pd.DataFrame(), thresholds_series, cumulative_imbalance_series
 
     result_df = pd.DataFrame(bars)
-    if "timestamp" in result_df.columns:
-        result_df = result_df.set_index("timestamp")
+    if TIMESTAMP_COL in result_df.columns:
+        result_df = result_df.set_index(TIMESTAMP_COL)
     return result_df, thresholds_series, cumulative_imbalance_series
 
 
@@ -374,9 +382,7 @@ def create_volume_imbalance_bars(
         initial_bar_volume_estimate = df_reset[volume_col].sum() / 100
 
     # --- Pre-computation for dynamic thresholds ---
-    ewma_tick_imbalances = tick_signs.ewm(
-        span=span_tick_imbalance, adjust=False
-    ).mean()
+    ewma_tick_imbalances = tick_signs.ewm(span=span_tick_imbalance, adjust=False).mean()
 
     # --- EWMA state variables ---
     ewma_bar_volume = float(initial_bar_volume_estimate)
@@ -429,8 +435,8 @@ def create_volume_imbalance_bars(
         return pd.DataFrame(), thresholds_series, cumulative_imbalance_series
 
     result_df = pd.DataFrame(bars)
-    if "timestamp" in result_df.columns:
-        result_df = result_df.set_index("timestamp")
+    if TIMESTAMP_COL in result_df.columns:
+        result_df = result_df.set_index(TIMESTAMP_COL)
     return result_df, thresholds_series, cumulative_imbalance_series
 
 

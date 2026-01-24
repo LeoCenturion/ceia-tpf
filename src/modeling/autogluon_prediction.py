@@ -6,7 +6,11 @@ from autogluon.tabular import TabularPredictor
 from sklearn.metrics import f1_score
 
 from src.data_analysis import fetch_historical_data
-from src.data_analysis.indicators import create_features, create_ao_target, create_price_change_target
+from src.data_analysis.indicators import (
+    create_features,
+    create_ao_target,
+    create_price_change_target,
+)
 
 
 def objective(trial, data):

@@ -11,6 +11,14 @@ import mplfinance as mpf
 
 from src.data_analysis.data_analysis import fetch_historical_data, sma, ewm, std
 from src.data_analysis.indicators import rsi_indicator
+from src.constants import (
+    OPEN_COL,
+    HIGH_COL,
+    LOW_COL,
+    CLOSE_COL,
+    VOLUME_COL,
+    TIMESTAMP_COL,
+)
 
 
 def awesome_oscillator(
@@ -270,9 +278,9 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
     features = pd.DataFrame(index=df.index)
 
     # --- Original features based on percentage changes ---
-    open_pct = df["Open"].pct_change().fillna(0)
-    high_pct = df["High"].pct_change().fillna(0)
-    low_pct = df["Low"].pct_change().fillna(0)
+    open_pct = df[OPEN_COL].pct_change().fillna(0)
+    high_pct = df[HIGH_COL].pct_change().fillna(0)
+    low_pct = df[LOW_COL].pct_change().fillna(0)
     close_pct = df["Close"].pct_change().fillna(0)
     features["pct_change"] = close_pct
     features["RSI_pct"] = rsi_indicator(close_pct, n=14)
@@ -309,14 +317,15 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
 
     # Momentum Indicators
     features["RSI"] = rsi_indicator(df["Close"], n=14)
-    features["AO"] = awesome_oscillator(df["High"], df["Low"])
-    features["WR"] = willr(df["High"], df["Low"], df["Close"])
+    features["AO"] = awesome_oscillator(df[HIGH_COL], df[LOW_COL])
+    features["WR"] = willr(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])
     features["ROC"] = roc(df["Close"])
     features = pd.concat(
-        [features, ultimate_oscillator(df["High"], df["Low"], df["Close"])], axis=1
+        [features, ultimate_oscillator(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])],
+        axis=1,
     )
     features = pd.concat([features, true_strength_index(df["Close"])], axis=1)
-    stoch_price = stochastic_oscillator(df["High"], df["Low"], df["Close"])
+    stoch_price = stochastic_oscillator(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])
     features["Stoch_K"] = stoch_price["%K"]
     features["Stoch_D"] = stoch_price["%D"]
 
@@ -325,11 +334,13 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
     features["MACD"] = macd_price_df["MACD"]
     features["MACD_Signal"] = macd_price_df["Signal"]
     features["MACD_Hist"] = macd_price_df["Hist"]
-    features = pd.concat([features, adx(df["High"], df["Low"], df["Close"])], axis=1)
-    features = pd.concat([features, aroon(df["High"], df["Low"])], axis=1)
-    features["CCI"] = cci(df["High"], df["Low"], df["Close"])
+    features = pd.concat(
+        [features, adx(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])], axis=1
+    )
+    features = pd.concat([features, aroon(df[HIGH_COL], df[LOW_COL])], axis=1)
+    features["CCI"] = cci(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])
     features = pd.concat([features, stc(df["Close"])], axis=1)
-    vortex_df = vortex(df["High"], df["Low"], df["Close"])
+    vortex_df = vortex(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])
     features = pd.concat([features, vortex_df], axis=1)
     if "VTXP_14" in features.columns and "VTXM_14" in features.columns:
         features["VORTEX_diff"] = features["VTXP_14"] - features["VTXM_14"]
@@ -339,7 +350,7 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
     if bbands is not None and not bbands.empty:
         features["BBP"] = bbands.get("BBP_20_2.0")
 
-    keltner = keltner_channels(df["High"], df["Low"], df["Close"])
+    keltner = keltner_channels(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])
     if keltner is not None and not keltner.empty:
         kcu = keltner.get("KCU_20_2.0")
         kcl = keltner.get("KCL_20_2.0")
@@ -347,7 +358,7 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
             kc_range = kcu - kcl
             features["KCP"] = (df["Close"] - kcl) / kc_range.replace(0, np.nan)
 
-    donchian = donchian_channels(df["High"], df["Low"])
+    donchian = donchian_channels(df[HIGH_COL], df[LOW_COL])
     if donchian is not None and not donchian.empty:
         dcu = donchian.get("DCU_20_20")
         dcl = donchian.get("DCL_20_20")
@@ -395,7 +406,7 @@ def create_target_variable(
     """
     if method == "pct_change_std":
         window = 24 * 7
-        close_pct_change = df["Close"].pct_change()
+        close_pct_change = df[CLOSE_COL].pct_change()
         # The target is based on the NEXT period's price change.
         future_pct_change = close_pct_change.shift(-1)
         rolling_std = close_pct_change.rolling(window=window).std()
@@ -407,15 +418,15 @@ def create_target_variable(
 
     if method == "ao_on_pct_change":
         # computing the peaks from the awesome oscillator from the pct_change of the values
-        high_pct = df["High"].pct_change().fillna(0)
-        low_pct = df["Low"].pct_change().fillna(0)
+        high_pct = df[HIGH_COL].pct_change().fillna(0)
+        low_pct = df[LOW_COL].pct_change().fillna(0)
         ao = awesome_oscillator(high_pct, low_pct)
     elif method == "ao_on_price":
         # computing the peaks from the awesome oscillator from the actual price values
-        ao = awesome_oscillator(df["High"], df["Low"])
+        ao = awesome_oscillator(df[HIGH_COL], df[LOW_COL])
     elif method == "pct_change_on_ao":
         # computing the peaks from the pct_change of the awesome oscillator from the actual price values
-        ao_price = awesome_oscillator(df["High"], df["Low"])
+        ao_price = awesome_oscillator(df[HIGH_COL], df[LOW_COL])
         ao = ao_price.pct_change().fillna(0).replace([np.inf, -np.inf], 0)
     else:
         raise ValueError(
@@ -544,7 +555,7 @@ def plot_reversals_on_candlestick(
     Plots a candlestick chart with markers for identified tops and bottoms.
 
     Args:
-        data (pd.DataFrame): The original DataFrame with 'Open', 'High', 'Low', 'Close' prices.
+        data (pd.DataFrame): The original DataFrame with '' + OPEN_COL + '', '' + HIGH_COL + '', '' + LOW_COL + '', '' + CLOSE_COL + '' prices.
         reversal_points (pd.DataFrame): DataFrame containing the identified tops (target=1) and bottoms (target=-1).
         sample_size (int, optional): The number of recent data points to plot. If None, plots the entire series.
     """
@@ -571,9 +582,11 @@ def plot_reversals_on_candlestick(
 
     # Check if there are any tops/bottoms to plot to avoid errors on empty access
     if not top_indices.empty:
-        top_markers.loc[top_indices] = plot_data.loc[top_indices, "High"] * 1.01
+        top_markers.loc[top_indices] = plot_data.loc[top_indices, HIGH_COL] * 1.01
     if not bottom_indices.empty:
-        bottom_markers.loc[bottom_indices] = plot_data.loc[bottom_indices, "Low"] * 0.99
+        bottom_markers.loc[bottom_indices] = (
+            plot_data.loc[bottom_indices, LOW_COL] * 0.99
+        )
 
     # Create addplots for mplfinance
     addplots = [

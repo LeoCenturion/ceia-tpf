@@ -10,6 +10,14 @@ from sklearn.utils.class_weight import compute_class_weight
 import cupy as cp
 from src.data_analysis.data_analysis import fetch_historical_data, sma, ewm, std
 from src.data_analysis.indicators import rsi_indicator
+from src.constants import (
+    OPEN_COL,
+    HIGH_COL,
+    LOW_COL,
+    CLOSE_COL,
+    VOLUME_COL,
+    TIMESTAMP_COL,
+)
 
 # --- Part 1: Data Simulation and Volume Bar Creation ---
 # The paper uses high-frequency data to construct volume bars.
@@ -285,9 +293,9 @@ def aggregate_to_volume_bars(df, volume_threshold=50000):
             # Bar characteristics
             open_time = bar_df.index[0]
             close_time = bar_df.index[-1]
-            open_price = bar_df["Open"].iloc[0]
-            high_price = bar_df["High"].max()
-            low_price = bar_df["Low"].min()
+            open_price = bar_df[OPEN_COL].iloc[0]
+            high_price = bar_df[HIGH_COL].max()
+            low_price = bar_df[LOW_COL].min()
             close_price = bar_df["close"].iloc[-1]
 
             # Calculate intra-bar volatility for labeling (σv)
@@ -370,10 +378,10 @@ def _create_reversal_features(df: pd.DataFrame) -> pd.DataFrame:
     features = pd.DataFrame(index=df.index)
 
     # --- Original features based on percentage changes ---
-    open_pct = df["Open"].pct_change().fillna(0)
-    high_pct = df["High"].pct_change().fillna(0)
-    low_pct = df["Low"].pct_change().fillna(0)
-    close_pct = df["Close"].pct_change().fillna(0)
+    open_pct = df[OPEN_COL].pct_change().fillna(0)
+    high_pct = df[HIGH_COL].pct_change().fillna(0)
+    low_pct = df[LOW_COL].pct_change().fillna(0)
+    close_pct = df[CLOSE_COL].pct_change().fillna(0)
     features["pct_change"] = close_pct
     features["RSI_pct"] = rsi_indicator(close_pct, n=14)
     stoch_pct = stochastic_oscillator(high_pct, low_pct, close_pct)
@@ -383,8 +391,8 @@ def _create_reversal_features(df: pd.DataFrame) -> pd.DataFrame:
     features["MACD_pct"] = macd_pct_df["MACD"]
     features["MACD_Signal_pct"] = macd_pct_df["Signal"]
     features["MACD_Hist_pct"] = macd_pct_df["Hist"]
-    if "Volume" in df.columns:
-        features["MFI_pct"] = mfi(high_pct, low_pct, close_pct, df["Volume"], n=14)
+    if VOLUME_COL in df.columns:
+        features["MFI_pct"] = mfi(high_pct, low_pct, close_pct, df[VOLUME_COL], n=14)
     sma20_pct = sma(close_pct, 20)
     std20_pct = std(close_pct, 20)
     features["BB_Upper_pct"] = sma20_pct + (std20_pct * 2)
@@ -403,64 +411,67 @@ def _create_reversal_features(df: pd.DataFrame) -> pd.DataFrame:
     # --- New features based on raw price data ---
 
     # Volume
-    if "Volume" in df.columns:
-        features["Volume"] = df["Volume"]
-        features["avg_volume_20"] = sma(df["Volume"], 20)
+    if VOLUME_COL in df.columns:
+        features[VOLUME_COL] = df[VOLUME_COL]
+        features["avg_volume_20"] = sma(df[VOLUME_COL], 20)
 
     # Momentum Indicators
-    features["RSI"] = rsi_indicator(df["Close"], n=14)
-    features["AO"] = awesome_oscillator(df["High"], df["Low"])
-    features["WR"] = willr(df["High"], df["Low"], df["Close"])
-    features["ROC"] = roc(df["Close"])
+    features["RSI"] = rsi_indicator(df[CLOSE_COL], n=14)
+    features["AO"] = awesome_oscillator(df[HIGH_COL], df[LOW_COL])
+    features["WR"] = willr(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])
+    features["ROC"] = roc(df[CLOSE_COL])
     features = pd.concat(
-        [features, ultimate_oscillator(df["High"], df["Low"], df["Close"])], axis=1
+        [features, ultimate_oscillator(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])],
+        axis=1,
     )
-    features = pd.concat([features, true_strength_index(df["Close"])], axis=1)
-    stoch_price = stochastic_oscillator(df["High"], df["Low"], df["Close"])
+    features = pd.concat([features, true_strength_index(df[CLOSE_COL])], axis=1)
+    stoch_price = stochastic_oscillator(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])
     features["Stoch_K"] = stoch_price["%K"]
     features["Stoch_D"] = stoch_price["%D"]
 
     # Trend Indicators
-    macd_price_df = macd(df["Close"])
+    macd_price_df = macd(df[CLOSE_COL])
     features["MACD"] = macd_price_df["MACD"]
     features["MACD_Signal"] = macd_price_df["Signal"]
     features["MACD_Hist"] = macd_price_df["Hist"]
-    features = pd.concat([features, adx(df["High"], df["Low"], df["Close"])], axis=1)
-    features = pd.concat([features, aroon(df["High"], df["Low"])], axis=1)
-    features["CCI"] = cci(df["High"], df["Low"], df["Close"])
-    features = pd.concat([features, stc(df["Close"])], axis=1)
-    vortex_df = vortex(df["High"], df["Low"], df["Close"])
+    features = pd.concat(
+        [features, adx(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])], axis=1
+    )
+    features = pd.concat([features, aroon(df[HIGH_COL], df[LOW_COL])], axis=1)
+    features["CCI"] = cci(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])
+    features = pd.concat([features, stc(df[CLOSE_COL])], axis=1)
+    vortex_df = vortex(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])
     features = pd.concat([features, vortex_df], axis=1)
     if "VTXP_14" in features.columns and "VTXM_14" in features.columns:
         features["VORTEX_diff"] = features["VTXP_14"] - features["VTXM_14"]
 
     # Fluctuation Indicators
-    bbands = bollinger_bands(df["Close"])
+    bbands = bollinger_bands(df[CLOSE_COL])
     if bbands is not None and not bbands.empty:
         features["BBP"] = bbands.get("BBP_20_2.0")
 
-    keltner = keltner_channels(df["High"], df["Low"], df["Close"])
+    keltner = keltner_channels(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])
     if keltner is not None and not keltner.empty:
         kcu = keltner.get("KCU_20_2.0")
         kcl = keltner.get("KCL_20_2.0")
         if kcu is not None and kcl is not None:
             kc_range = kcu - kcl
-            features["KCP"] = (df["Close"] - kcl) / kc_range.replace(0, np.nan)
+            features["KCP"] = (df[CLOSE_COL] - kcl) / kc_range.replace(0, np.nan)
 
-    donchian = donchian_channels(df["High"], df["Low"])
+    donchian = donchian_channels(df[HIGH_COL], df[LOW_COL])
     if donchian is not None and not donchian.empty:
         dcu = donchian.get("DCU_20_20")
         dcl = donchian.get("DCL_20_20")
         if dcu is not None and dcl is not None:
             dc_range = dcu - dcl
-            features["DCP"] = (df["Close"] - dcl) / dc_range.replace(0, np.nan)
+            features["DCP"] = (df[CLOSE_COL] - dcl) / dc_range.replace(0, np.nan)
 
     # EMA features
     emas = [10, 15, 20, 30, 40, 50, 60]
     for e in emas:
-        features[f"above_ema_{e}"] = (df["Close"] > ewm(df["Close"], span=e)).astype(
-            int
-        )
+        features[f"above_ema_{e}"] = (
+            df[CLOSE_COL] > ewm(df[CLOSE_COL], span=e)
+        ).astype(int)
 
     # Consecutive run feature
     signs = np.sign(close_pct)
@@ -494,11 +505,11 @@ def create_features(df):
     # Add features from xgboost_price_reversal.py
     # Create a temporary df with standard column names for feature functions
     temp_df_for_features = pd.DataFrame(index=df.index)
-    temp_df_for_features["Open"] = df["open_price"]
-    temp_df_for_features["High"] = df["High"]
-    temp_df_for_features["Low"] = df["Low"]
-    temp_df_for_features["Close"] = df["close_price"]
-    temp_df_for_features["Volume"] = df["total_volume"]
+    temp_df_for_features[OPEN_COL] = df["open_price"]
+    temp_df_for_features[HIGH_COL] = df["High"]
+    temp_df_for_features[LOW_COL] = df["Low"]
+    temp_df_for_features[CLOSE_COL] = df["close_price"]
+    temp_df_for_features[VOLUME_COL] = df["total_volume"]
 
     reversal_features = _create_reversal_features(temp_df_for_features)
 
@@ -746,7 +757,7 @@ def main():
     )
     # The aggregate_to_volume_bars function expects 'close' and 'volume' columns.
     # fetch_historical_data returns 'Close' and 'Volume', so we rename them.
-    minute_data.rename(columns={"Close": "close", "Volume": "volume"}, inplace=True)
+    minute_data.rename(columns={CLOSE_COL: "close", VOLUME_COL: "volume"}, inplace=True)
     # print(minute_data)
     # 2. Setup and Run Optuna Study
     db_file_name = "optuna-study"

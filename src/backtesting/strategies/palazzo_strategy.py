@@ -86,9 +86,7 @@ def create_features(df):
     return df
 
 
-class XGBoostPriceReversalPalazzoStrategy(
-    Strategy
-):  # pylint: disable=attribute-defined-outside-init
+class XGBoostPriceReversalPalazzoStrategy(Strategy):  # pylint: disable=attribute-defined-outside-init
     # Default Hyperparameters (to be tuned by Optuna)
     volume_threshold = 37798
     tau = 1.2688331479071624

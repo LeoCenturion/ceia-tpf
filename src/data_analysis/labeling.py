@@ -1,4 +1,5 @@
 """Functions for creating labels for machine learning models in finance."""
+
 import numpy as np
 import pandas as pd
 

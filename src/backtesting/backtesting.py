@@ -1,4 +1,5 @@
 """Backtesting framework with Optuna optimization and MLflow logging."""
+
 import os
 import re
 import itertools
@@ -10,7 +11,7 @@ import pandas as pd
 from backtesting import Backtest, Strategy
 from sklearn.metrics import f1_score
 from sklearn.model_selection import KFold
-from abc import  abstractmethod
+from abc import abstractmethod
 from src.data_analysis import (
     adjust_data_to_ubtc,
     fetch_historical_data,
@@ -54,6 +55,7 @@ class TrialStrategy(Strategy):
     @abstractmethod
     def next(self):
         pass
+
 
 def sanitize_metric_name(name):
     """Sanitize metric name to be MLflow compliant."""
@@ -297,7 +299,6 @@ def run_classification_optimizations(  # pylint: disable=too-many-arguments
             print(f"Optimization for {name} complete.")
 
 
-
 def combinatorial_symmetric_cv(performance_matrix: pd.DataFrame, S: int = 16):
     """
     Calculates the Probability of Backtest Overfitting (PBO) using combinatorial
@@ -336,8 +337,7 @@ def combinatorial_symmetric_cv(performance_matrix: pd.DataFrame, S: int = 16):
 
     block_size = T // S
     blocks = [
-        performance_matrix.iloc[i * block_size : (i + 1) * block_size]
-        for i in range(S)
+        performance_matrix.iloc[i * block_size : (i + 1) * block_size] for i in range(S)
     ]
 
     # Step 2: Generate Combinations
@@ -384,8 +384,6 @@ def combinatorial_symmetric_cv(performance_matrix: pd.DataFrame, S: int = 16):
 
     # Step 4: Aggregate and Calculate PBO
     omega_values = np.array(omega_values)
-    pbo = (
-        np.sum(omega_values < 0.5) / len(omega_values) if len(omega_values) > 0 else 0
-    )
+    pbo = np.sum(omega_values < 0.5) / len(omega_values) if len(omega_values) > 0 else 0
 
     return pbo, omega_values

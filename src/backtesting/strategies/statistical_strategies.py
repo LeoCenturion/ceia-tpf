@@ -245,9 +245,7 @@ class SARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outsid
         }
 
 
-class KalmanARIMAStrategy(
-    TrialStrategy
-):  # pylint: disable=attribute-defined-outside-init
+class KalmanARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
     p = 12
     d = 0
     q = 12
@@ -364,9 +362,7 @@ def main():
     )
 
 
-class ARIMAXGARCHStrategy(
-    TrialStrategy
-):  # pylint: disable=attribute-defined-outside-init
+class ARIMAXGARCHStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
     # ARIMAX params
     p, d, q = 5, 1, 0
     # GARCH params
