@@ -12,7 +12,7 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score
 from statsmodels.tsa.stattools import adfuller
-
+from sklearn.metrics import log_loss, f1_score
 from src.data_analysis.bar_aggregation import create_dollar_bars
 from src.data_analysis.data_analysis import fetch_historical_data
 from src.data_analysis.indicators import create_features
@@ -60,7 +60,7 @@ def frac_diff_ffd(series, d, thres=1e-5):
     df = {}
     for name in series.columns:
         series_f = series[name].ffill().dropna()
-        df_ = pd.Series(0, index=series_f.index, name=name)
+        df_ = pd.Series(0.0, index=series_f.index, name=name)
 
         for i in range(width, series_f.shape[0]):
             loc0, loc1 = series_f.index[i - width], series_f.index[i]
@@ -109,12 +109,14 @@ def step_2_feature_engineering(bars):
 
     # Orthogonalize features using PCA
     pca = PCA()
-    orthogonal_features = pca.fit_transform(stationary_features)
+    orthogonal_features_data = pca.fit_transform(stationary_features)
     orthogonal_features = pd.DataFrame(
-        orthogonal_features, index=stationary_features.index
+        orthogonal_features_data,
+        index=stationary_features.index,
+        columns=[f"PC{i+1}" for i in range(orthogonal_features_data.shape[1])],
     )
 
-    return orthogonal_features
+    return features, orthogonal_features, pca
 
 
 # Step 3: Labeling and Weighting
@@ -190,7 +192,23 @@ def get_num_co_events(close_idx, t1, molecule):
     t1 = t1.fillna(close_idx[-1])
     t1 = t1[t1.index.isin(molecule)]
     t1 = t1.loc[molecule]
-    count = pd.Series(0, index=close_idx[t1.index[0] : t1.max()])
+    # count = pd.Series(0, index=close_idx[t1.index[0] : t1.max()])
+    
+    # Use searchsorted to find integer locations for slicing the DatetimeIndex
+    idx_start = close_idx.searchsorted(t1.index[0])
+    idx_end = close_idx.searchsorted(t1.max())
+    
+    # Create the series using the sliced index
+    # We add 1 to idx_end to include the end timestamp in the slice, mimicking inclusive slicing if needed,
+    # or adjust based on exact requirements. searchsorted returns the insertion point.
+    # If t1.max() is in close_idx, searchsorted returns its index (if side='left' which is default).
+    # We want to include the range up to t1.max().
+    
+    # If the exact timestamp t1.max() exists, we want to include it.
+    if idx_end < len(close_idx) and close_idx[idx_end] == t1.max():
+         idx_end += 1
+         
+    count = pd.Series(0, index=close_idx[idx_start:idx_end])
     for t_in, t_out in t1.items():
         count.loc[t_in:t_out] += 1
     return count.loc[molecule]
@@ -259,7 +277,7 @@ def machine_learning_cycle(raw_tick_data, model, config):
     bars = step_1_data_structuring(raw_tick_data, config["dollar_threshold"])
 
     # Step 2: Feature Engineering
-    orthogonal_features = step_2_feature_engineering(bars)
+    features, orthogonal_features, pca = step_2_feature_engineering(bars)
 
     # Step 3: Labeling and Weighting
     labels, sample_weights = step_3_labeling_and_weighting(bars, config)
@@ -295,7 +313,167 @@ def machine_learning_cycle(raw_tick_data, model, config):
         from sklearn.metrics import f1_score
         scores.append(f1_score(y_test, y_pred, average="weighted"))
 
-    return model, scores
+    # Fit the model on the entire dataset for feature importance analysis
+    model.fit(X, y, sample_weight=sample_weights_series.values)
+
+    return model, scores, X, y, sample_weights_series, t1_series, features, pca
+
+
+def feature_importance_mdi(model, X, y):
+    """
+    Mean Decrease Impurity (MDI) feature importance.
+    Trains a new RandomForestClassifier with max_features=1 to avoid masking effects.
+    """
+    # Use a new model with the specified max_features
+    mdi_model = RandomForestClassifier(
+        n_estimators=model.n_estimators,
+        max_features=1,  # Key change for López de Prado's method
+        random_state=model.random_state,
+        n_jobs=model.n_jobs,
+    )
+    mdi_model.fit(X, y)
+
+    importances = pd.Series(mdi_model.feature_importances_, index=X.columns, name="MDI")
+    return importances.sort_values(ascending=False)
+
+
+def _get_mda_score_for_feature(
+    model, X_test, y_test, col, base_score, scorer, sample_weights
+):
+    """Helper for MDA: Permutes a single column and returns the score difference."""
+    X_test_permuted = X_test.copy()
+    np.random.shuffle(X_test_permuted[col].values)
+
+    y_pred_permuted = (
+        model.predict_proba(X_test_permuted)
+        if scorer == log_loss
+        else model.predict(X_test_permuted)
+    )
+    permuted_score = scorer(y_test, y_pred_permuted, sample_weight=sample_weights)
+
+    return base_score - permuted_score
+
+
+def feature_importance_mda(model, X, y, cv, sample_weights, t1, scoring="neg_log_loss"):
+    """
+    Mean Decrease Accuracy (MDA) feature importance using PurgedKFold.
+    The permutation of features is parallelized.
+    """
+    if scoring == "neg_log_loss":
+        scorer = log_loss
+    else:
+        # Assuming f1_score with "weighted" average
+        scorer = lambda y_true, y_pred, sample_weight: f1_score(
+            y_true, y_pred, average="weighted", sample_weight=sample_weight
+        )
+
+    fold_importances = []
+    for train_idx, test_idx in cv.split(X, y, groups=t1):
+        X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+        y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+        sample_weight_train = sample_weights.iloc[train_idx]
+        sample_weight_test = sample_weights.iloc[test_idx]
+
+        model.fit(X_train, y_train, sample_weight=sample_weight_train.values)
+        y_pred = (
+            model.predict_proba(X_test) if scorer == log_loss else model.predict(X_test)
+        )
+
+        base_score = scorer(y_test, y_pred, sample_weight=sample_weight_test.values)
+
+        # Sequential evaluation of each feature to avoid multiprocessing issues
+        feature_scores = []
+        for col in X.columns:
+            score = _get_mda_score_for_feature(
+                model,
+                X_test,
+                y_test,
+                col,
+                base_score,
+                scorer,
+                sample_weight_test.values,
+            )
+            feature_scores.append(score)
+
+        fold_importances.append(pd.Series(feature_scores, index=X.columns))
+
+    # Average importance across all folds
+    importances = pd.concat(fold_importances, axis=1).mean(axis=1)
+
+    # Add the full model score for reference (using the last fold's base score)
+    importances.loc["full_model"] = base_score
+
+    return importances.sort_values(ascending=False)
+
+
+def _run_sfi_for_feature(model, X, y, col, cv, sample_weights, t1):
+    """Helper for SFI: Runs a full CV for a single feature."""
+    scores = []
+    for train_idx, test_idx in cv.split(X, y, groups=t1):
+        X_train, X_test = X[[col]].iloc[train_idx], X[[col]].iloc[test_idx]
+        y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+        sample_weight_train = sample_weights.iloc[train_idx]
+
+        model.fit(X_train, y_train, sample_weight=sample_weight_train.values)
+        y_pred = model.predict(X_test)
+
+        score = f1_score(y_test, y_pred, average="weighted")
+        scores.append(score)
+    return np.mean(scores)
+
+
+def feature_importance_sfi(model, X, y, cv, sample_weights, t1, scoring="f1_weighted"):
+    """
+    Single Feature Importance (SFI) using PurgedKFold.
+    """
+    # Sequential evaluation of each feature
+    scores = []
+    for col in X.columns:
+        score = _run_sfi_for_feature(model, X, y, col, cv, sample_weights, t1)
+        scores.append(score)
+
+    importances = pd.Series(scores, index=X.columns)
+    return importances.sort_values(ascending=False)
+
+
+def feature_importance_orthogonal(model, X_ortho, y, sample_weights, pca):
+    """
+    Feature importance on orthogonal features (PCA components).
+    """
+    model.fit(X_ortho, y, sample_weight=sample_weights.values)
+    importances_ortho = pd.Series(
+        model.feature_importances_, index=X_ortho.columns, name="Orthogonal Importance"
+    )
+
+    # Combine with PCA explained variance
+    explained_variance = pd.Series(
+        pca.explained_variance_ratio_, index=X_ortho.columns, name="Explained Variance"
+    )
+
+    results = pd.concat([importances_ortho, explained_variance], axis=1)
+    results = results.sort_values(by="Orthogonal Importance", ascending=False)
+
+    return results
+
+
+from scipy.stats import weightedtau
+
+def weighted_kendalls_tau(series1, series2):
+    """
+    Computes the weighted Kendall's tau rank correlation between two series.
+    """
+    # Align the two series by their index
+    aligned_s1, aligned_s2 = series1.align(series2, join="inner")
+
+    if aligned_s1.empty or aligned_s2.empty:
+        return np.nan, np.nan
+
+        # Scipy's weightedtau computes the weighted correlation.
+        # By default, it uses a linear weighting scheme where disagreements
+        # at the top of the rank are penalized more heavily.
+    correlation, p_value = weightedtau(aligned_s1, aligned_s2)
+
+    return correlation, p_value
 
 
 def main():
@@ -333,12 +511,58 @@ def main():
         "pct_embargo": 0.01,
     }
 
-    trained_model, scores = machine_learning_cycle(raw_tick_data, model, config)
+    trained_model, scores, X, y, sample_weights, t1, features, pca = machine_learning_cycle(raw_tick_data, model, config)
 
     print(f"Model: {trained_model}")
     print(f"Cross-validation F1 scores: {scores}")
     print(f"Average F1 score: {np.mean(scores)}")
 
+    # --- Feature Importance Analysis ---
+    print("\n--- Feature Importance Analysis ---")
+
+    # Get PurgedKFold for MDA and SFI
+    cv = PurgedKFold(
+        n_splits=config["n_splits"], t1=t1, pct_embargo=config["pct_embargo"]
+    )
+
+    # 1. Mean Decrease Impurity (MDI) - on original features for interpretability
+    # Use features.loc[X.index] to ensure we only use rows that survived alignment
+    # Note: MDI is strictly for the *trained* model, which uses *orthogonal* features (X).
+    # If we want MDI on *original* features, we'd need to retrain a model on them.
+    # The previous code implied we could just pass features, but MDI comes from the tree structure
+    # built on X (orthogonal). So MDI here is technically on Principal Components.
+    # If we want MDI on original features, we must fit a new model on them.
+    print("\n1. Mean Decrease Impurity (MDI) on orthogonal features (PCs):")
+    mdi_importance = feature_importance_mdi(trained_model, X, y)
+    print(mdi_importance)
+
+    # 2. Mean Decrease Accuracy (MDA) - on orthogonal features
+    print("\n2. Mean Decrease Accuracy (MDA) on orthogonal features:")
+    mda_importance = feature_importance_mda(trained_model, X, y, cv, sample_weights, t1)
+    print(mda_importance)
+
+    # 3. Single Feature Importance (SFI) - on original features for interpretability
+    # SFI is great because we can check each original feature independently.
+    print("\n3. Single Feature Importance (SFI) on original features:")
+    sfi_importance = feature_importance_sfi(
+        trained_model, features.loc[X.index], y, cv, sample_weights, t1
+    )
+    print(sfi_importance)
+
+    # 4. Orthogonal Feature Importance
+    print("\n4. Orthogonal Feature Importance (PCA-based):")
+    ortho_importance = feature_importance_orthogonal(
+        trained_model, X, y, sample_weights, pca
+    )
+    print(ortho_importance)
+
+    # 5. Rank Correlation between ML Importance and PCA Eigenvalues
+    ml_importance = ortho_importance["Orthogonal Importance"]
+    eigen_importance = ortho_importance["Explained Variance"]
+
+    tau, p_value = weighted_kendalls_tau(ml_importance, eigen_importance)
+    print("\n5. Weighted Kendall's Tau between ML Importance and PCA Eigenvalues:")
+    print(f"Correlation: {tau:.4f} (p-value: {p_value:.4f})")
 
 if __name__ == "__main__":
     main()
