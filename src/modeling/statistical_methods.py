@@ -1,11 +1,12 @@
 import os
 import sys
+import time
+from functools import wraps
 
 # Make the script runnable from anywhere
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
-
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
@@ -26,8 +27,23 @@ from src.constants import (
     TIMESTAMP_COL,
 )
 
+
+def timer(func):
+    """Decorator that prints the execution time of the function it decorates."""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        end_time = time.perf_counter()
+        duration = end_time - start_time
+        print(f"\n>>> Function '{func.__name__}' executed in {duration:.4f} seconds")
+        return result
+    return wrapper
+
+
 # Part I: Data Analysis
 # Step 1: Data Structuring
+@timer
 def step_1_data_structuring(raw_tick_data, dollar_threshold):
     """
     Generate information-driven bars (Dollar Bars).
@@ -95,6 +111,7 @@ def find_minimum_d(series):
     return 1.0
 
 
+@timer
 def step_2_feature_engineering(bars):
     """
     Create features, make them stationary, and orthogonalize them.
@@ -237,6 +254,7 @@ def get_sample_weights(t1, num_co_events, close):
     return weights
 
 
+@timer
 def step_3_labeling_and_weighting(bars, config):
     """
     Apply Triple-Barrier method, compute uniqueness, and sample weights.
@@ -268,6 +286,7 @@ def step_3_labeling_and_weighting(bars, config):
 
 
 # Part II: Modeling
+@timer
 def machine_learning_cycle(raw_tick_data, model, config):
     """
     Execute the full machine learning pipeline.
@@ -319,6 +338,7 @@ def machine_learning_cycle(raw_tick_data, model, config):
     return model, scores, X, y, sample_weights_series, t1_series, features, pca
 
 
+@timer
 def feature_importance_mdi(model, X, y):
     """
     Mean Decrease Impurity (MDI) feature importance.
@@ -338,7 +358,7 @@ def feature_importance_mdi(model, X, y):
 
 
 def _get_mda_score_for_feature(
-    model, X_test, y_test, col, base_score, scorer, sample_weights
+    model, X_test, y_test, col, base_score, scorer, sample_weights, labels=None
 ):
     """Helper for MDA: Permutes a single column and returns the score difference."""
     X_test_permuted = X_test.copy()
@@ -349,11 +369,16 @@ def _get_mda_score_for_feature(
         if scorer == log_loss
         else model.predict(X_test_permuted)
     )
-    permuted_score = scorer(y_test, y_pred_permuted, sample_weight=sample_weights)
+    
+    if scorer == log_loss and labels is not None:
+        permuted_score = scorer(y_test, y_pred_permuted, sample_weight=sample_weights, labels=labels)
+    else:
+        permuted_score = scorer(y_test, y_pred_permuted, sample_weight=sample_weights)
 
     return base_score - permuted_score
 
 
+@timer
 def feature_importance_mda(model, X, y, cv, sample_weights, t1, scoring="neg_log_loss"):
     """
     Mean Decrease Accuracy (MDA) feature importance using PurgedKFold.
@@ -363,7 +388,7 @@ def feature_importance_mda(model, X, y, cv, sample_weights, t1, scoring="neg_log
         scorer = log_loss
     else:
         # Assuming f1_score with "weighted" average
-        scorer = lambda y_true, y_pred, sample_weight: f1_score(
+        scorer = lambda y_true, y_pred, sample_weight, labels=None: f1_score(
             y_true, y_pred, average="weighted", sample_weight=sample_weight
         )
 
@@ -375,11 +400,18 @@ def feature_importance_mda(model, X, y, cv, sample_weights, t1, scoring="neg_log
         sample_weight_test = sample_weights.iloc[test_idx]
 
         model.fit(X_train, y_train, sample_weight=sample_weight_train.values)
+        
+        # Capture classes from the trained model
+        labels = model.classes_
+
         y_pred = (
             model.predict_proba(X_test) if scorer == log_loss else model.predict(X_test)
         )
 
-        base_score = scorer(y_test, y_pred, sample_weight=sample_weight_test.values)
+        if scorer == log_loss:
+             base_score = scorer(y_test, y_pred, sample_weight=sample_weight_test.values, labels=labels)
+        else:
+             base_score = scorer(y_test, y_pred, sample_weight=sample_weight_test.values)
 
         # Sequential evaluation of each feature to avoid multiprocessing issues
         feature_scores = []
@@ -392,6 +424,7 @@ def feature_importance_mda(model, X, y, cv, sample_weights, t1, scoring="neg_log
                 base_score,
                 scorer,
                 sample_weight_test.values,
+                labels=labels if scorer == log_loss else None
             )
             feature_scores.append(score)
 
@@ -422,6 +455,7 @@ def _run_sfi_for_feature(model, X, y, col, cv, sample_weights, t1):
     return np.mean(scores)
 
 
+@timer
 def feature_importance_sfi(model, X, y, cv, sample_weights, t1, scoring="f1_weighted"):
     """
     Single Feature Importance (SFI) using PurgedKFold.
@@ -436,6 +470,7 @@ def feature_importance_sfi(model, X, y, cv, sample_weights, t1, scoring="f1_weig
     return importances.sort_values(ascending=False)
 
 
+@timer
 def feature_importance_orthogonal(model, X_ortho, y, sample_weights, pca):
     """
     Feature importance on orthogonal features (PCA components).
@@ -483,7 +518,7 @@ def main():
     raw_tick_data = fetch_historical_data(
         symbol="BTC/USDT",
         timeframe="1m",
-        start_date="2025-09-01T00:00:00Z",
+        start_date="2025-01-01T00:00:00Z",
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv",
     )
 
