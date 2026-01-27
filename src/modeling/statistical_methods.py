@@ -30,6 +30,7 @@ from src.constants import (
 
 def timer(func):
     """Decorator that prints the execution time of the function it decorates."""
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         start_time = time.perf_counter()
@@ -38,6 +39,7 @@ def timer(func):
         duration = end_time - start_time
         print(f"\n>>> Function '{func.__name__}' executed in {duration:.4f} seconds")
         return result
+
     return wrapper
 
 
@@ -67,6 +69,7 @@ def get_weights_ffd(d, thres):
     return np.array(w[::-1]).reshape(-1, 1)
 
 
+@timer
 def frac_diff_ffd(series, d, thres=1e-5):
     """
     Fractional differentiation with fixed-width window.
@@ -88,9 +91,11 @@ def frac_diff_ffd(series, d, thres=1e-5):
     return df
 
 
+@timer
 def find_minimum_d(series):
     """
     Find minimum d for stationarity using ADF test.
+    Returns optimal d and the differentiated series.
     """
     for d in np.linspace(0, 1, 11):
         d_series_df = frac_diff_ffd(series, d, thres=1e-5).dropna()
@@ -107,8 +112,11 @@ def find_minimum_d(series):
                 break  # This d is not sufficient, try the next one
 
         if all_stationary:
-            return d  # Found a d that makes all columns stationary
-    return 1.0
+            return d, d_series_df  # Found a d that makes all columns stationary
+
+    # Fallback to d=1.0
+    d_series_df = frac_diff_ffd(series, 1.0, thres=1e-5).dropna()
+    return 1.0, d_series_df
 
 
 @timer
@@ -120,9 +128,9 @@ def step_2_feature_engineering(bars):
     features = features.dropna()
 
     # Fractional differentiation to reach stationarity
-    d_star = find_minimum_d(features)
-    stationary_features = frac_diff_ffd(features, d_star)
-    stationary_features = stationary_features.dropna()
+    # find_minimum_d now returns the d value AND the differentiated series
+    d_star, stationary_features = find_minimum_d(features)
+    print(f"Fractional differentiation to reach stationarity {d_star}")
 
     # Orthogonalize features using PCA
     pca = PCA()
@@ -130,7 +138,7 @@ def step_2_feature_engineering(bars):
     orthogonal_features = pd.DataFrame(
         orthogonal_features_data,
         index=stationary_features.index,
-        columns=[f"PC{i+1}" for i in range(orthogonal_features_data.shape[1])],
+        columns=[f"PC{i + 1}" for i in range(orthogonal_features_data.shape[1])],
     )
 
     return features, orthogonal_features, pca
@@ -166,7 +174,7 @@ def get_events(close, t_events, pt_sl, target, min_ret, t1=None):
     Get Triple-Barrier events.
     """
     # Align target index with t_events index
-    target = target.reindex(t_events, method='ffill')
+    target = target.reindex(t_events, method="ffill")
     target = target.loc[t_events]
     target = target[target > min_ret]
     if t1 is None:
@@ -210,21 +218,21 @@ def get_num_co_events(close_idx, t1, molecule):
     t1 = t1[t1.index.isin(molecule)]
     t1 = t1.loc[molecule]
     # count = pd.Series(0, index=close_idx[t1.index[0] : t1.max()])
-    
+
     # Use searchsorted to find integer locations for slicing the DatetimeIndex
     idx_start = close_idx.searchsorted(t1.index[0])
     idx_end = close_idx.searchsorted(t1.max())
-    
+
     # Create the series using the sliced index
     # We add 1 to idx_end to include the end timestamp in the slice, mimicking inclusive slicing if needed,
     # or adjust based on exact requirements. searchsorted returns the insertion point.
     # If t1.max() is in close_idx, searchsorted returns its index (if side='left' which is default).
     # We want to include the range up to t1.max().
-    
+
     # If the exact timestamp t1.max() exists, we want to include it.
     if idx_end < len(close_idx) and close_idx[idx_end] == t1.max():
-         idx_end += 1
-         
+        idx_end += 1
+
     count = pd.Series(0, index=close_idx[idx_start:idx_end])
     for t_in, t_out in t1.items():
         count.loc[t_in:t_out] += 1
@@ -330,6 +338,7 @@ def machine_learning_cycle(raw_tick_data, model, config):
 
         # Calculate F1 score for the current fold
         from sklearn.metrics import f1_score
+
         scores.append(f1_score(y_test, y_pred, average="weighted"))
 
     # Fit the model on the entire dataset for feature importance analysis
@@ -369,9 +378,11 @@ def _get_mda_score_for_feature(
         if scorer == log_loss
         else model.predict(X_test_permuted)
     )
-    
+
     if scorer == log_loss and labels is not None:
-        permuted_score = scorer(y_test, y_pred_permuted, sample_weight=sample_weights, labels=labels)
+        permuted_score = scorer(
+            y_test, y_pred_permuted, sample_weight=sample_weights, labels=labels
+        )
     else:
         permuted_score = scorer(y_test, y_pred_permuted, sample_weight=sample_weights)
 
@@ -400,7 +411,7 @@ def feature_importance_mda(model, X, y, cv, sample_weights, t1, scoring="neg_log
         sample_weight_test = sample_weights.iloc[test_idx]
 
         model.fit(X_train, y_train, sample_weight=sample_weight_train.values)
-        
+
         # Capture classes from the trained model
         labels = model.classes_
 
@@ -409,9 +420,11 @@ def feature_importance_mda(model, X, y, cv, sample_weights, t1, scoring="neg_log
         )
 
         if scorer == log_loss:
-             base_score = scorer(y_test, y_pred, sample_weight=sample_weight_test.values, labels=labels)
+            base_score = scorer(
+                y_test, y_pred, sample_weight=sample_weight_test.values, labels=labels
+            )
         else:
-             base_score = scorer(y_test, y_pred, sample_weight=sample_weight_test.values)
+            base_score = scorer(y_test, y_pred, sample_weight=sample_weight_test.values)
 
         # Sequential evaluation of each feature to avoid multiprocessing issues
         feature_scores = []
@@ -424,7 +437,7 @@ def feature_importance_mda(model, X, y, cv, sample_weights, t1, scoring="neg_log
                 base_score,
                 scorer,
                 sample_weight_test.values,
-                labels=labels if scorer == log_loss else None
+                labels=labels if scorer == log_loss else None,
             )
             feature_scores.append(score)
 
@@ -493,6 +506,7 @@ def feature_importance_orthogonal(model, X_ortho, y, sample_weights, pca):
 
 from scipy.stats import weightedtau
 
+
 def weighted_kendalls_tau(series1, series2):
     """
     Computes the weighted Kendall's tau rank correlation between two series.
@@ -518,7 +532,8 @@ def main():
     raw_tick_data = fetch_historical_data(
         symbol="BTC/USDT",
         timeframe="1m",
-        start_date="2025-01-01T00:00:00Z",
+        start_date="2025-06-01T00:00:00Z",
+        end_date="2025-09-01T00:00:00Z",
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv",
     )
 
@@ -546,7 +561,9 @@ def main():
         "pct_embargo": 0.01,
     }
 
-    trained_model, scores, X, y, sample_weights, t1, features, pca = machine_learning_cycle(raw_tick_data, model, config)
+    trained_model, scores, X, y, sample_weights, t1, features, pca = (
+        machine_learning_cycle(raw_tick_data, model, config)
+    )
 
     print(f"Model: {trained_model}")
     print(f"Cross-validation F1 scores: {scores}")
@@ -598,6 +615,7 @@ def main():
     tau, p_value = weighted_kendalls_tau(ml_importance, eigen_importance)
     print("\n5. Weighted Kendall's Tau between ML Importance and PCA Eigenvalues:")
     print(f"Correlation: {tau:.4f} (p-value: {p_value:.4f})")
+
 
 if __name__ == "__main__":
     main()
