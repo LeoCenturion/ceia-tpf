@@ -13,6 +13,7 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score
 from sklearn.metrics import log_loss, f1_score
+from sklearn.base import clone
 from statsmodels.tsa.stattools import adfuller
 from joblib import Parallel, delayed, cpu_count
 
@@ -71,25 +72,51 @@ def get_weights_ffd(d, thres):
     return np.array(w[::-1]).reshape(-1, 1)
 
 
-@timer
-def frac_diff_ffd(series, d, thres=1e-5):
+def _frac_diff_ffd_batch(df_chunk, w, width):
     """
-    Fractional differentiation with fixed-width window.
+    Helper to apply fractional differentiation on a batch of columns.
     """
-    w = get_weights_ffd(d, thres)
-    width = len(w) - 1
-    df = {}
-    for name in series.columns:
-        series_f = series[name].ffill().dropna()
+    df_batch = {}
+    for name in df_chunk.columns:
+        series_f = df_chunk[name].ffill().dropna()
         df_ = pd.Series(0.0, index=series_f.index, name=name)
 
         for i in range(width, series_f.shape[0]):
             loc0, loc1 = series_f.index[i - width], series_f.index[i]
-            if not np.isfinite(series.loc[loc1, name]):
+            if not np.isfinite(df_chunk.loc[loc1, name]):
                 continue
             df_[loc1] = np.dot(w.T, series_f.loc[loc0:loc1])[0]
-        df[name] = df_.copy(deep=True)
-    df = pd.concat(df, axis=1)
+        df_batch[name] = df_.copy(deep=True)
+
+    if not df_batch:
+        return pd.DataFrame()
+
+    return pd.concat(df_batch, axis=1)
+
+
+@timer
+def frac_diff_ffd(series, d, thres=1e-5):
+    """
+    Fractional differentiation with fixed-width window.
+    Parallelized with column batching.
+    """
+    w = get_weights_ffd(d, thres)
+    width = len(w) - 1
+
+    n_jobs = cpu_count()
+    columns = series.columns
+    n_batches = min(n_jobs, len(columns))
+
+    if n_batches < 1:
+        return pd.DataFrame(index=series.index)
+
+    col_chunks = np.array_split(columns, n_batches)
+
+    batch_results = Parallel(n_jobs=n_jobs)(
+        delayed(_frac_diff_ffd_batch)(series[chunk], w, width) for chunk in col_chunks
+    )
+
+    df = pd.concat(batch_results, axis=1)
     return df
 
 
@@ -111,6 +138,7 @@ def _check_stationarity_batch(df_chunk):
         except Exception:
             results.append(False)
     return results
+
 
 @timer
 def find_minimum_d(series):
@@ -162,6 +190,7 @@ def orthogonalize_pca(stationary_features):
     )
     return orthogonal_features, pca
 
+
 @timer
 def step_2_feature_engineering(bars):
     """
@@ -174,7 +203,6 @@ def step_2_feature_engineering(bars):
     # find_minimum_d now returns the d value AND the differentiated series
     d_star, stationary_features = find_minimum_d(features)
     print(f"Fractional differentiation to reach stationarity {d_star}")
-
 
     orthogonal_features, pca = orthogonalize_pca(stationary_features)
     return features, orthogonal_features, pca
@@ -509,10 +537,13 @@ def feature_importance_sfi(model, X, y, cv, sample_weights, t1, scoring="f1_weig
     """
     Single Feature Importance (SFI) using PurgedKFold.
     """
+    # Use a clean, unfitted model for each feature to avoid pickling overhead and state leakage
+    base_model = clone(model)
+    
     # Sequential evaluation of each feature
     scores = []
     for col in X.columns:
-        score = _run_sfi_for_feature(model, X, y, col, cv, sample_weights, t1)
+        score = _run_sfi_for_feature(base_model, X, y, col, cv, sample_weights, t1)
         scores.append(score)
 
     importances = pd.Series(scores, index=X.columns)
@@ -569,7 +600,7 @@ def main():
         symbol="BTC/USDT",
         timeframe="1m",
         start_date="2025-06-01T00:00:00Z",
-        end_date="2025-09-01T00:00:00Z",
+        end_date="2025-08-01T00:00:00Z",
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv",
     )
 
