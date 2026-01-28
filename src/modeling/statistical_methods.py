@@ -12,8 +12,10 @@ import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score
-from statsmodels.tsa.stattools import adfuller
 from sklearn.metrics import log_loss, f1_score
+from statsmodels.tsa.stattools import adfuller
+from joblib import Parallel, delayed, cpu_count
+
 from src.data_analysis.bar_aggregation import create_dollar_bars
 from src.data_analysis.data_analysis import fetch_historical_data
 from src.data_analysis.indicators import create_features
@@ -92,32 +94,73 @@ def frac_diff_ffd(series, d, thres=1e-5):
 
 
 @timer
+def _check_stationarity_batch(df_chunk):
+    """
+    Helper to check stationarity for a batch of columns.
+    Returns a list of booleans (True if stationary).
+    """
+    results = []
+    for col in df_chunk.columns:
+        series = df_chunk[col]
+        try:
+            if series.nunique() <= 1:
+                results.append(False)
+                continue
+            p_val = adfuller(series, maxlag=1, regression="c", autolag=None)[1]
+            results.append(p_val < 0.05)
+        except Exception:
+            results.append(False)
+    return results
+
+@timer
 def find_minimum_d(series):
     """
     Find minimum d for stationarity using ADF test.
     Returns optimal d and the differentiated series.
+    Uses batched parallel execution for efficiency.
     """
+    n_jobs = cpu_count()
+
     for d in np.linspace(0, 1, 11):
         d_series_df = frac_diff_ffd(series, d, thres=1e-5).dropna()
         if d_series_df.empty:
             continue
 
-        all_stationary = True
-        for col_name in d_series_df.columns:
-            p_val = adfuller(
-                d_series_df[col_name], maxlag=1, regression="c", autolag=None
-            )[1]
-            if p_val >= 0.05:
-                all_stationary = False
-                break  # This d is not sufficient, try the next one
+        # Split columns into batches for efficient parallel processing
+        columns = d_series_df.columns
+        # Handle case where n_jobs > n_columns
+        n_batches = min(n_jobs, len(columns))
+        col_chunks = np.array_split(columns, n_batches)
 
-        if all_stationary:
+        # Execute batches in parallel
+        # We pass the full dataframe subset to avoid slicing/pickling overhead repeatedly
+        batch_results = Parallel(n_jobs=n_jobs)(
+            delayed(_check_stationarity_batch)(d_series_df[chunk])
+            for chunk in col_chunks
+        )
+
+        # Flatten results
+        is_stationary = [item for sublist in batch_results for item in sublist]
+
+        if all(is_stationary):
             return d, d_series_df  # Found a d that makes all columns stationary
 
     # Fallback to d=1.0
     d_series_df = frac_diff_ffd(series, 1.0, thres=1e-5).dropna()
     return 1.0, d_series_df
 
+
+@timer
+def orthogonalize_pca(stationary_features):
+    # Orthogonalize features using PCA
+    pca = PCA()
+    orthogonal_features_data = pca.fit_transform(stationary_features)
+    orthogonal_features = pd.DataFrame(
+        orthogonal_features_data,
+        index=stationary_features.index,
+        columns=[f"PC{i + 1}" for i in range(orthogonal_features_data.shape[1])],
+    )
+    return orthogonal_features, pca
 
 @timer
 def step_2_feature_engineering(bars):
@@ -132,15 +175,8 @@ def step_2_feature_engineering(bars):
     d_star, stationary_features = find_minimum_d(features)
     print(f"Fractional differentiation to reach stationarity {d_star}")
 
-    # Orthogonalize features using PCA
-    pca = PCA()
-    orthogonal_features_data = pca.fit_transform(stationary_features)
-    orthogonal_features = pd.DataFrame(
-        orthogonal_features_data,
-        index=stationary_features.index,
-        columns=[f"PC{i + 1}" for i in range(orthogonal_features_data.shape[1])],
-    )
 
+    orthogonal_features, pca = orthogonalize_pca(stationary_features)
     return features, orthogonal_features, pca
 
 
@@ -615,6 +651,9 @@ def main():
     tau, p_value = weighted_kendalls_tau(ml_importance, eigen_importance)
     print("\n5. Weighted Kendall's Tau between ML Importance and PCA Eigenvalues:")
     print(f"Correlation: {tau:.4f} (p-value: {p_value:.4f})")
+
+    # Force exit to avoid noisy multiprocessing resource tracker errors on Linux
+    os._exit(0)
 
 
 if __name__ == "__main__":
