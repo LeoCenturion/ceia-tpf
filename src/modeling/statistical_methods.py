@@ -13,6 +13,7 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import cross_val_score
 from sklearn.metrics import log_loss, f1_score
+from sklearn.preprocessing import StandardScaler
 from sklearn.base import clone
 from statsmodels.tsa.stattools import adfuller
 from joblib import Parallel, delayed, cpu_count
@@ -111,11 +112,11 @@ def frac_diff_ffd(series, d, thres=1e-5):
         return pd.DataFrame(index=series.index)
 
     col_chunks = np.array_split(columns, n_batches)
-
-    batch_results = Parallel(n_jobs=n_jobs)(
-        delayed(_frac_diff_ffd_batch)(series[chunk], w, width) for chunk in col_chunks
+    # Use backend='multiprocessing' to avoid ResourceTracker/loky cleanup errors
+    batch_results = Parallel(n_jobs=n_jobs, backend="multiprocessing")(
+        delayed(_frac_diff_ffd_batch)(series[chunk], w, width)
+        for chunk in col_chunks
     )
-
     df = pd.concat(batch_results, axis=1)
     return df
 
@@ -162,11 +163,11 @@ def find_minimum_d(series):
 
         # Execute batches in parallel
         # We pass the full dataframe subset to avoid slicing/pickling overhead repeatedly
-        batch_results = Parallel(n_jobs=n_jobs)(
+        # Use backend='multiprocessing' to avoid ResourceTracker/loky cleanup errors
+        batch_results = Parallel(n_jobs=n_jobs, backend="multiprocessing")(
             delayed(_check_stationarity_batch)(d_series_df[chunk])
             for chunk in col_chunks
         )
-
         # Flatten results
         is_stationary = [item for sublist in batch_results for item in sublist]
 
@@ -202,9 +203,26 @@ def step_2_feature_engineering(bars):
     # Fractional differentiation to reach stationarity
     # find_minimum_d now returns the d value AND the differentiated series
     d_star, stationary_features = find_minimum_d(features)
-    print(f"Fractional differentiation to reach stationarity {d_star}")
+    
+    # Standardize features before PCA
+    # PCA is sensitive to scale; without standardization, features with larger variances (magnitudes)
+    # will dominate the principal components.
+    scaler = StandardScaler()
+    stationary_features_scaled = pd.DataFrame(
+        scaler.fit_transform(stationary_features),
+        index=stationary_features.index,
+        columns=stationary_features.columns
+    )
 
-    orthogonal_features, pca = orthogonalize_pca(stationary_features)
+    # Orthogonalize features using PCA
+    pca = PCA()
+    orthogonal_features_data = pca.fit_transform(stationary_features_scaled)
+    orthogonal_features = pd.DataFrame(
+        orthogonal_features_data,
+        index=stationary_features.index,
+        columns=[f"PC{i+1}" for i in range(orthogonal_features_data.shape[1])],
+    )
+
     return features, orthogonal_features, pca
 
 
@@ -682,9 +700,6 @@ def main():
     tau, p_value = weighted_kendalls_tau(ml_importance, eigen_importance)
     print("\n5. Weighted Kendall's Tau between ML Importance and PCA Eigenvalues:")
     print(f"Correlation: {tau:.4f} (p-value: {p_value:.4f})")
-
-    # Force exit to avoid noisy multiprocessing resource tracker errors on Linux
-    os._exit(0)
 
 
 if __name__ == "__main__":
