@@ -39,6 +39,7 @@ tqdm = "^4.67.1"
 chronos = "^0.3"
 chronos-forecasting = "^2.0.1"
 pylint = "^4.0.3"
+jupytext = "^1.19.1"
 
 
 [build-system]

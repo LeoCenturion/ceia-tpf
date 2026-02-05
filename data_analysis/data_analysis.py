@@ -444,7 +444,14 @@ print(f"Using Dollar Threshold: ${avg_hourly_usdt_volume:,.2f} USDT")
 
 # The bar creation functions expect a 'date' column.
 # We reset the index to turn the 'timestamp' index into a column, then rename it to 'date'.
-df_for_bars = df.reset_index().rename(columns={'timestamp': 'date'})
+df_for_bars = fetch_historical_data(
+        symbol="BTC/USDT",
+        timeframe="1m",
+        start_date="2025-06-01T00:00:00Z",
+        end_date="2025-08-01T00:00:00Z",
+        data_path=DATA_PATH,
+    )
+# df_for_bars = df.reset_index().rename(columns={'timestamp': 'date'})
 
 # Create the bars
 volume_bars = create_volume_bars(df_for_bars, volume_threshold=avg_hourly_btc_volume)
@@ -988,14 +995,169 @@ plot_threshold_sweep_analysis(
 # The analysis on 1-minute data generally confirms the findings from the hourly data: using activity-based bars tends to improve the statistical properties of the returns series. However, the scale of the thresholds is much smaller due to the finer time resolution. The trends of decreasing kurtosis and serial correlation with increasing thresholds remain consistent, reinforcing the validity of this sampling technique across different timeframes.
 
 #%% [markdown]
-# ## 11. t-SNE Analysis of Feature Sets
+# ## 11. Bar Count Stability Analysis
+#
+# One of the desirable properties of information-driven bars (Volume/Dollar) is that they tend to produce a more stable number of bars per period (e.g., per week) compared to time bars, especially when market activity fluctuates.
+#
+# We will analyze the stability of the bar counts for:
+# 1.  Time Bars (1-Hour)
+# 2.  Volume Bars (BTC)
+# 3.  Dollar Bars (USDT)
+#
+# We will measure this stability using the Coefficient of Variation (CV) of the weekly bar counts.
+
+#%%
+def analyze_bar_count_stability(bars_df, bar_type_name, frequency='W'):
+    """
+    Analyzes the stability of bar counts over a specified frequency (default: Weekly).
+    """
+    # Resample to get counts per period
+    counts = bars_df['close'].resample(frequency).count()
+    
+    # Filter out incomplete periods (first and last if they might be partial)
+    counts = counts[counts > 0]
+
+    mean_count = counts.mean()
+    std_count = counts.std()
+    cv = std_count / mean_count if mean_count > 0 else np.nan
+    
+    print(f"--- Stability Analysis for {bar_type_name} ({frequency}) ---")
+    print(f"Mean Count: {mean_count:.2f}")
+    print(f"Std Dev:    {std_count:.2f}")
+    print(f"CV:         {cv:.4f}")
+    
+    return counts, cv
+
+print("Analyzing stability of weekly bar counts...")
+
+# 1. Time Bars (1H)
+counts_time, cv_time = analyze_bar_count_stability(df, "1-Hour Time Bars")
+
+# 2. Volume Bars (from Section 7 - Mean Threshold)
+counts_vol, cv_vol = analyze_bar_count_stability(volume_bars, "Volume Bars")
+
+# 3. Dollar Bars (from Section 7 - Mean Threshold)
+counts_dollar, cv_dollar = analyze_bar_count_stability(dollar_bars, "Dollar Bars")
+
+#%%
+# Plot the weekly counts
+print("Plotting weekly bar counts...")
+plt.figure(figsize=(15, 6))
+plt.plot(counts_time.index, counts_time, label=f'Time Bars (CV={cv_time:.2f})', alpha=0.7)
+plt.plot(counts_vol.index, counts_vol, label=f'Volume Bars (CV={cv_vol:.2f})', alpha=0.7)
+plt.plot(counts_dollar.index, counts_dollar, label=f'Dollar Bars (CV={cv_dollar:.2f})', alpha=0.7)
+
+plt.title('Weekly Bar Counts Over Time')
+plt.xlabel('Date')
+plt.ylabel('Number of Bars per Week')
+plt.legend()
+plt.show()
+
+#%% [markdown]
+# **Interpretation:**
+# A lower Coefficient of Variation (CV) indicates more stable sampling. Ideally, volume or dollar bars should show a more constant rate of information arrival (stable bar counts) compared to time bars.
+
+#%% [markdown]
+# ### 11.1. Threshold Sweep for Bar Count Stability
+#
+# We will now perform a sweep across different thresholds to see how the average weekly bar count and its standard deviation change. This helps in selecting a threshold that targets a specific number of bars per week while understanding the associated variability.
+
+#%%
+def plot_bar_count_sweep(
+    df_for_bars: pd.DataFrame,
+    bar_creation_func,
+    metric_series: pd.Series,
+    title: str,
+    frequency: str = 'W',
+    num_steps: int = 30
+):
+    print(f"\n--- Sweeping Bar Count Stability for {title} ---")
+    
+    min_threshold = metric_series.mean() * 0.5
+    max_threshold = metric_series.max() * 2
+    thresholds = np.linspace(min_threshold, max_threshold, num_steps)
+    
+    results = []
+    
+    from tqdm.notebook import tqdm
+    for threshold in tqdm(thresholds, desc=f"Sweeping {title}"):
+        if threshold <= 0: continue
+        
+        bars = bar_creation_func(df_for_bars, threshold)
+        
+        # Calculate counts per period
+        counts = bars['close'].resample(frequency).count()
+        counts = counts[counts > 0]
+        
+        if len(counts) < 2:
+            continue
+            
+        results.append({
+            'threshold': threshold,
+            'mean_count': counts.mean(),
+            'std_count': counts.std(),
+            'cv': counts.std() / counts.mean()
+        })
+    
+    results_df = pd.DataFrame(results)
+    
+    if results_df.empty:
+        print("Not enough data to plot.")
+        return
+
+    # Plotting
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    fig.suptitle(f'Bar Count Stability vs. Threshold ({title})', fontsize=16)
+    
+    # 1. Mean Count vs Threshold
+    axes[0].plot(results_df['threshold'], results_df['mean_count'], marker='o', linestyle='-')
+    axes[0].set_title(f'Average Bars per {frequency}')
+    axes[0].set_xlabel('Threshold')
+    axes[0].set_ylabel('Mean Count')
+    axes[0].grid(True)
+    
+    # 2. Std Dev vs Threshold
+    axes[1].plot(results_df['threshold'], results_df['std_count'], marker='o', linestyle='-', color='orange')
+    axes[1].set_title(f'Std Dev of Bars per {frequency}')
+    axes[1].set_xlabel('Threshold')
+    axes[1].set_ylabel('Std Dev')
+    axes[1].grid(True)
+    
+    # 3. CV vs Threshold
+    axes[2].plot(results_df['threshold'], results_df['cv'], marker='o', linestyle='-', color='green')
+    axes[2].set_title(f'Coefficient of Variation (CV)')
+    axes[2].set_xlabel('Threshold')
+    axes[2].set_ylabel('CV (Std/Mean)')
+    axes[2].grid(True)
+    
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.show()
+
+# Run sweep for Volume Bars
+plot_bar_count_sweep(
+    df_for_bars=df_for_bars,
+    bar_creation_func=create_volume_bars,
+    metric_series=df['Volume BTC'],
+    title="Volume Bars (BTC)"
+)
+
+# Run sweep for Dollar Bars
+plot_bar_count_sweep(
+    df_for_bars=df_for_bars,
+    bar_creation_func=create_dollar_bars,
+    metric_series=df['Volume USDT'],
+    title="Dollar Bars (USDT)"
+)
+
+#%% [markdown]
+# ## 12. t-SNE Analysis of Feature Sets
 #
 # In this section, we explore the structure of the market data by visualizing a rich feature set using t-SNE (t-Distributed Stochastic Neighbor Embedding). The goal is to see if different market regimes or predictable patterns form distinct clusters in a low-dimensional space.
 #
 # We will create a feature set for time, volume, and dollar bars, and then use PCA for initial dimensionality reduction followed by t-SNE for visualization. The points in the resulting 2D plot will be colored by the sign of the return in the next period to see if the features can help separate future positive and negative price movements.
 
 #%% [markdown]
-# ### 11.1. Helper Functions for Feature Engineering and Visualization
+# ### 12.1. Helper Functions for Feature Engineering and Visualization
 
 #%%
 def create_feature_set(bars_df: pd.DataFrame, vol_col: str = 'Volume BTC', window: int = 20):
@@ -1092,7 +1254,7 @@ def run_tsne_analysis(features: pd.DataFrame, target: pd.Series, title: str):
     plt.show()
 
 #%% [markdown]
-# ### 11.2. t-SNE on Time Bar Features
+# ### 12.2. t-SNE on Time Bar Features
 # We first apply the analysis to the standard 1-hour time bars.
 
 #%%
@@ -1101,7 +1263,7 @@ features_time, target_time = create_feature_set(df)
 run_tsne_analysis(features_time, target_time, "1-Hour Time Bars")
 
 #%% [markdown]
-# ### 11.3. t-SNE on Volume Bar Features
+# ### 12.3. t-SNE on Volume Bar Features
 # Next, we apply the analysis to volume bars, which sample based on market activity (BTC traded).
 
 #%%
@@ -1110,7 +1272,7 @@ features_volume, target_volume = create_feature_set(volume_bars, vol_col='Volume
 run_tsne_analysis(features_volume, target_volume, "Volume Bars")
 
 #%% [markdown]
-# ### 11.4. t-SNE on Dollar Bar Features
+# ### 12.4. t-SNE on Dollar Bar Features
 # Finally, we repeat the analysis for dollar bars, which sample based on the value traded (USDT).
 
 #%%
@@ -1119,7 +1281,7 @@ features_dollar, target_dollar = create_feature_set(dollar_bars, vol_col='Volume
 run_tsne_analysis(features_dollar, target_dollar, "Dollar Bars")
 
 #%% [markdown]
-# ### 11.5. Analysis of t-SNE Results
+# ### 12.5. Analysis of t-SNE Results
 #
 # The t-SNE plots visualize the structure within the high-dimensional feature space. If distinct, well-separated clusters appear, it suggests that the market exhibits different regimes that are captured by our features. If the colors (representing future returns) are separated into different regions of the plot, it indicates that the feature set has some predictive power.
 #

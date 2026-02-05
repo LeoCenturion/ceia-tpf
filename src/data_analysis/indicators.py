@@ -295,6 +295,68 @@ def donchian_channels(high: pd.Series, low: pd.Series, n: int = 20):
     return pd.DataFrame({f"DCU_{n}_{n}": upper, f"DCL_{n}_{n}": lower})
 
 
+def volume_oscillator(volume: pd.Series, short_period: int = 14, long_period: int = 28):
+    """Calculates the Volume Oscillator."""
+    short_ma = sma(volume, short_period)
+    long_ma = sma(volume, long_period)
+    return 100 * (short_ma - long_ma) / long_ma.replace(0, 1e-9)
+
+
+def kama(close: pd.Series, n: int = 10, pow1: int = 2, pow2: int = 30):
+    """Calculates Kaufman's Adaptive Moving Average (KAMA)."""
+    # Efficiency Ratio
+    change = abs(close - close.shift(n))
+    volatility = abs(close - close.shift(1)).rolling(n).sum()
+    er = change / volatility.replace(0, 1e-9)
+
+    # Smoothing Constant
+    sc = (er * (2.0 / (pow1 + 1) - 2.0 / (pow2 + 1)) + 2.0 / (pow2 + 1)) ** 2
+
+    # KAMA calculation
+    kama_values = pd.Series(np.nan, index=close.index)
+    kama_values.iloc[n - 1] = close.iloc[n - 1]  # Initialize with the first valid price
+
+    # We need to iterate because KAMA depends on its previous value
+    # Using numpy for speed
+    close_values = close.values
+    sc_values = sc.values
+    kama_arr = np.full(len(close), np.nan)
+    kama_arr[n-1] = close_values[n-1]
+    
+    for i in range(n, len(close)):
+        if np.isnan(sc_values[i]):
+             kama_arr[i] = kama_arr[i-1] # Carry forward if SC is NaN
+        else:
+             kama_arr[i] = kama_arr[i-1] + sc_values[i] * (close_values[i] - kama_arr[i-1])
+             
+    return pd.Series(kama_arr, index=close.index)
+
+
+def volume_price_trend(close: pd.Series, volume: pd.Series):
+    """Calculates the Volume Price Trend (VPT)."""
+    vpt = volume * close.pct_change()
+    return vpt.cumsum()
+
+
+def chaikin_money_flow(
+    high: pd.Series, low: pd.Series, close: pd.Series, volume: pd.Series, n: int = 20
+):
+    """Calculates Chaikin Money Flow (CMF)."""
+    # Money Flow Multiplier
+    mf_multiplier = ((close - low) - (high - close)) / (high - low).replace(0, 1e-9)
+    mf_volume = mf_multiplier * volume
+
+    # Sum of MF Volume / Sum of Volume
+    return mf_volume.rolling(n).sum() / volume.rolling(n).sum().replace(0, 1e-9)
+
+
+def rolling_z_score(series: pd.Series, window: int = 20):
+    """Calculates the rolling Z-Score."""
+    mean = series.rolling(window).mean()
+    std_dev = series.rolling(window).std(ddof=0)
+    return (series - mean) / std_dev.replace(0, 1e-9)
+
+
 def create_features(
     df: pd.DataFrame,
 ) -> pd.DataFrame:  # pylint: disable=too-many-locals, too-many-statements
@@ -340,6 +402,10 @@ def create_features(
     if VOLUME_COL in df.columns:
         features[VOLUME_COL] = df[VOLUME_COL]
         features["avg_volume_20"] = sma(df[VOLUME_COL], 20)
+        # New Volume Features
+        features["VO"] = volume_oscillator(df[VOLUME_COL])
+        features["VPT"] = volume_price_trend(df[CLOSE_COL], df[VOLUME_COL])
+        features["CMF"] = chaikin_money_flow(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL], df[VOLUME_COL])
 
     # Momentum Indicators
     features["RSI"] = rsi_indicator(df[CLOSE_COL], n=14)
@@ -354,6 +420,9 @@ def create_features(
     stoch_price = stochastic_oscillator(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])
     features["Stoch_K"] = stoch_price["%K"]
     features["Stoch_D"] = stoch_price["%D"]
+    
+    # New Trend Indicator
+    features["KAMA"] = kama(df[CLOSE_COL])
 
     # Trend Indicators
     macd_price_df = macd(df[CLOSE_COL])
@@ -370,6 +439,15 @@ def create_features(
     features = pd.concat([features, vortex_df], axis=1)
     if "VTXP_14" in features.columns and "VTXM_14" in features.columns:
         features["VORTEX_diff"] = features["VTXP_14"] - features["VTXM_14"]
+    
+    # --- Statistical Features on Returns (Rolling) ---
+    # "aggregated returns data... accumulated, average, and standard deviation values"
+    # "z-score of the returns values... considering only the last z-score"
+    roll_window = 20 # Standard window, can be adjusted
+    features["returns_roll_sum"] = close_pct.rolling(roll_window).sum()
+    features["returns_roll_mean"] = close_pct.rolling(roll_window).mean()
+    features["returns_roll_std"] = close_pct.rolling(roll_window).std()
+    features["returns_z_score"] = rolling_z_score(close_pct, window=roll_window)
 
     # Fluctuation Indicators
     bbands = bollinger_bands(df[CLOSE_COL])
@@ -404,10 +482,11 @@ def create_features(
     blocks = signs.diff().ne(0).cumsum()
     features["run"] = signs.groupby(blocks).cumsum()
 
-    # Fill NaN values that might have been generated
+    # Fill NaN values: "forward fill, back fill or zero"
     features.replace([np.inf, -np.inf], np.nan, inplace=True)
-    features.bfill(inplace=True)
     features.ffill(inplace=True)
+    features.bfill(inplace=True)
+    features.fillna(0, inplace=True) # Final fallback for any remaining NaNs (e.g. empty series)
 
     return features
 

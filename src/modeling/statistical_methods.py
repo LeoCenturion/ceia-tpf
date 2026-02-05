@@ -121,7 +121,7 @@ def frac_diff_ffd(series, d, thres=1e-5):
     return df
 
 
-@timer
+# @timer
 def _check_stationarity_batch(df_chunk):
     """
     Helper to check stationarity for a batch of columns.
@@ -215,7 +215,8 @@ def step_2_feature_engineering(bars):
     )
 
     # Orthogonalize features using PCA
-    pca = PCA()
+    # Set random_state to ensure deterministic Principal Components
+    pca = PCA(n_components=0.95, random_state=42)
     orthogonal_features_data = pca.fit_transform(stationary_features_scaled)
     orthogonal_features = pd.DataFrame(
         orthogonal_features_data,
@@ -511,7 +512,8 @@ def feature_importance_mda(model, X, y, cv, sample_weights, t1, scoring="neg_log
         # Sequential evaluation of each feature to avoid multiprocessing issues
         feature_scores = []
         for col in X.columns:
-            score = _get_mda_score_for_feature(
+            # _get_mda_score_for_feature returns (base_score - permuted_score)
+            diff = _get_mda_score_for_feature(
                 model,
                 X_test,
                 y_test,
@@ -521,16 +523,28 @@ def feature_importance_mda(model, X, y, cv, sample_weights, t1, scoring="neg_log
                 sample_weight_test.values,
                 labels=labels if scorer == log_loss else None,
             )
-            feature_scores.append(score)
+            
+            # If Loss (log_loss): diff = Loss_orig - Loss_perm. 
+            # We want Loss_perm - Loss_orig, so we negate it.
+            # If Accuracy (f1): diff = Acc_orig - Acc_perm.
+            # We want Acc_orig - Acc_perm, so we keep it.
+            if scorer == log_loss:
+                importance = -diff
+            else:
+                importance = diff
+                
+            feature_scores.append(importance)
 
         fold_importances.append(pd.Series(feature_scores, index=X.columns))
 
     # Average importance across all folds
     importances = pd.concat(fold_importances, axis=1).mean(axis=1)
 
-    # Add the full model score for reference (using the last fold's base score)
+    # Add the full model score for reference (keeping the raw base_score from the last fold)
     importances.loc["full_model"] = base_score
 
+    # Sort from most predictive to least predictive
+    # Note: 'full_model' might end up anywhere in the sort, but that's okay.
     return importances.sort_values(ascending=False)
 
 
@@ -616,10 +630,10 @@ def main():
     """
     raw_tick_data = fetch_historical_data(
         symbol="BTC/USDT",
-        timeframe="1m",
-        start_date="2025-06-01T00:00:00Z",
+        timeframe="1h",
+        start_date="2020-01-01T00:00:00Z",
         end_date="2025-08-01T00:00:00Z",
-        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv",
+        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1h/BTCUSDT_consolidated_klines.csv",
     )
 
     # raw_tick_data.rename(
@@ -637,8 +651,8 @@ def main():
 
     model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
     config = {
-        "dollar_threshold": 5_000_000,
-        "horizon": 5,
+        "dollar_threshold": 1e9,
+        "horizon": 8,
         "pt": 1,
         "sl": 1,
         "min_ret": 0.0005,

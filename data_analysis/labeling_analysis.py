@@ -25,6 +25,7 @@ import seaborn as sns
 # This try-except block allows the script to be run from the project root or from the `data_analysis` directory.
 try:
     from src.data_analysis.data_analysis import fetch_historical_data, adjust_data_to_ubtc
+    from src.data_analysis.bar_aggregation import create_dollar_bars, create_volume_bars
     from src.data_analysis.labeling import (
         create_fixed_time_horizon_labels,
         create_volatility_adjusted_labels,
@@ -37,6 +38,7 @@ except ModuleNotFoundError:
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
     from src.data_analysis.data_analysis import fetch_historical_data, adjust_data_to_ubtc
+    from src.data_analysis.bar_aggregation import create_dollar_bars, create_volume_bars
     from src.data_analysis.labeling import (
         create_fixed_time_horizon_labels,
         create_volatility_adjusted_labels,
@@ -199,4 +201,86 @@ plt.show()
 #
 # The triple-barrier method, on the other hand, shows fluctuating concurrency. This is because events can terminate early if a profit-take or stop-loss barrier is hit. This dynamic event duration leads to a lower and more variable number of overlapping labels, which is generally a desirable property for training machine learning models as it reduces the redundancy of information across samples.
 
+# %% [markdown]
+# ## 5. Triple-Barrier Labels on Alternative Bars
+#
+# We extend the analysis to Triple-Barrier labels applied on Dollar Bars and Volume Bars.
+# Alternative bars sample data based on activity (volume/dollars) rather than time, which
+# can lead to better statistical properties and different concurrency patterns.
+#
+# Parameters:
+# - Dollar Bar Threshold: 1,000,000,000 (1e9) USDT
+# - Volume Bar Threshold: 50,000 BTC
+
 # %%
+print("\n--- Generating Alternative Bars and Labels ---")
+
+# 1. Create Bars
+# We assume data loaded via fetch_historical_data has 'Volume USDT' if present in CSV.
+
+dollar_threshold = 1_000_000_000
+volume_threshold = 50_000
+
+print(f"Creating Dollar Bars (Thresh={dollar_threshold:,.0f})...")
+dollar_bars = create_dollar_bars(data, dollar_threshold)
+print(f"Created {len(dollar_bars)} Dollar Bars.")
+
+print(f"Creating Volume Bars (Thresh={volume_threshold:,.0f})...")
+volume_bars = create_volume_bars(data, volume_threshold)
+print(f"Created {len(volume_bars)} Volume Bars.")
+
+# 2. Generate Labels (Triple-Barrier)
+def get_tb_labels(bars, name):
+    if bars.empty:
+        print(f"No bars created for {name}.")
+        return pd.DataFrame(), pd.Series()
+    
+    # Recalculate volatility on these bars
+    vol = bars["Close"].pct_change().rolling(window=VOL_WINDOW).std()
+    
+    labels = create_triple_barrier_labels(
+        close=bars["Close"],
+        volatility=vol,
+        look_forward=31, 
+        pt_sl_multipliers=(2.0, 2.0),
+        label_timeout_by_sign=True,
+    )
+    return labels, bars["Close"]
+
+print("Generating labels for Dollar Bars...")
+dollar_labels, dollar_close = get_tb_labels(dollar_bars, "Dollar Bars")
+
+print("Generating labels for Volume Bars...")
+volume_labels, volume_close = get_tb_labels(volume_bars, "Volume Bars")
+
+# 3. Compute Concurrency
+print("Computing concurrency...")
+concurrency_dollar = count_concurrent_labels(dollar_labels["event_end_time"], dollar_close.index)
+concurrency_volume = count_concurrent_labels(volume_labels["event_end_time"], volume_close.index)
+
+# 4. Visualize
+fig, axes = plt.subplots(2, 1, figsize=(15, 12), sharex=False)
+
+# Dollar Bars
+axes[0].plot(concurrency_dollar, label=f"Dollar Bars (1e9)", color="purple")
+axes[0].set_title("Concurrency: Triple-Barrier on Dollar Bars", fontsize=16)
+axes[0].set_ylabel("Concurrent Labels")
+axes[0].legend()
+axes[0].grid(True)
+
+# Volume Bars
+axes[1].plot(concurrency_volume, label=f"Volume Bars (50k)", color="orange")
+axes[1].set_title("Concurrency: Triple-Barrier on Volume Bars", fontsize=16)
+axes[1].set_ylabel("Concurrent Labels")
+axes[1].legend()
+axes[1].grid(True)
+
+plt.tight_layout()
+plt.show()
+
+print("\nAlternative Bars Concurrency Stats:")
+concurrency_stats_alt = pd.DataFrame({
+    "Dollar Bars": concurrency_dollar.describe(),
+    "Volume Bars": concurrency_volume.describe()
+})
+print(concurrency_stats_alt)
