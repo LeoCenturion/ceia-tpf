@@ -19,7 +19,12 @@ from statsmodels.tsa.stattools import adfuller
 from joblib import Parallel, delayed, cpu_count
 
 from src.data_analysis.bar_aggregation import create_dollar_bars
-from src.data_analysis.data_analysis import fetch_historical_data
+from src.data_analysis.data_analysis import (
+    fetch_historical_data,
+    get_weights_ffd,
+    frac_diff_ffd,
+    find_minimum_d,
+)
 from src.data_analysis.indicators import create_features
 from src.modeling import PurgedKFold
 from src.constants import (
@@ -29,6 +34,13 @@ from src.constants import (
     CLOSE_COL,
     VOLUME_COL,
     TIMESTAMP_COL,
+)
+from src.modeling.feature_importance import (
+    feature_importance_mdi,
+    feature_importance_mda,
+    feature_importance_sfi,
+    feature_importance_orthogonal,
+    weighted_kendalls_tau,
 )
 
 
@@ -59,131 +71,39 @@ def step_1_data_structuring(raw_tick_data, dollar_threshold):
 
 
 # Step 2: Feature Engineering
-def get_weights_ffd(d, thres):
+@timer
+def filter_features_whitelist(stationary_features, whitelist):
     """
-    Get weights for fractional differentiation.
+    Filter features based on a predefined whitelist.
     """
-    w, k = [1.0], 1
-    while True:
-        w_ = -w[-1] / k * (d - k + 1)
-        if abs(w_) < thres:
-            break
-        w.append(w_)
-        k += 1
-    return np.array(w[::-1]).reshape(-1, 1)
+    print("\n--- Filtering Features by Whitelist ---")
 
+    # Check which features from the whitelist are present
+    available_features = [f for f in whitelist if f in stationary_features.columns]
+    missing_features = set(whitelist) - set(available_features)
 
-def _frac_diff_ffd_batch(df_chunk, w, width):
-    """
-    Helper to apply fractional differentiation on a batch of columns.
-    """
-    df_batch = {}
-    for name in df_chunk.columns:
-        series_f = df_chunk[name].ffill().dropna()
-        df_ = pd.Series(0.0, index=series_f.index, name=name)
+    if missing_features:
+        print(f"Warning: {len(missing_features)} features from whitelist not found in data: {missing_features}")
 
-        for i in range(width, series_f.shape[0]):
-            loc0, loc1 = series_f.index[i - width], series_f.index[i]
-            if not np.isfinite(df_chunk.loc[loc1, name]):
-                continue
-            df_[loc1] = np.dot(w.T, series_f.loc[loc0:loc1])[0]
-        df_batch[name] = df_.copy(deep=True)
+    print(f"Original Feature Count: {len(stationary_features.columns)}")
+    print(f"Keeping {len(available_features)} features: {available_features}")
 
-    if not df_batch:
-        return pd.DataFrame()
-
-    return pd.concat(df_batch, axis=1)
+    return stationary_features[available_features]
 
 
 @timer
-def frac_diff_ffd(series, d, thres=1e-5):
-    """
-    Fractional differentiation with fixed-width window.
-    Parallelized with column batching.
-    """
-    w = get_weights_ffd(d, thres)
-    width = len(w) - 1
-
-    n_jobs = cpu_count()
-    columns = series.columns
-    n_batches = min(n_jobs, len(columns))
-
-    if n_batches < 1:
-        return pd.DataFrame(index=series.index)
-
-    col_chunks = np.array_split(columns, n_batches)
-    # Use backend='multiprocessing' to avoid ResourceTracker/loky cleanup errors
-    batch_results = Parallel(n_jobs=n_jobs, backend="multiprocessing")(
-        delayed(_frac_diff_ffd_batch)(series[chunk], w, width)
-        for chunk in col_chunks
+def orthogonalize_pca(stationary_features, n_components=0.95):
+    # Standardize features before PCA
+    scaler = StandardScaler()
+    stationary_features_scaled = pd.DataFrame(
+        scaler.fit_transform(stationary_features),
+        index=stationary_features.index,
+        columns=stationary_features.columns
     )
-    df = pd.concat(batch_results, axis=1)
-    return df
-
-
-# @timer
-def _check_stationarity_batch(df_chunk):
-    """
-    Helper to check stationarity for a batch of columns.
-    Returns a list of booleans (True if stationary).
-    """
-    results = []
-    for col in df_chunk.columns:
-        series = df_chunk[col]
-        try:
-            if series.nunique() <= 1:
-                results.append(False)
-                continue
-            p_val = adfuller(series, maxlag=1, regression="c", autolag=None)[1]
-            results.append(p_val < 0.05)
-        except Exception:
-            results.append(False)
-    return results
-
-
-@timer
-def find_minimum_d(series):
-    """
-    Find minimum d for stationarity using ADF test.
-    Returns optimal d and the differentiated series.
-    Uses batched parallel execution for efficiency.
-    """
-    n_jobs = cpu_count()
-
-    for d in np.linspace(0, 1, 11):
-        d_series_df = frac_diff_ffd(series, d, thres=1e-5).dropna()
-        if d_series_df.empty:
-            continue
-
-        # Split columns into batches for efficient parallel processing
-        columns = d_series_df.columns
-        # Handle case where n_jobs > n_columns
-        n_batches = min(n_jobs, len(columns))
-        col_chunks = np.array_split(columns, n_batches)
-
-        # Execute batches in parallel
-        # We pass the full dataframe subset to avoid slicing/pickling overhead repeatedly
-        # Use backend='multiprocessing' to avoid ResourceTracker/loky cleanup errors
-        batch_results = Parallel(n_jobs=n_jobs, backend="multiprocessing")(
-            delayed(_check_stationarity_batch)(d_series_df[chunk])
-            for chunk in col_chunks
-        )
-        # Flatten results
-        is_stationary = [item for sublist in batch_results for item in sublist]
-
-        if all(is_stationary):
-            return d, d_series_df  # Found a d that makes all columns stationary
-
-    # Fallback to d=1.0
-    d_series_df = frac_diff_ffd(series, 1.0, thres=1e-5).dropna()
-    return 1.0, d_series_df
-
-
-@timer
-def orthogonalize_pca(stationary_features):
+    
     # Orthogonalize features using PCA
-    pca = PCA()
-    orthogonal_features_data = pca.fit_transform(stationary_features)
+    pca = PCA(n_components=n_components, random_state=42)
+    orthogonal_features_data = pca.fit_transform(stationary_features_scaled)
     orthogonal_features = pd.DataFrame(
         orthogonal_features_data,
         index=stationary_features.index,
@@ -193,38 +113,21 @@ def orthogonalize_pca(stationary_features):
 
 
 @timer
-def step_2_feature_engineering(bars):
+def step_2_feature_engineering(bars, feature_whitelist=None):
     """
-    Create features, make them stationary, and orthogonalize them.
+    Create features and make them stationary.
     """
     features = create_features(bars)
     features = features.dropna()
 
+    # Filter features based on whitelist
+    if feature_whitelist is not None:
+        features = filter_features_whitelist(features, feature_whitelist)
+
     # Fractional differentiation to reach stationarity
-    # find_minimum_d now returns the d value AND the differentiated series
     d_star, stationary_features = find_minimum_d(features)
-    
-    # Standardize features before PCA
-    # PCA is sensitive to scale; without standardization, features with larger variances (magnitudes)
-    # will dominate the principal components.
-    scaler = StandardScaler()
-    stationary_features_scaled = pd.DataFrame(
-        scaler.fit_transform(stationary_features),
-        index=stationary_features.index,
-        columns=stationary_features.columns
-    )
 
-    # Orthogonalize features using PCA
-    # Set random_state to ensure deterministic Principal Components
-    pca = PCA(n_components=0.95, random_state=42)
-    orthogonal_features_data = pca.fit_transform(stationary_features_scaled)
-    orthogonal_features = pd.DataFrame(
-        orthogonal_features_data,
-        index=stationary_features.index,
-        columns=[f"PC{i+1}" for i in range(orthogonal_features_data.shape[1])],
-    )
-
-    return features, orthogonal_features, pca
+    return features, stationary_features
 
 
 # Step 3: Labeling and Weighting
@@ -386,18 +289,29 @@ def machine_learning_cycle(raw_tick_data, model, config):
     # Step 1: Data Structuring
     bars = step_1_data_structuring(raw_tick_data, config["dollar_threshold"])
 
-    # Step 2: Feature Engineering
-    features, orthogonal_features, pca = step_2_feature_engineering(bars)
+    # Step 2: Feature Engineering (Stationary Features Only)
+    # Pass feature_whitelist from config if available
+    features, stationary_features = step_2_feature_engineering(bars, config.get("feature_whitelist"))
 
     # Step 3: Labeling and Weighting
     labels, sample_weights = step_3_labeling_and_weighting(bars, config)
+    
+    # Apply PCA on the filtered features
+    orthogonal_features, pca = orthogonalize_pca(stationary_features)
 
-    # Align data
-    combined = pd.concat([labels, orthogonal_features, sample_weights], axis=1).dropna()
+    # Filter PCA features based on whitelist if provided
+    if config.get("pca_whitelist"):
+        orthogonal_features = filter_features_whitelist(orthogonal_features, config["pca_whitelist"])
+
+    # Align data for final training
+    # t1 is embedded in labels['t1'] from step_3
+    t1 = labels["t1"]
+    
+    combined = pd.concat([labels["bin"], orthogonal_features, sample_weights], axis=1).dropna()
     X = combined[orthogonal_features.columns]
     y = combined["bin"]
     sample_weights_series = combined["sample_weight"]
-    t1_series = combined["t1"]
+    t1_series = t1.loc[X.index]
 
     # Part II: Modeling
     # Manual Cross-validation with PurgedKFold
@@ -430,200 +344,6 @@ def machine_learning_cycle(raw_tick_data, model, config):
     return model, scores, X, y, sample_weights_series, t1_series, features, pca
 
 
-@timer
-def feature_importance_mdi(model, X, y):
-    """
-    Mean Decrease Impurity (MDI) feature importance.
-    Trains a new RandomForestClassifier with max_features=1 to avoid masking effects.
-    """
-    # Use a new model with the specified max_features
-    mdi_model = RandomForestClassifier(
-        n_estimators=model.n_estimators,
-        max_features=1,  # Key change for López de Prado's method
-        random_state=model.random_state,
-        n_jobs=model.n_jobs,
-    )
-    mdi_model.fit(X, y)
-
-    importances = pd.Series(mdi_model.feature_importances_, index=X.columns, name="MDI")
-    return importances.sort_values(ascending=False)
-
-
-def _get_mda_score_for_feature(
-    model, X_test, y_test, col, base_score, scorer, sample_weights, labels=None
-):
-    """Helper for MDA: Permutes a single column and returns the score difference."""
-    X_test_permuted = X_test.copy()
-    np.random.shuffle(X_test_permuted[col].values)
-
-    y_pred_permuted = (
-        model.predict_proba(X_test_permuted)
-        if scorer == log_loss
-        else model.predict(X_test_permuted)
-    )
-
-    if scorer == log_loss and labels is not None:
-        permuted_score = scorer(
-            y_test, y_pred_permuted, sample_weight=sample_weights, labels=labels
-        )
-    else:
-        permuted_score = scorer(y_test, y_pred_permuted, sample_weight=sample_weights)
-
-    return base_score - permuted_score
-
-
-@timer
-def feature_importance_mda(model, X, y, cv, sample_weights, t1, scoring="neg_log_loss"):
-    """
-    Mean Decrease Accuracy (MDA) feature importance using PurgedKFold.
-    The permutation of features is parallelized.
-    """
-    if scoring == "neg_log_loss":
-        scorer = log_loss
-    else:
-        # Assuming f1_score with "weighted" average
-        scorer = lambda y_true, y_pred, sample_weight, labels=None: f1_score(
-            y_true, y_pred, average="weighted", sample_weight=sample_weight
-        )
-
-    fold_importances = []
-    for train_idx, test_idx in cv.split(X, y, groups=t1):
-        X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
-        y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
-        sample_weight_train = sample_weights.iloc[train_idx]
-        sample_weight_test = sample_weights.iloc[test_idx]
-
-        model.fit(X_train, y_train, sample_weight=sample_weight_train.values)
-
-        # Capture classes from the trained model
-        labels = model.classes_
-
-        y_pred = (
-            model.predict_proba(X_test) if scorer == log_loss else model.predict(X_test)
-        )
-
-        if scorer == log_loss:
-            base_score = scorer(
-                y_test, y_pred, sample_weight=sample_weight_test.values, labels=labels
-            )
-        else:
-            base_score = scorer(y_test, y_pred, sample_weight=sample_weight_test.values)
-
-        # Sequential evaluation of each feature to avoid multiprocessing issues
-        feature_scores = []
-        for col in X.columns:
-            # _get_mda_score_for_feature returns (base_score - permuted_score)
-            diff = _get_mda_score_for_feature(
-                model,
-                X_test,
-                y_test,
-                col,
-                base_score,
-                scorer,
-                sample_weight_test.values,
-                labels=labels if scorer == log_loss else None,
-            )
-            
-            # If Loss (log_loss): diff = Loss_orig - Loss_perm. 
-            # We want Loss_perm - Loss_orig, so we negate it.
-            # If Accuracy (f1): diff = Acc_orig - Acc_perm.
-            # We want Acc_orig - Acc_perm, so we keep it.
-            if scorer == log_loss:
-                importance = -diff
-            else:
-                importance = diff
-                
-            feature_scores.append(importance)
-
-        fold_importances.append(pd.Series(feature_scores, index=X.columns))
-
-    # Average importance across all folds
-    importances = pd.concat(fold_importances, axis=1).mean(axis=1)
-
-    # Add the full model score for reference (keeping the raw base_score from the last fold)
-    importances.loc["full_model"] = base_score
-
-    # Sort from most predictive to least predictive
-    # Note: 'full_model' might end up anywhere in the sort, but that's okay.
-    return importances.sort_values(ascending=False)
-
-
-def _run_sfi_for_feature(model, X, y, col, cv, sample_weights, t1):
-    """Helper for SFI: Runs a full CV for a single feature."""
-    scores = []
-    for train_idx, test_idx in cv.split(X, y, groups=t1):
-        X_train, X_test = X[[col]].iloc[train_idx], X[[col]].iloc[test_idx]
-        y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
-        sample_weight_train = sample_weights.iloc[train_idx]
-
-        model.fit(X_train, y_train, sample_weight=sample_weight_train.values)
-        y_pred = model.predict(X_test)
-
-        score = f1_score(y_test, y_pred, average="weighted")
-        scores.append(score)
-    return np.mean(scores)
-
-
-@timer
-def feature_importance_sfi(model, X, y, cv, sample_weights, t1, scoring="f1_weighted"):
-    """
-    Single Feature Importance (SFI) using PurgedKFold.
-    """
-    # Use a clean, unfitted model for each feature to avoid pickling overhead and state leakage
-    base_model = clone(model)
-    
-    # Sequential evaluation of each feature
-    scores = []
-    for col in X.columns:
-        score = _run_sfi_for_feature(base_model, X, y, col, cv, sample_weights, t1)
-        scores.append(score)
-
-    importances = pd.Series(scores, index=X.columns)
-    return importances.sort_values(ascending=False)
-
-
-@timer
-def feature_importance_orthogonal(model, X_ortho, y, sample_weights, pca):
-    """
-    Feature importance on orthogonal features (PCA components).
-    """
-    model.fit(X_ortho, y, sample_weight=sample_weights.values)
-    importances_ortho = pd.Series(
-        model.feature_importances_, index=X_ortho.columns, name="Orthogonal Importance"
-    )
-
-    # Combine with PCA explained variance
-    explained_variance = pd.Series(
-        pca.explained_variance_ratio_, index=X_ortho.columns, name="Explained Variance"
-    )
-
-    results = pd.concat([importances_ortho, explained_variance], axis=1)
-    results = results.sort_values(by="Orthogonal Importance", ascending=False)
-
-    return results
-
-
-from scipy.stats import weightedtau
-
-
-def weighted_kendalls_tau(series1, series2):
-    """
-    Computes the weighted Kendall's tau rank correlation between two series.
-    """
-    # Align the two series by their index
-    aligned_s1, aligned_s2 = series1.align(series2, join="inner")
-
-    if aligned_s1.empty or aligned_s2.empty:
-        return np.nan, np.nan
-
-        # Scipy's weightedtau computes the weighted correlation.
-        # By default, it uses a linear weighting scheme where disagreements
-        # at the top of the rank are penalized more heavily.
-    correlation, p_value = weightedtau(aligned_s1, aligned_s2)
-
-    return correlation, p_value
-
-
 def main():
     """
     Main function to run the ML pipeline.
@@ -636,20 +356,45 @@ def main():
         data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1h/BTCUSDT_consolidated_klines.csv",
     )
 
-    # raw_tick_data.rename(
-    #     columns={
-    #         "Open": "open",
-    #         "High": "high",
-    #         "Low": "low",
-    #         "Close": "close",
-    #         "Volume": "volume",
-    #     },
-    #     inplace=True,
-    # )
     print(raw_tick_data.head())
     raw_tick_data.index = pd.to_datetime(raw_tick_data.index)
 
     model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
+    
+    feature_whitelist = [
+        "avg_volume_20",
+        "ADX_14",
+        "Stoch_D_pct",
+        "open_pct_lag_1",
+        "VPT",
+        "low_pct_lag_1",
+        "high_pct_lag_1",
+        "pct_change",
+        "UO_7_14_28",
+        "MACD",
+        "RSI_pct",
+        "close_pct_lag_3",
+        "high_pct_lag_5",
+        "KAMA",
+        "Volume",
+        "VO",
+        "Stoch_K_pct",
+        "run",
+        "MACD_pct",
+        "high_pct_lag_2",
+        "CMF",
+        "AROONU_14",
+        "close_pct_lag_5",
+        "DMP_14",
+        "open_pct_lag_4",
+        "high_pct_lag_3",
+        "TSI_25_13",
+        "above_ema_40",
+        "low_pct_lag_3",
+        "TSIs_25_13",
+        "low_pct_lag_4",
+    ]
+
     config = {
         "dollar_threshold": 1e9,
         "horizon": 8,
@@ -658,6 +403,8 @@ def main():
         "min_ret": 0.0005,
         "n_splits": 3,
         "pct_embargo": 0.01,
+        "feature_whitelist": feature_whitelist,
+        "pca_whitelist": None, # Add list of PC names here if needed, e.g. ["PC1", "PC2"]
     }
 
     trained_model, scores, X, y, sample_weights, t1, features, pca = (
@@ -676,13 +423,7 @@ def main():
         n_splits=config["n_splits"], t1=t1, pct_embargo=config["pct_embargo"]
     )
 
-    # 1. Mean Decrease Impurity (MDI) - on original features for interpretability
-    # Use features.loc[X.index] to ensure we only use rows that survived alignment
-    # Note: MDI is strictly for the *trained* model, which uses *orthogonal* features (X).
-    # If we want MDI on *original* features, we'd need to retrain a model on them.
-    # The previous code implied we could just pass features, but MDI comes from the tree structure
-    # built on X (orthogonal). So MDI here is technically on Principal Components.
-    # If we want MDI on original features, we must fit a new model on them.
+    # 1. Mean Decrease Impurity (MDI) - on orthogonal features (PCs) used in training
     print("\n1. Mean Decrease Impurity (MDI) on orthogonal features (PCs):")
     mdi_importance = feature_importance_mdi(trained_model, X, y)
     print(mdi_importance)
@@ -692,9 +433,29 @@ def main():
     mda_importance = feature_importance_mda(trained_model, X, y, cv, sample_weights, t1)
     print(mda_importance)
 
+    # 2b. Mean Decrease Accuracy (MDA) - on original features
+    print("\n2b. Mean Decrease Accuracy (MDA) on original features:")
+    # Use a fresh model to calculate MDA on original features
+    # The trained_model is fitted on orthogonal features (X), so it cannot be used here.
+    mda_original_model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
+    mda_original = feature_importance_mda(
+        mda_original_model,
+        features.loc[X.index],
+        y,
+        cv,
+        sample_weights,
+        t1,
+    )
+    print(mda_original)
+
     # 3. Single Feature Importance (SFI) - on original features for interpretability
-    # SFI is great because we can check each original feature independently.
+    # SFI on features that survived alignment with X (which are orthogonal)
+    # But SFI usually wants original features.
+    # We have 'features' returned from machine_learning_cycle which are the raw features.
+    # However, 'features' might not align perfectly with X if rows were dropped.
+    # Let's align.
     print("\n3. Single Feature Importance (SFI) on original features:")
+    # Using features.loc[X.index] ensures alignment
     sfi_importance = feature_importance_sfi(
         trained_model, features.loc[X.index], y, cv, sample_weights, t1
     )
