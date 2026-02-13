@@ -102,7 +102,7 @@ def orthogonalize_pca(stationary_features, n_components=0.95):
     )
     
     # Orthogonalize features using PCA
-    pca = PCA(n_components=n_components, random_state=42)
+    pca = PCA(n_components=None, random_state=42)
     orthogonal_features_data = pca.fit_transform(stationary_features_scaled)
     orthogonal_features = pd.DataFrame(
         orthogonal_features_data,
@@ -126,7 +126,7 @@ def step_2_feature_engineering(bars, feature_whitelist=None):
 
     # Fractional differentiation to reach stationarity
     d_star, stationary_features = find_minimum_d(features)
-
+    print(f'minimum d: {d_star}')
     return features, stationary_features
 
 
@@ -283,35 +283,31 @@ def step_3_labeling_and_weighting(bars, config):
 @timer
 def machine_learning_cycle(raw_tick_data, model, config):
     """
-    Execute the full machine learning pipeline.
+    Execute the full machine learning pipeline with leakage-free CV.
     """
     # Part I: Data Analysis
     # Step 1: Data Structuring
     bars = step_1_data_structuring(raw_tick_data, config["dollar_threshold"])
 
     # Step 2: Feature Engineering (Stationary Features Only)
-    # Pass feature_whitelist from config if available
     features, stationary_features = step_2_feature_engineering(bars, config.get("feature_whitelist"))
 
     # Step 3: Labeling and Weighting
     labels, sample_weights = step_3_labeling_and_weighting(bars, config)
     
-    # Apply PCA on the filtered features
-    orthogonal_features, pca = orthogonalize_pca(stationary_features)
-
-    # Filter PCA features based on whitelist if provided
-    if config.get("pca_whitelist"):
-        orthogonal_features = filter_features_whitelist(orthogonal_features, config["pca_whitelist"])
-
-    # Align data for final training
-    # t1 is embedded in labels['t1'] from step_3
+    # Align data for labeling
     t1 = labels["t1"]
     
-    combined = pd.concat([labels["bin"], orthogonal_features, sample_weights], axis=1).dropna()
-    X = combined[orthogonal_features.columns]
+    # We first align the features with the labels/weights before splitting
+    # This ensures indices match across X, y, and weights
+    combined = pd.concat([labels["bin"], stationary_features, sample_weights], axis=1).dropna()
+    
+    # Separate back into components
+    # X_raw contains the stationary features (not yet scaled/PCA'd)
+    X_raw = combined[stationary_features.columns]
     y = combined["bin"]
     sample_weights_series = combined["sample_weight"]
-    t1_series = t1.loc[X.index]
+    t1_series = t1.loc[X_raw.index]
 
     # Part II: Modeling
     # Manual Cross-validation with PurgedKFold
@@ -320,28 +316,72 @@ def machine_learning_cycle(raw_tick_data, model, config):
     )
 
     scores = []
-    for train_idx, test_idx in cv.split(X, y, groups=t1_series):
-        X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+    
+    # We need to store the columns of the PCA for consistency
+    pca_columns = None
+
+    for train_idx, test_idx in cv.split(X_raw, y, groups=t1_series):
+        # 1. Split Raw Data
+        X_train_raw, X_test_raw = X_raw.iloc[train_idx], X_raw.iloc[test_idx]
         y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
         sample_weight_train = sample_weights_series.iloc[train_idx]
 
-        # Ensure model is a fresh instance for each fold if it's stateful
-        # For RandomForestClassifier, it's generally fine to reuse if not stateful, but good practice to clone
-        # For simplicity here, we assume it's stateless or reinitialized in some way outside this loop.
-        # If the model state needs to be reset, use `sklearn.base.clone(model)`.
+        # 2. Fit Scaler on TRAIN only, apply to both
+        scaler = StandardScaler()
+        X_train_scaled = scaler.fit_transform(X_train_raw)
+        X_test_scaled = scaler.transform(X_test_raw) # Leakage prevented
 
-        model.fit(X_train, y_train, sample_weight=sample_weight_train.values)
-        y_pred = model.predict(X_test)
+        # 3. Fit PCA on TRAIN only, apply to both
+        # Note: We need to handle the case where n_components=None (all components)
+        pca_fold = PCA(n_components=None, random_state=42)
+        X_train_pca = pca_fold.fit_transform(X_train_scaled)
+        X_test_pca = pca_fold.transform(X_test_scaled)
 
-        # Calculate F1 score for the current fold
-        from sklearn.metrics import f1_score
+        # Convert to DataFrame to handle column selection easily
+        # We name columns PC1, PC2...
+        num_pcs = X_train_pca.shape[1]
+        pc_cols = [f"PC{i + 1}" for i in range(num_pcs)]
+        X_train_df = pd.DataFrame(X_train_pca, index=X_train_raw.index, columns=pc_cols)
+        X_test_df = pd.DataFrame(X_test_pca, index=X_test_raw.index, columns=pc_cols)
+
+        # 4. Filter PCA features based on whitelist if provided
+        if config.get("pca_whitelist"):
+            available_pcs = [c for c in config["pca_whitelist"] if c in X_train_df.columns]
+            X_train_df = X_train_df[available_pcs]
+            X_test_df = X_test_df[available_pcs]
+        
+        pca_columns = X_train_df.columns # Save for final consistent output
+
+        # Use clone to ensure a fresh instance for each fold
+        fold_model = clone(model)
+        fold_model.fit(X_train_df, y_train, sample_weight=sample_weight_train.values)
+        y_pred = fold_model.predict(X_test_df)
 
         scores.append(f1_score(y_test, y_pred, average="weighted"))
 
-    # Fit the model on the entire dataset for feature importance analysis
-    model.fit(X, y, sample_weight=sample_weights_series.values)
+    # --- Final Fit on Full Dataset (for Feature Importance Analysis) ---
+    # We must repeat the transformation pipeline on the FULL dataset
+    # so the returned 'X' and 'pca' are consistent with the logic.
+    scaler_final = StandardScaler()
+    X_raw_scaled = scaler_final.fit_transform(X_raw)
+    
+    pca_final = PCA(n_components=None, random_state=42)
+    X_pca_final = pca_final.fit_transform(X_raw_scaled)
+    
+    num_pcs_final = X_pca_final.shape[1]
+    pc_cols_final = [f"PC{i + 1}" for i in range(num_pcs_final)]
+    X_final = pd.DataFrame(X_pca_final, index=X_raw.index, columns=pc_cols_final)
+    
+    if config.get("pca_whitelist"):
+         available_pcs = [c for c in config["pca_whitelist"] if c in X_final.columns]
+         X_final = X_final[available_pcs]
 
-    return model, scores, X, y, sample_weights_series, t1_series, features, pca
+    trained_model = clone(model)
+    trained_model.fit(X_final, y, sample_weight=sample_weights_series.values)
+
+    # Return the transformed X (PCA features) and the fitted PCA object
+    return trained_model, scores, X_final, y, sample_weights_series, t1_series, features, pca_final
+
 
 
 def main():
@@ -359,7 +399,7 @@ def main():
     print(raw_tick_data.head())
     raw_tick_data.index = pd.to_datetime(raw_tick_data.index)
 
-    model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
+    model = RandomForestClassifier(n_estimators=1000, random_state=42, n_jobs=-1, max_features=1)
     
     feature_whitelist = [
         "avg_volume_20",
@@ -395,6 +435,14 @@ def main():
         "low_pct_lag_4",
     ]
 
+    pca_whitelist = [
+        "PC2",
+        "PC3",
+        "PC4",
+        "PC6",
+        "PC1",
+        "PC5"
+    ]
     config = {
         "dollar_threshold": 1e9,
         "horizon": 8,
@@ -403,8 +451,8 @@ def main():
         "min_ret": 0.0005,
         "n_splits": 3,
         "pct_embargo": 0.01,
-        "feature_whitelist": feature_whitelist,
-        "pca_whitelist": None, # Add list of PC names here if needed, e.g. ["PC1", "PC2"]
+        "feature_whitelist": None,
+        "pca_whitelist": None
     }
 
     trained_model, scores, X, y, sample_weights, t1, features, pca = (
@@ -437,7 +485,7 @@ def main():
     print("\n2b. Mean Decrease Accuracy (MDA) on original features:")
     # Use a fresh model to calculate MDA on original features
     # The trained_model is fitted on orthogonal features (X), so it cannot be used here.
-    mda_original_model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
+    mda_original_model = clone(model)
     mda_original = feature_importance_mda(
         mda_original_model,
         features.loc[X.index],
