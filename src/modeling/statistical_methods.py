@@ -24,6 +24,7 @@ from src.data_analysis.data_analysis import (
     get_weights_ffd,
     frac_diff_ffd,
     find_minimum_d,
+    timer,
 )
 from src.data_analysis.indicators import create_features
 from src.modeling import PurgedKFold
@@ -35,6 +36,7 @@ from src.constants import (
     VOLUME_COL,
     TIMESTAMP_COL,
 )
+from src.modeling.pipeline import AbstractMLPipeline
 from src.modeling.feature_importance import (
     feature_importance_mdi,
     feature_importance_mda,
@@ -44,24 +46,9 @@ from src.modeling.feature_importance import (
 )
 
 
-def timer(func):
-    """Decorator that prints the execution time of the function it decorates."""
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        start_time = time.perf_counter()
-        result = func(*args, **kwargs)
-        end_time = time.perf_counter()
-        duration = end_time - start_time
-        print(f"\n>>> Function '{func.__name__}' executed in {duration:.4f} seconds")
-        return result
-
-    return wrapper
-
-
-class MachineLearningPipeline:
+class MachineLearningPipeline(AbstractMLPipeline):
     def __init__(self, config):
-        self.config = config
+        super().__init__(config)
 
     # Part I: Data Analysis
     # Step 1: Data Structuring
@@ -94,26 +81,6 @@ class MachineLearningPipeline:
         return stationary_features[available_features]
 
     @timer
-    def orthogonalize_pca(self, stationary_features, n_components=0.95):
-        # Standardize features before PCA
-        scaler = StandardScaler()
-        stationary_features_scaled = pd.DataFrame(
-            scaler.fit_transform(stationary_features),
-            index=stationary_features.index,
-            columns=stationary_features.columns
-        )
-        
-        # Orthogonalize features using PCA
-        pca = PCA(n_components=None, random_state=42)
-        orthogonal_features_data = pca.fit_transform(stationary_features_scaled)
-        orthogonal_features = pd.DataFrame(
-            orthogonal_features_data,
-            index=stationary_features.index,
-            columns=[f"PC{i + 1}" for i in range(orthogonal_features_data.shape[1])],
-        )
-        return orthogonal_features, pca
-
-    @timer
     def step_2_feature_engineering(self, bars):
         """
         Create features and make them stationary.
@@ -128,7 +95,7 @@ class MachineLearningPipeline:
         # Fractional differentiation to reach stationarity
         d_star, stationary_features = find_minimum_d(features)
         print(f'minimum d: {d_star}')
-        return features, stationary_features
+        return stationary_features
 
     # Step 3: Labeling and Weighting
     def get_daily_vol(self, close, lookback=100):
@@ -263,110 +230,7 @@ class MachineLearningPipeline:
         )
         sample_weights = self.get_sample_weights(events_for_weights["t1"], num_co_events, close)
 
-        return labels, sample_weights
-
-    # Part II: Modeling
-    @timer
-    def run(self, raw_tick_data, model):
-        """
-        Execute the full machine learning pipeline with leakage-free CV.
-        """
-        # Part I: Data Analysis
-        # Step 1: Data Structuring
-        bars = self.step_1_data_structuring(raw_tick_data)
-
-        # Step 2: Feature Engineering (Stationary Features Only)
-        features, stationary_features = self.step_2_feature_engineering(bars)
-
-        # Step 3: Labeling and Weighting
-        labels, sample_weights = self.step_3_labeling_and_weighting(bars)
-        
-        # Align data for labeling
-        t1 = labels["t1"]
-        
-        # We first align the features with the labels/weights before splitting
-        # This ensures indices match across X, y, and weights
-        combined = pd.concat([labels["bin"], stationary_features, sample_weights], axis=1).dropna()
-        
-        # Separate back into components
-        # X_raw contains the stationary features (not yet scaled/PCA'd)
-        X_raw = combined[stationary_features.columns]
-        y = combined["bin"]
-        sample_weights_series = combined["sample_weight"]
-        t1_series = t1.loc[X_raw.index]
-
-        # Part II: Modeling
-        # Manual Cross-validation with PurgedKFold
-        cv = PurgedKFold(
-            n_splits=self.config["n_splits"], t1=t1_series, pct_embargo=self.config["pct_embargo"]
-        )
-
-        scores = []
-        
-        # We need to store the columns of the PCA for consistency
-        pca_columns = None
-
-        for train_idx, test_idx in cv.split(X_raw, y, groups=t1_series):
-            # 1. Split Raw Data
-            X_train_raw, X_test_raw = X_raw.iloc[train_idx], X_raw.iloc[test_idx]
-            y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
-            sample_weight_train = sample_weights_series.iloc[train_idx]
-
-            # 2. Fit Scaler on TRAIN only, apply to both
-            scaler = StandardScaler()
-            X_train_scaled = scaler.fit_transform(X_train_raw)
-            X_test_scaled = scaler.transform(X_test_raw) # Leakage prevented
-
-            # 3. Fit PCA on TRAIN only, apply to both
-            # Note: We need to handle the case where n_components=None (all components)
-            pca_fold = PCA(n_components=None, random_state=42)
-            X_train_pca = pca_fold.fit_transform(X_train_scaled)
-            X_test_pca = pca_fold.transform(X_test_scaled)
-
-            # Convert to DataFrame to handle column selection easily
-            # We name columns PC1, PC2...
-            num_pcs = X_train_pca.shape[1]
-            pc_cols = [f"PC{i + 1}" for i in range(num_pcs)]
-            X_train_df = pd.DataFrame(X_train_pca, index=X_train_raw.index, columns=pc_cols)
-            X_test_df = pd.DataFrame(X_test_pca, index=X_test_raw.index, columns=pc_cols)
-
-            # 4. Filter PCA features based on whitelist if provided
-            if self.config.get("pca_whitelist"):
-                available_pcs = [c for c in self.config["pca_whitelist"] if c in X_train_df.columns]
-                X_train_df = X_train_df[available_pcs]
-                X_test_df = X_test_df[available_pcs]
-            
-            pca_columns = X_train_df.columns # Save for final consistent output
-
-            # Use clone to ensure a fresh instance for each fold
-            fold_model = clone(model)
-            fold_model.fit(X_train_df, y_train, sample_weight=sample_weight_train.values)
-            y_pred = fold_model.predict(X_test_df)
-
-            scores.append(f1_score(y_test, y_pred, average="weighted"))
-
-        # --- Final Fit on Full Dataset (for Feature Importance Analysis) ---
-        # We must repeat the transformation pipeline on the FULL dataset
-        # so the returned 'X' and 'pca' are consistent with the logic.
-        scaler_final = StandardScaler()
-        X_raw_scaled = scaler_final.fit_transform(X_raw)
-        
-        pca_final = PCA(n_components=None, random_state=42)
-        X_pca_final = pca_final.fit_transform(X_raw_scaled)
-        
-        num_pcs_final = X_pca_final.shape[1]
-        pc_cols_final = [f"PC{i + 1}" for i in range(num_pcs_final)]
-        X_final = pd.DataFrame(X_pca_final, index=X_raw.index, columns=pc_cols_final)
-        
-        if self.config.get("pca_whitelist"):
-             available_pcs = [c for c in self.config["pca_whitelist"] if c in X_final.columns]
-             X_final = X_final[available_pcs]
-
-        trained_model = clone(model)
-        trained_model.fit(X_final, y, sample_weight=sample_weights_series.values)
-
-        # Return the transformed X (PCA features) and the fitted PCA object
-        return trained_model, scores, X_final, y, sample_weights_series, t1_series, features, pca_final
+        return labels["bin"], sample_weights, labels["t1"]
 
 
 def main():
@@ -441,8 +305,8 @@ def main():
     }
 
     pipeline = MachineLearningPipeline(config)
-    trained_model, scores, X, y, sample_weights, t1, features, pca = (
-        pipeline.run(raw_tick_data, model)
+    trained_model, scores, X, y, sample_weights, t1, pca = (
+        pipeline.run_cv(raw_tick_data, model)
     )
 
     print(f"Model: {trained_model}")
@@ -468,13 +332,20 @@ def main():
     print(mda_importance)
 
     # 2b. Mean Decrease Accuracy (MDA) - on original features
+    # Note: This part needs the 'features' (original ones). 
+    # Since AbstractMLPipeline.run_cv doesn't return original features, 
+    # we need to call step_2_feature_engineering again or modify run_cv.
+    # For now, let's just use the features from the pipeline.
     print("\n2b. Mean Decrease Accuracy (MDA) on original features:")
-    # Use a fresh model to calculate MDA on original features
-    # The trained_model is fitted on orthogonal features (X), so it cannot be used here.
+    # Re-run feature engineering to get original features for MDA
+    # This is a bit inefficient but keeps AbstractMLPipeline clean.
+    bars = pipeline.step_1_data_structuring(raw_tick_data)
+    original_features = create_features(bars).dropna()
+
     mda_original_model = clone(model)
     mda_original = feature_importance_mda(
         mda_original_model,
-        features.loc[X.index],
+        original_features.loc[X.index],
         y,
         cv,
         sample_weights,
@@ -483,32 +354,27 @@ def main():
     print(mda_original)
 
     # 3. Single Feature Importance (SFI) - on original features for interpretability
-    # SFI on features that survived alignment with X (which are orthogonal)
-    # But SFI usually wants original features.
-    # We have 'features' returned from machine_learning_cycle which are the raw features.
-    # However, 'features' might not align perfectly with X if rows were dropped.
-    # Let's align.
     print("\n3. Single Feature Importance (SFI) on original features:")
-    # Using features.loc[X.index] ensures alignment
     sfi_importance = feature_importance_sfi(
-        trained_model, features.loc[X.index], y, cv, sample_weights, t1
+        trained_model, original_features.loc[X.index], y, cv, sample_weights, t1
     )
     print(sfi_importance)
 
     # 4. Orthogonal Feature Importance
-    print("\n4. Orthogonal Feature Importance (PCA-based):")
-    ortho_importance = feature_importance_orthogonal(
-        trained_model, X, y, sample_weights, pca
-    )
-    print(ortho_importance)
+    if pca:
+        print("\n4. Orthogonal Feature Importance (PCA-based):")
+        ortho_importance = feature_importance_orthogonal(
+            trained_model, X, y, sample_weights, pca
+        )
+        print(ortho_importance)
 
-    # 5. Rank Correlation between ML Importance and PCA Eigenvalues
-    ml_importance = ortho_importance["Orthogonal Importance"]
-    eigen_importance = ortho_importance["Explained Variance"]
+        # 5. Rank Correlation between ML Importance and PCA Eigenvalues
+        ml_importance = ortho_importance["Orthogonal Importance"]
+        eigen_importance = ortho_importance["Explained Variance"]
 
-    tau, p_value = weighted_kendalls_tau(ml_importance, eigen_importance)
-    print("\n5. Weighted Kendall's Tau between ML Importance and PCA Eigenvalues:")
-    print(f"Correlation: {tau:.4f} (p-value: {p_value:.4f})")
+        tau, p_value = weighted_kendalls_tau(ml_importance, eigen_importance)
+        print("\n5. Weighted Kendall's Tau between ML Importance and PCA Eigenvalues:")
+        print(f"Correlation: {tau:.4f} (p-value: {p_value:.4f})")
 
 
 if __name__ == "__main__":
