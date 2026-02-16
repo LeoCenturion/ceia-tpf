@@ -38,6 +38,20 @@ class AbstractMLPipeline(ABC):
         """
         pass
 
+    def log_config(self, logger):
+        """
+        Log pipeline configuration and metadata to MLflow.
+        """
+        logger.log_params(self.config, prefix="pipeline_config")
+        logger.log_params({"pipeline_class": self.__class__.__name__})
+
+    def log_results(self, logger, model, X_test=None, y_test=None):
+        """
+        Hook for logging custom results after model training.
+        Can be overridden by subclasses to log specific model artifacts (e.g. AutoGluon leaderboard).
+        """
+        pass
+
     @timer
     def run_cv(self, raw_tick_data, model):
         """
