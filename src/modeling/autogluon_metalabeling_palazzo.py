@@ -6,12 +6,11 @@ import xgboost as xgb
 from sklearn.base import clone
 from sklearn.metrics import (
     classification_report,
-    accuracy_score,
     precision_score,
-    recall_score,
     f1_score,
 )
 from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
 
 # Make the script runnable from anywhere
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -21,6 +20,7 @@ if project_root not in sys.path:
 from src.data_analysis.data_analysis import fetch_historical_data
 from src.modeling.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
 from src.modeling.autogluon_adapter import AutoGluonAdapter
+from src.modeling.pipeline_runner import run_pipeline
 from src.modeling import PurgedKFold
 from src.constants import VOLUME_COL, CLOSE_COL
 
@@ -32,6 +32,11 @@ class PalazzoMetaLabelingPipeline(PalazzoXGBoostPipeline):
     trains a Meta-Model to predict correctness of Primary Model,
     and then evaluates on Test.
     """
+
+    def __init__(self, config):
+        super().__init__(config)
+        self._scaler = None
+        self._pca = None
 
     def generate_oof_predictions(self, X, y, t1, sw, model):
         """
@@ -102,11 +107,62 @@ class PalazzoMetaLabelingPipeline(PalazzoXGBoostPipeline):
             index=X.index,
         )
 
-    def run_metalabeling_experiment(self, raw_data, primary_model, meta_model_config):
+    def log_results(self, logger, primary_model, meta_model, metrics, X_test, y_test, t1_test):
+        """
+        Log Meta-Labeling specific artifacts and metrics.
+        """
+        logger.log_metrics(metrics)
+
+        # Log AutoGluon Meta-Model Leaderboard
+        if hasattr(meta_model, 'leaderboard') and X_test is not None and y_test is not None:
+            print("\n--- AutoGluon Meta-Model Leaderboard ---")
+            leaderboard_data = X_test.copy()
+            leaderboard_data["primary_prob"] = primary_model.predict_proba(self._transform_data(X_test))[:, 1]
+            leaderboard_data["primary_pred"] = primary_model.predict(self._transform_data(X_test))
+            # The meta-model was trained on meta_labels derived from primary model's correctness.
+            # We need to recreate meta_labels for test set for leaderboard.
+            primary_test_pred = primary_model.predict(self._transform_data(X_test))
+            meta_labels_test = (primary_test_pred == y_test).astype(int)
+            leaderboard_data[meta_model.label] = meta_labels_test # Assuming meta_model.label is 'label'
+
+            leaderboard = meta_model.leaderboard(leaderboard_data, silent=True)
+            print(leaderboard)
+            
+            if leaderboard is not None and not leaderboard.empty:
+                best_meta_model_score = leaderboard.iloc[0]['score_test']
+                best_meta_model_name = leaderboard.iloc[0]['model']
+                logger.log_metrics({"test_f1_best_meta_model": best_meta_model_score})
+                logger.log_params({"best_meta_model_name": best_meta_model_name})
+                
+                lb_path = "autogluon_meta_leaderboard.csv"
+                leaderboard.to_csv(lb_path)
+                logger.log_artifact(lb_path)
+                if os.path.exists(lb_path):
+                    os.remove(lb_path)
+
+    def _transform_data(self, X):
+        """Helper to apply scaling and PCA if enabled, for consistency."""
+        if self._scaler is None:
+            raise RuntimeError("Scaler not fitted. Run the pipeline first.")
+
+        X_scaled = self._scaler.transform(X)
+        
+        if self._pca:
+            X_transformed = self._pca.transform(X_scaled)
+        else:
+            X_transformed = X_scaled
+        return X_transformed
+
+
+    def run(self, raw_data, model_cls, model_params):
         """
         Runs the full meta-labeling experiment.
         """
-        # 1. Preprocessing (Step 1, 2, 3) on FULL data
+        primary_model_params = model_params.get("primary_model_params", {})
+        meta_model_config = model_params.get("meta_model_config", {})
+
+        # Instantiate primary model
+        primary_model = xgb.XGBClassifier(**primary_model_params)
         bars = self.step_1_data_structuring(raw_data)
         features = self.step_2_feature_engineering(bars)
         labels, sample_weights, t1 = self.step_3_labeling_and_weighting(bars)
@@ -165,7 +221,7 @@ class PalazzoMetaLabelingPipeline(PalazzoXGBoostPipeline):
 
         # 5. Train Meta-Model (AutoGluon)
         print("Training Meta-Model (AutoGluon)...")
-        meta_model = AutoGluonAdapter(**meta_model_config)
+        meta_model = model_cls(**meta_model_config)
         # We don't use sample weights for meta-model for now (or could use same weights)
         meta_model.fit(X_meta_train, meta_labels)
 
@@ -173,19 +229,17 @@ class PalazzoMetaLabelingPipeline(PalazzoXGBoostPipeline):
         print("Training Final Primary Model on all Training Data...")
 
         # Scale/PCA on full train
-        scaler = StandardScaler()
-        X_train_scaled = scaler.fit_transform(X_train)
+        self._scaler = StandardScaler()
+        X_train_scaled = self._scaler.fit_transform(X_train)
 
         if self.config.get("use_pca", False):
-            from sklearn.decomposition import PCA
-
-            pca = PCA(
+            self._pca = PCA(
                 n_components=self.config.get("pca_components", 0.95), random_state=42
             )
-            X_train_final = pca.fit_transform(X_train_scaled)
+            X_train_final = self._pca.fit_transform(X_train_scaled)
         else:
             X_train_final = X_train_scaled
-            pca = None
+            self._pca = None # Ensure _pca is None if not used
 
         primary_final = clone(primary_model)
         primary_final.fit(X_train_final, y_train, sample_weight=sw_train.values)
@@ -194,11 +248,7 @@ class PalazzoMetaLabelingPipeline(PalazzoXGBoostPipeline):
         print("\n--- Evaluation on Holdout Test Set ---")
 
         # Prepare Test Features
-        X_test_scaled = scaler.transform(X_test)
-        if pca:
-            X_test_final = pca.transform(X_test_scaled)
-        else:
-            X_test_final = X_test_scaled
+        X_test_final = self._transform_data(X_test)
 
         # Primary Predictions on Test
         primary_test_pred = primary_final.predict(X_test_final)
@@ -246,19 +296,26 @@ class PalazzoMetaLabelingPipeline(PalazzoXGBoostPipeline):
 
         print(f"Precision Improvement: {prec_baseline:.4f} -> {prec_meta:.4f}")
 
-        return primary_final, meta_model
+        metrics = {
+            "baseline_precision": prec_baseline,
+            "metalabeling_precision": prec_meta,
+            "baseline_f1_weighted": f1_score(y_test, primary_test_pred, average="weighted"),
+            "metalabeling_f1_weighted": f1_score(y_test, final_decision, average="weighted")
+        }
+
+        return primary_final, meta_model, metrics, X_test, y_test, t1_test
 
 
 def main():
-    # Load data
+    data_path = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv"
     raw_data = fetch_historical_data(
         symbol="BTC/USDT",
         timeframe="1m",
-        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv",
+        data_path=data_path,
     )
     raw_data.rename(columns={VOLUME_COL: "volume", CLOSE_COL: "close"}, inplace=True)
 
-    # Configuration
+    # Configuration for the PalazzoMetaLabelingPipeline
     pipeline_config = {
         "volume_threshold": 50000,
         "tau": 0.7,
@@ -268,8 +325,8 @@ def main():
         "pca_components": 0.95,
     }
 
-    # Primary Model (XGBoost)
-    xgb_params = {
+    # Primary Model (XGBoost) parameters
+    primary_model_params = {
         "objective": "binary:logistic",
         "eval_metric": "auc",
         "tree_method": "hist",
@@ -278,21 +335,33 @@ def main():
         "learning_rate": 0.1,
         "max_depth": 6,
     }
-    primary_model = xgb.XGBClassifier(**xgb_params)
 
-    # Meta Model Config (AutoGluon)
-    meta_config = {
-        "label": "label",  # Actually we pass y directly, but adapter needs this attr
+    # Meta Model Config (AutoGluon) parameters
+    meta_model_config = {
+        "label": "label",  # Label for AutoGluon
         "eval_metric": "f1",
         "presets": "medium_quality",
-        "time_limit": 120,  # Higher limit for meta model as it has more features
+        "time_limit": 120,
         "path": "AutogluonModels/metalabeling",
         "verbosity": 2,
     }
 
-    pipeline = PalazzoMetaLabelingPipeline(pipeline_config)
-    pipeline.run_metalabeling_experiment(raw_data, primary_model, meta_config)
+    # Combine all model parameters for run_pipeline
+    model_params = {
+        "primary_model_params": primary_model_params,
+        "meta_model_config": meta_model_config,
+    }
 
+    pipeline = PalazzoMetaLabelingPipeline(pipeline_config)
+
+    run_pipeline(
+        pipeline=pipeline,
+        model_cls=AutoGluonAdapter, # This will be the class for the meta-model
+        raw_data=raw_data,
+        model_params=model_params,
+        experiment_name="MetaLabeling_Palazzo_Pipeline",
+        data_path=data_path,
+    )
 
 if __name__ == "__main__":
     main()
