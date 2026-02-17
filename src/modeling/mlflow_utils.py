@@ -1,6 +1,7 @@
 import mlflow
 import os
 import pandas as pd
+import json
 from datetime import datetime
 
 class MLflowLogger:
@@ -66,6 +67,17 @@ class MLflowLogger:
     def log_artifact(self, local_path):
         """Log a local file as an artifact."""
         mlflow.log_artifact(local_path)
+
+    def log_artifact_dict(self, dictionary, artifact_path):
+        """
+        Log a dictionary as a JSON artifact.
+        """
+        import json
+        temp_filepath = f"temp_{artifact_path}"
+        with open(temp_filepath, 'w') as f:
+            json.dump(dictionary, f, indent=4)
+        mlflow.log_artifact(temp_filepath)
+        os.remove(temp_filepath)
 
     def end_run(self):
         """End the current run."""

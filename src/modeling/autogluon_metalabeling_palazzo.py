@@ -1,5 +1,4 @@
 import os
-import sys
 import numpy as np
 import pandas as pd
 import xgboost as xgb
@@ -11,11 +10,6 @@ from sklearn.metrics import (
 )
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-
-# Make the script runnable from anywhere
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
 
 from src.data_analysis.data_analysis import fetch_historical_data
 from src.modeling.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
@@ -107,11 +101,18 @@ class PalazzoMetaLabelingPipeline(PalazzoXGBoostPipeline):
             index=X.index,
         )
 
-    def log_results(self, logger, primary_model, meta_model, metrics, X_test, y_test, t1_test):
+    def log_results(self, logger, primary_model, meta_model, metrics, X_test, y_test, t1_test, primary_test_pred, final_decision):
         """
         Log Meta-Labeling specific artifacts and metrics.
         """
         logger.log_metrics(metrics)
+
+        # Capture and log full classification reports as artifacts
+        baseline_report = classification_report(y_test, primary_test_pred, output_dict=True)
+        meta_labeling_report = classification_report(y_test, final_decision, output_dict=True)
+
+        logger.log_artifact_dict(baseline_report, "baseline_classification_report.json")
+        logger.log_artifact_dict(meta_labeling_report, "meta_labeling_classification_report.json")
 
         # Log AutoGluon Meta-Model Leaderboard
         if hasattr(meta_model, 'leaderboard') and X_test is not None and y_test is not None:
@@ -121,7 +122,6 @@ class PalazzoMetaLabelingPipeline(PalazzoXGBoostPipeline):
             leaderboard_data["primary_pred"] = primary_model.predict(self._transform_data(X_test))
             # The meta-model was trained on meta_labels derived from primary model's correctness.
             # We need to recreate meta_labels for test set for leaderboard.
-            primary_test_pred = primary_model.predict(self._transform_data(X_test))
             meta_labels_test = (primary_test_pred == y_test).astype(int)
             leaderboard_data[meta_model.label] = meta_labels_test # Assuming meta_model.label is 'label'
 
@@ -303,7 +303,7 @@ class PalazzoMetaLabelingPipeline(PalazzoXGBoostPipeline):
             "metalabeling_f1_weighted": f1_score(y_test, final_decision, average="weighted")
         }
 
-        return primary_final, meta_model, metrics, X_test, y_test, t1_test
+        return primary_final, meta_model, metrics, X_test, y_test, t1_test, primary_test_pred, final_decision
 
 
 def main():
@@ -340,10 +340,13 @@ def main():
     meta_model_config = {
         "label": "label",  # Label for AutoGluon
         "eval_metric": "f1",
-        "presets": "medium_quality",
+        "presets": "high_quality",
         "time_limit": 120,
         "path": "AutogluonModels/metalabeling",
         "verbosity": 2,
+        "hyperparameters": {
+            "FT_TRANSFORMER": {}
+        }
     }
 
     # Combine all model parameters for run_pipeline
