@@ -239,16 +239,14 @@ def main():
     """
     raw_tick_data = fetch_historical_data(
         symbol="BTC/USDT",
-        timeframe="1h",
-        start_date="2020-01-01T00:00:00Z",
-        end_date="2025-08-01T00:00:00Z",
-        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1h/BTCUSDT_consolidated_klines.csv",
+        timeframe="1m",
+        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv",
     )
 
     print(raw_tick_data.head())
     raw_tick_data.index = pd.to_datetime(raw_tick_data.index)
 
-    model = RandomForestClassifier(n_estimators=1000, random_state=42, n_jobs=-1, max_features=1)
+    model = RandomForestClassifier(n_estimators=1000, random_state=42, n_jobs=-1)
     
     feature_whitelist = [
         "avg_volume_20",
@@ -313,6 +311,7 @@ def main():
     print(f"Cross-validation F1 scores: {scores}")
     print(f"Average F1 score: {np.mean(scores)}")
 
+    return 0
     # --- Feature Importance Analysis ---
     print("\n--- Feature Importance Analysis ---")
 

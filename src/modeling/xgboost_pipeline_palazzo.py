@@ -125,7 +125,7 @@ def main():
         "learning_rate": 0.1,
         "max_depth": 6,
     }
-    
+
     pipeline = PalazzoXGBoostPipeline(config)
 
     run_pipeline(

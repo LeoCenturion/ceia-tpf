@@ -16,6 +16,7 @@ class AbstractMLPipeline(ABC):
 
     def __init__(self, config):
         self.config = config
+        self.problem_type = "classification" # Default to classification
 
     @abstractmethod
     def step_1_data_structuring(self, raw_tick_data):
