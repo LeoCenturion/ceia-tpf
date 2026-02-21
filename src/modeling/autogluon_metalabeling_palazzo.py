@@ -340,13 +340,18 @@ def main():
     meta_model_config = {
         "label": "label",  # Label for AutoGluon
         "eval_metric": "f1",
-        "presets": "high_quality",
-        "time_limit": 120,
+        "time_limit": 600,
         "path": "AutogluonModels/metalabeling",
         "verbosity": 2,
         "hyperparameters": {
-            "FT_TRANSFORMER": {}
-        }
+            "FT_TRANSFORMER": {
+                "optim": {
+                    "loss_func": "focal_loss",
+                    "focal_loss": {"alpha": [0.75, 0.25], "gamma": 2.0},
+                },
+                "data": {"mixup": {"turn_on": True, "cutmix_alpha": 0.8}},
+            }
+        },
     }
 
     # Combine all model parameters for run_pipeline
