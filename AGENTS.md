@@ -26,3 +26,7 @@ This project uses optuna for hyperparameter search. The db is located in `optuna
 
 This project uses python. Try to document main functions. Try to use type hints whenever possible.
 This project uses poetry. Dependencies are defined in pyproject.toml. To run python you should ALWAYS use poetry e.g. 'poetry run python -m src.modeling.my_model'
+
+Utility scripts are in scripts/
+
+Data analysis notebooks and sctipts are found in data_analysis/. Before modifying files there you should always run make sync-notebooks. After creating a new script/notebooks you should run make pair-notebooks

@@ -2339,6 +2339,29 @@ plum-dispatch = "*"
 dev = ["matplotlib", "numpy", "pandas"]
 
 [[package]]
+name = "fawltydeps"
+version = "0.20.0"
+description = "Find undeclared and unused 3rd-party dependencies in your Python project."
+optional = false
+python-versions = ">=3.9.2"
+groups = ["main"]
+files = [
+    {file = "fawltydeps-0.20.0-py3-none-any.whl", hash = "sha256:d3bfb260c54135ec5dfa2583a7381c45d2759deb23f6de6f4905da9adac67512"},
+    {file = "fawltydeps-0.20.0.tar.gz", hash = "sha256:ad080b284a2278c9940540b643483aff8b57794a1362735d3024c270810c0182"},
+]
+
+[package.dependencies]
+importlib_metadata = ">=6.6.0"
+isort = ">=5.10"
+packaging = ">=24.0"
+pip-requirements-parser = ">=32.0.1"
+pydantic = ">=1.10.4,<3.0.0"
+PyYAML = ">=6.0.1"
+
+[package.extras]
+uv = ["uv (>=0.1.6)"]
+
+[[package]]
 name = "filelock"
 version = "3.20.0"
 description = "A platform independent file lock."
@@ -6143,6 +6166,26 @@ files = [
     {file = "pip-25.2-py3-none-any.whl", hash = "sha256:6d67a2b4e7f14d8b31b8b52648866fa717f45a1eb70e83002f4331d07e953717"},
     {file = "pip-25.2.tar.gz", hash = "sha256:578283f006390f85bb6282dffb876454593d637f5d1be494b5202ce4877e71f2"},
 ]
+
+[[package]]
+name = "pip-requirements-parser"
+version = "32.0.1"
+description = "pip requirements parser - a mostly correct pip requirements parsing library because it uses pip's own code."
+optional = false
+python-versions = ">=3.6.0"
+groups = ["main"]
+files = [
+    {file = "pip-requirements-parser-32.0.1.tar.gz", hash = "sha256:b4fa3a7a0be38243123cf9d1f3518da10c51bdb165a2b2985566247f9155a7d3"},
+    {file = "pip_requirements_parser-32.0.1-py3-none-any.whl", hash = "sha256:4659bc2a667783e7a15d190f6fccf8b2486685b6dba4c19c3876314769c57526"},
+]
+
+[package.dependencies]
+packaging = "*"
+pyparsing = "*"
+
+[package.extras]
+docs = ["Sphinx (>=3.3.1)", "doc8 (>=0.8.1)", "sphinx-rtd-theme (>=0.5.0)"]
+testing = ["aboutcode-toolkit (>=6.0.0)", "black", "pytest (>=6,!=7.0.0)", "pytest-xdist (>=2)"]
 
 [[package]]
 name = "platformdirs"
@@ -10364,4 +10407,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11,<3.13"
-content-hash = "a031707493749140dac41cde7a7ae9aa474ebc5e3444e9cfb088db73cd8d06df"
+content-hash = "9f2d7231cd285d1fbc1c6d3430d0d138730dacc0d5044c42fef85d00c90f3860"

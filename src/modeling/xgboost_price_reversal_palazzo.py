@@ -119,7 +119,7 @@ def ultimate_oscillator(
     medium: int = 14,
     slow: int = 28,
 ):
-    close_prev = close.shift(1).fillna(method="bfill")
+    close_prev = close.shift(1).bfill()
     bp = close - pd.concat([low, close_prev], axis=1).min(axis=1)
     tr = true_range(high, low, close)
 

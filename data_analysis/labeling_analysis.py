@@ -1,3 +1,19 @@
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     formats: ipynb,py:percent
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.19.1
+#   kernelspec:
+#     display_name: Python 3 (ipykernel)
+#     language: python
+#     name: python3
+# ---
+
 # %% [markdown]
 # # Label Concurrency Analysis
 #
@@ -56,11 +72,14 @@ sns.set_style("whitegrid")
 
 # %%
 DATA_PATH = '/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1h/BTCUSDT_consolidated_klines.csv'
-START_DATE = "2022-01-01"
+START_DATE = "2020-01-01"
 data = fetch_historical_data(data_path=DATA_PATH, start_date=START_DATE, timeframe="1d")
 data = adjust_data_to_ubtc(data)
 data.dropna(inplace=True)
 close = data["Close"]
+# Common parameters
+LOOK_FORWARD = 5  # 20 days
+VOL_WINDOW = 30    # 20-day rolling volatility
 
 print(f"Data loaded from {data.index.min()} to {data.index.max()}")
 print(f"Number of data points: {len(data)}")
@@ -72,9 +91,6 @@ print(f"Number of data points: {len(data)}")
 # We will generate labels using three different methods to compare their concurrency properties.
 
 # %%
-# Common parameters
-LOOK_FORWARD = 5  # 20 days
-VOL_WINDOW = 30    # 20-day rolling volatility
 
 # --- Strategy 1: Fixed-Time Horizon Labels ---
 print("Generating Fixed-Time Horizon Labels...")
@@ -241,9 +257,9 @@ def get_tb_labels(bars, name):
     labels = create_triple_barrier_labels(
         close=bars["Close"],
         volatility=vol,
-        look_forward=31, 
-        pt_sl_multipliers=(2.0, 2.0),
-        label_timeout_by_sign=True,
+        look_forward=8, 
+        pt_sl_multipliers=(1, 1),
+        label_timeout_by_sign=False,
     )
     return labels, bars["Close"]
 
@@ -253,6 +269,12 @@ dollar_labels, dollar_close = get_tb_labels(dollar_bars, "Dollar Bars")
 print("Generating labels for Volume Bars...")
 volume_labels, volume_close = get_tb_labels(volume_bars, "Volume Bars")
 
+
+
+# %%
+dollar_labels.label.value_counts()
+
+# %%
 # 3. Compute Concurrency
 print("Computing concurrency...")
 concurrency_dollar = count_concurrent_labels(dollar_labels["event_end_time"], dollar_close.index)
@@ -284,3 +306,5 @@ concurrency_stats_alt = pd.DataFrame({
     "Volume Bars": concurrency_volume.describe()
 })
 print(concurrency_stats_alt)
+
+# %%

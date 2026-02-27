@@ -1,12 +1,28 @@
-#%% [markdown]
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     formats: ipynb,py:percent
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.19.1
+#   kernelspec:
+#     display_name: Python 3 (ipykernel)
+#     language: python
+#     name: python3
+# ---
+
+# %% [markdown]
 # BTC Price Data Analysis (Percentage Change)
 #
 # This script performs a basic analysis of BTC/USDT hourly price data, focusing on the behavior of the percentage change in the close price.
 
-#%% [markdown]
+# %% [markdown]
 # ## 1. Load Data and Libraries
 
-#%%
+# %%
 import sys
 import os
 current_dir = os.getcwd()
@@ -34,10 +50,10 @@ sns.set(style="whitegrid")
 
 print("Libraries loaded.")
 
-#%% [markdown]
+# %% [markdown]
 # ### Helper Functions
 
-#%%
+# %%
 def sma(series, n):
     """Calculates the Simple Moving Average."""
     return series.rolling(window=n).mean()
@@ -48,10 +64,10 @@ def awesome_oscillator(high: pd.Series, low: pd.Series, fast_period: int = 5, sl
     ao = sma(median_price, fast_period) - sma(median_price, slow_period)
     return ao
 
-#%% [markdown]
+# %% [markdown]
 # ## 2. Load and Prepare Data
 
-#%%
+# %%
 DATA_PATH = '/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1h/BTCUSDT_consolidated_klines.csv'
 df = pd.read_csv(DATA_PATH)
 
@@ -65,12 +81,12 @@ df.drop(columns=['date'], inplace=True)
 print("Data loaded and prepared. Shape:", df.shape)
 print(df.head())
 
-#%% [markdown]
+# %% [markdown]
 # ## 3. Analyze Close Price Percentage Change
-# 
+#
 # We calculate the percentage change of the closing price. This normalizes the price changes and is a standard way to analyze financial time series. It's also a crucial step for time series modeling, as models like ARIMA often require stationary data.
 
-#%%
+# %%
 # Calculate the percentage change in the closing price
 df['close_pct_change'] = (df['close'].pct_change()) * 100
 
@@ -80,10 +96,10 @@ df.dropna(subset=['close_pct_change'], inplace=True)
 print("Close price percentage change calculated.")
 print(df[['close', 'close_pct_change']].head())
 
-#%% [markdown]
+# %% [markdown]
 # ### 3.1. Time Series Plot of Price Percentage Change
 
-#%%
+# %%
 print("Plotting the close price percentage change over time...")
 plt.figure(figsize=(15, 7))
 plt.plot(df.index, df['close_pct_change'], label='Close Price Percentage Change', linewidth=0.7)
@@ -93,13 +109,13 @@ plt.ylabel('Price Change (%)')
 plt.legend()
 plt.show()
 
-#%% [markdown]
+# %% [markdown]
 # The plot shows that the percentage change is centered around zero but exhibits volatility clustering—periods of high volatility are followed by more high volatility, and vice versa.
 
-#%% [markdown]
+# %% [markdown]
 # ### 3.2. Distribution of Price Percentage Change
 
-#%%
+# %%
 print("Plotting the distribution of the close price percentage change...")
 plt.figure(figsize=(12, 6))
 sns.histplot(df['close_pct_change'], bins=100, kde=True)
@@ -108,25 +124,25 @@ plt.xlabel('Price Change (%)')
 plt.ylabel('Frequency')
 plt.show()
 
-#%% [markdown]
+# %% [markdown]
 # The distribution is highly leptokurtic (sharply peaked at zero with heavy tails), which is a classic characteristic of financial returns. This indicates that extreme price changes occur more frequently than a normal distribution would predict.
 
-#%% [markdown]
+# %% [markdown]
 # ### 3.3. Descriptive Statistics
 
-#%%
+# %%
 print("Descriptive Statistics for Close Price Percentage Change:")
 print(df['close_pct_change'].describe())
 
-#%% [markdown]
+# %% [markdown]
 # The mean is very close to zero. The standard deviation confirms the significant volatility, and the min/max values highlight the extreme hourly percentage swings present in the data.
 
-#%% [markdown]
+# %% [markdown]
 # ### 3.4. Stationarity Test (Augmented Dickey-Fuller)
-# 
+#
 # We perform an ADF test to formally check if the percentage change series is stationary. The null hypothesis is that the series is non-stationary.
 
-#%%
+# %%
 print("Performing Augmented Dickey-Fuller (ADF) test for stationarity...")
 adf_result = adfuller(df['close_pct_change'])
 
@@ -142,13 +158,13 @@ else:
     print("\nResult: The series is not stationary (p-value > 0.05).")
 
 
-#%% [markdown]
+# %% [markdown]
 # The extremely low p-value allows us to confidently reject the null hypothesis, confirming that the percentage change series is stationary. This is a suitable input for time series models.
 
-#%% [markdown]
+# %% [markdown]
 # ### 3.5. Zoomed-in Histogram of Price Percentage Change
 
-#%%
+# %%
 print("Plotting the zoomed-in distribution for price changes between -0.1% and 0.1%...")
 zoomed_data = df['close_pct_change'].loc[(df['close_pct_change'] >= -0.1) & (df['close_pct_change'] <= 0.1)]
 
@@ -159,13 +175,13 @@ plt.xlabel('Price Change (%)')
 plt.ylabel('Frequency')
 plt.show()
 
-#%% [markdown]
+# %% [markdown]
 # Zooming in on the vast majority of the data, we can see the distribution around zero more clearly.
 
-#%% [markdown]
+# %% [markdown]
 # ### 3.6. Cumulative Distribution of Absolute Price Change
 
-#%%
+# %%
 print("Plotting the Cumulative Distribution Function (CDF) of absolute percentage changes...")
 df['abs_close_pct_change'] = df['close_pct_change'].abs()
 
@@ -177,20 +193,20 @@ plt.ylabel('Cumulative Probability')
 plt.grid(True, which="both", ls="--")
 plt.show()
 
-#%% [markdown]
+# %% [markdown]
 # The CDF plot shows the probability of observing a price change of a certain magnitude or less. For example, you can use it to find the value on the x-axis that corresponds to 0.95 on the y-axis to see what magnitude of price change accounts for 95% of all hourly movements.
 
-#%% [markdown]
+# %% [markdown]
 # ## 4. Awesome Oscillator Analysis
 
-#%% [markdown]
+# %% [markdown]
 # We will now analyze the Awesome Oscillator (AO). We'll compute it in two ways:
 # 1. Using the raw `High` and `Low` prices.
 # 2. Using the percentage change of the `High` and `Low` prices.
-# 
+#
 # This comparison will help visualize how the oscillator behaves on the price series versus the returns series.
 
-#%%
+# %%
 # Calculate AO on raw prices
 print("Calculating Awesome Oscillator on raw prices...")
 df['ao_price'] = awesome_oscillator(df['high'], df['low'])
@@ -208,10 +224,10 @@ df['ao_pct_change'] = awesome_oscillator(high_pct_change_filled, low_pct_change_
 print("Awesome Oscillators calculated.")
 print(df[['ao_price', 'ao_pct_change']].head())
 
-#%% [markdown]
+# %% [markdown]
 # ### 4.1. Plotting Awesome Oscillators
 
-#%%
+# %%
 print("Plotting Awesome Oscillators for comparison...")
 fig, axes = plt.subplots(2, 1, figsize=(15, 10), sharex=True)
 
@@ -233,10 +249,10 @@ plt.xlabel('Date')
 fig.tight_layout()
 plt.show()
 
-#%% [markdown]
+# %% [markdown]
 # The plots show a stark difference. The AO on raw prices reflects longer-term price trends and momentum, with large swings. The AO on percentage change is much more stationary and centered around zero, reflecting the short-term volatility and returns behavior rather than the price level itself.
 
-#%% [markdown]
+# %% [markdown]
 # ## 5. Consecutive Runs Analysis
 #
 # Here, we analyze the length of consecutive periods of positive or negative price changes. A "run" is a sequence of one or more hours where the price change has the same sign. For example:
@@ -246,7 +262,7 @@ plt.show()
 #
 # This analysis can help identify if there is momentum or mean-reversion behavior in the short term.
 
-#%%
+# %%
 print("Analyzing consecutive runs of positive and negative price changes...")
 
 # Determine the sign of the price change, treating 0 as neutral
@@ -266,7 +282,7 @@ runs = runs[runs != 0]
 print("Consecutive runs calculated. Descriptive statistics:")
 print(runs.describe())
 
-#%%
+# %%
 # Plot a histogram of the runs
 print("\nPlotting the histogram of consecutive runs...")
 plt.figure(figsize=(14, 7))
@@ -278,17 +294,17 @@ plt.xticks(np.arange(int(runs.min()), int(runs.max()) + 1, 1))
 plt.grid(True, which="both", ls="--")
 plt.show()
 
-#%% [markdown]
+# %% [markdown]
 # The histogram shows that short runs (of length 1, 2, or 3) are very common, while long streaks of consecutive gains or losses are increasingly rare. This is consistent with the behavior of a volatile asset where the direction can change frequently.
 
-#%% [markdown]
+# %% [markdown]
 # ### 5.1. Run Transition Probability Analysis
 #
 # Now, we'll analyze the probability of transitioning from a run of one length to another. For example, what is the likelihood that a 1-hour run of gains is followed by a 1-hour run of losses? This can be modeled as a Markov chain, and we can compute the transition matrix.
 #
 # We will focus on transitions between runs of length -5 to +5.
 
-#%%
+# %%
 print("Calculating run transition probabilities...")
 # Create a DataFrame of consecutive run pairs
 transitions = pd.DataFrame({'from': runs, 'to': runs.shift(-1)}).dropna()
@@ -310,7 +326,7 @@ transition_matrix = transition_probabilities.reindex(index=run_range, columns=ru
 print("Transition Matrix (-5 to +5):")
 print(transition_matrix.to_string(float_format="%.3f"))
 
-#%%
+# %%
 # Plot the transition matrix as a heatmap
 print("\nPlotting the transition probability heatmap...")
 plt.figure(figsize=(12, 10))
@@ -320,12 +336,12 @@ plt.xlabel('From Run Length')
 plt.ylabel('To Run Length')
 plt.show()
 
-#%% [markdown]
+# %% [markdown]
 # The heatmap shows the probability of moving from a run length on the x-axis to a run length on the y-axis.
 #
 # A key observation is the high probability along the anti-diagonal, especially for short runs. For example, there's a high likelihood that a run of `+1` is followed by a run of `-1`, and vice-versa. This suggests a strong tendency for the price direction to revert after short periods, which aligns with the previous observation that long runs are rare.
 
-#%% [markdown]
+# %% [markdown]
 # ### 5.2. Conditional Probability of Run Continuation
 #
 # Here we analyze the probability that a run of a certain length will continue for at least one more period. For example, given that we have observed two consecutive hours of price increases (a run of +2), what is the probability that the next hour will also be an increase, extending the run to +3?
@@ -333,7 +349,7 @@ plt.show()
 # This is calculated for positive and negative runs separately. The probability is:
 # `P(Run extends to N+1 | Run has reached length N) = (Total number of runs with length >= N+1) / (Total number of runs with length >= N)`
 
-#%%
+# %%
 print("Calculating conditional probabilities of run continuation...")
 
 positive_runs = runs[runs > 0]
@@ -364,7 +380,7 @@ prob_df.index.name = 'Run Extension'
 print("Conditional Probabilities of Run Continuation:")
 print(prob_df.to_string(float_format="%.3f"))
 
-#%%
+# %%
 # Plot the continuation probabilities
 print("\nPlotting the run continuation probabilities...")
 prob_df.plot(kind='bar', figsize=(14, 7), rot=0)
@@ -375,15 +391,15 @@ plt.grid(axis='y', linestyle='--')
 plt.legend(title='Run Type')
 plt.show()
 
-#%% [markdown]
+# %% [markdown]
 # The bar chart shows the probability that a run of length N will extend to N+1. For both positive and negative runs, the probability of continuation is consistently below 0.5 and generally decreases as the run gets longer. This reinforces the idea of mean reversion in the hourly price changes; the longer a directional streak continues, the more likely it is to break.
 
-#%% [markdown]
+# %% [markdown]
 # ## 6. Buy and Hold Performance Metrics
 #
 # This section calculates standard performance metrics for a simple "buy and hold" strategy over the entire dataset. This provides a baseline against which any active trading strategy can be compared.
 
-#%%
+# %%
 print("Calculating Buy and Hold performance metrics...")
 
 # --- 1. Calculate Daily Returns ---
@@ -421,7 +437,7 @@ print(f"Annualized Volatility: {annualized_volatility:.2%}")
 print(f"Sharpe Ratio: {sharpe_ratio:.2f}")
 print(f"Maximum Drawdown: {max_drawdown:.2%}")
 
-#%% [markdown]
+# %% [markdown]
 # ## 7. Volume and Dollar Bar Analysis
 #
 # Time-based bars (like the hourly data we've used) are standard, but they don't account for market activity. During quiet periods, time bars have low volume and volatility, while during active periods, they can contain multiple significant market events.
@@ -432,7 +448,7 @@ print(f"Maximum Drawdown: {max_drawdown:.2%}")
 #
 # This approach samples data more frequently during high-activity periods and less frequently during low-activity periods, potentially providing a better signal for analysis and strategy development. We will use the average hourly volume and dollar value as thresholds to create these bars.
 
-#%%
+# %%
 print("Creating Volume and Dollar bars...")
 
 # Calculate thresholds based on the average hourly activity
@@ -447,12 +463,10 @@ print(f"Using Dollar Threshold: ${avg_hourly_usdt_volume:,.2f} USDT")
 df_for_bars = fetch_historical_data(
         symbol="BTC/USDT",
         timeframe="1m",
-        start_date="2025-06-01T00:00:00Z",
+        start_date="2020-01-01T00:00:00Z",
         end_date="2025-08-01T00:00:00Z",
         data_path=DATA_PATH,
     )
-# df_for_bars = df.reset_index().rename(columns={'timestamp': 'date'})
-
 # Create the bars
 volume_bars = create_volume_bars(df_for_bars, volume_threshold=avg_hourly_btc_volume)
 dollar_bars = create_dollar_bars(df_for_bars, dollar_threshold=avg_hourly_usdt_volume)
@@ -461,15 +475,15 @@ print(f"\nNumber of original 1-hour bars: {len(df)}")
 print(f"Number of volume bars created: {len(volume_bars)}")
 print(f"Number of dollar bars created: {len(dollar_bars)}")
 
-#%% [markdown]
+# %% [markdown]
 # The number of bars created is very similar to the original number of hourly bars, which is expected since we used the average hourly activity as the threshold. However, the timing of these bars will now be irregular.
 
-#%% [markdown]
+# %% [markdown]
 # ### 7.1. Analysis of Volume
-# 
+#
 # First, let's look at the trading volume (in USDT) from the original hourly data to see how activity varies over time.
 
-#%%
+# %%
 print("Plotting hourly trading volume over time...")
 plt.figure(figsize=(15, 7))
 plt.plot(df.index, df['Volume USDT'], label='Hourly Volume (USDT)', color='purple', alpha=0.7, linewidth=0.8)
@@ -479,12 +493,12 @@ plt.ylabel('Volume (USDT)')
 plt.legend()
 plt.show()
 
-#%% [markdown]
+# %% [markdown]
 # The plot clearly shows periods of high and low trading activity, reinforcing the idea that a fixed time interval may not be the best way to sample the market.
-# 
+#
 # Next, we'll examine the distribution of the volumes within the bars we created. Since we defined a fixed threshold for bar creation, we expect the volumes to be clustered around that threshold.
 
-#%%
+# %%
 print("Plotting the distribution of volumes within the generated bars...")
 fig, axes = plt.subplots(1, 2, figsize=(16, 6))
 
@@ -505,13 +519,13 @@ axes[1].legend()
 fig.tight_layout()
 plt.show()
 
-#%% [markdown]
+# %% [markdown]
 # As expected, the distributions are tightly centered around the threshold values we used. The small variations occur because a bar is only formed *after* the cumulative volume crosses the threshold, so the final volume for a bar is typically slightly higher than the threshold itself.
 
-#%% [markdown]
+# %% [markdown]
 # ### 7.2. Comparison of Close Prices
 
-#%%
+# %%
 print("Plotting comparison of close prices across bar types...")
 plt.figure(figsize=(15, 8))
 
@@ -526,15 +540,15 @@ plt.ylabel('Price (USDT)')
 plt.legend()
 plt.show()
 
-#%% [markdown]
+# %% [markdown]
 # The plot shows how volume and dollar bars sample the price series. During periods of low volatility and volume, the points for volume/dollar bars are sparse. During periods of high activity, they are clustered together, capturing more detail than fixed time bars.
 
-#%% [markdown]
+# %% [markdown]
 # ### 7.3. Analysis of Bar Durations
 #
 # A key feature of volume and dollar bars is their variable duration in time. Let's analyze the distribution of these durations.
 
-#%%
+# %%
 print("Analyzing the distribution of bar durations...")
 
 # Calculate duration in hours for each bar
@@ -556,17 +570,17 @@ axes[1].set_xlabel('Duration (hours)')
 fig.tight_layout()
 plt.show()
 
-#%% [markdown]
+# %% [markdown]
 # The distributions show that most bars complete in under an hour, which is expected as we used the average hourly volume as a threshold. The right-skewed tail indicates that some bars take much longer to form, corresponding to periods of very low market activity.
 
-#%%
+# %%
 print("Descriptive statistics for bar durations (in hours):")
 print("\n--- Volume Bar Duration ---")
 print(volume_bars['duration_hours'].describe())
 print("\n--- Dollar Bar Duration ---")
 print(dollar_bars['duration_hours'].describe())
 
-#%% [markdown]
+# %% [markdown]
 # ## 8. Statistical Properties of Returns for Different Bar Types
 #
 # A key motivation for using alternative bars (like volume or dollar bars) is that they may produce returns series with better statistical properties—closer to being independent and identically distributed (i.i.d.) Gaussian. This is desirable for many financial models.
@@ -576,7 +590,7 @@ print(dollar_bars['duration_hours'].describe())
 # 2.  **Serial Correlation**: Are the returns independent of each other? We'll use the Ljung-Box test to check for autocorrelation.
 # 3.  **Homoscedasticity**: Is the variance of returns constant over time? We will use Levene's test to compare the variance of the first and second halves of the data.
 
-#%%
+# %%
 def analyze_returns_properties(returns: pd.Series, bar_type: str):
     """
     Performs and prints a statistical analysis of a returns series.
@@ -631,19 +645,19 @@ def analyze_returns_properties(returns: pd.Series, bar_type: str):
 
     print("-" * 50)
 
-#%% [markdown]
+# %% [markdown]
 # ### 8.1. Analysis of Time Bar Returns (Baseline)
 
-#%%
+# %%
 time_bar_returns = df['close'].pct_change()
 analyze_returns_properties(time_bar_returns, "1-Hour Time Bars")
 
-#%% [markdown]
+# %% [markdown]
 # ### 8.2. Analysis of Volume Bar Returns
 #
 # We'll analyze returns from volume bars created using three different thresholds: the mean hourly volume, the 75th percentile, and the 90th percentile.
 
-#%%
+# %%
 print("\nAnalyzing statistical properties of Volume Bar returns...")
 
 volume_thresholds = {
@@ -658,12 +672,12 @@ for label, threshold in volume_thresholds.items():
     bar_label = f"Volume Bars ({label} Threshold: {threshold:.2f} BTC)"
     analyze_returns_properties(returns, bar_label)
 
-#%% [markdown]
+# %% [markdown]
 # ### 8.3. Analysis of Dollar Bar Returns
 #
 # We'll do the same analysis for dollar bars, using thresholds based on the mean, 75th, and 90th percentiles of hourly USDT volume.
 
-#%%
+# %%
 print("\nAnalyzing statistical properties of Dollar Bar returns...")
 
 dollar_thresholds = {
@@ -678,22 +692,22 @@ for label, threshold in dollar_thresholds.items():
     bar_label = f"Dollar Bars ({label} Threshold: ${threshold:,.0f})"
     analyze_returns_properties(returns, bar_label)
 
-#%% [markdown]
+# %% [markdown]
 # ### 8.4. Summary of Findings
 #
 # This analysis typically shows that as we move from time-based sampling to activity-based sampling (volume/dollar bars), the resulting returns series often exhibit weaker serial correlation and become closer to a Gaussian distribution (i.e., lower kurtosis). This makes them a more suitable input for many standard financial models that assume i.i.d. returns. However, heteroscedasticity (non-constant variance) often remains a persistent feature in financial data, regardless of the bar type.
 
-#%% [markdown]
+# %% [markdown]
 # ## 9. Threshold Sweep Analysis for Statistical Properties
 #
 # To understand how the choice of threshold affects the statistical properties of returns, we will perform a sweep across a range of thresholds for both volume and dollar bars. We will start from the mean hourly value and go up to four times the maximum observed hourly value.
 #
 # For each threshold, we will compute the same statistical properties as before and plot them. This will help us identify if there are optimal threshold regions where the returns series is "best behaved" (e.g., lowest kurtosis, highest p-value for normality tests, etc.).
 
-#%% [markdown]
+# %% [markdown]
 # ### 9.1. Helper Functions for Threshold Sweep
 
-#%%
+# %%
 def get_returns_properties(returns: pd.Series):
     """
     Calculates statistical properties of a returns series.
@@ -827,10 +841,10 @@ def plot_threshold_sweep_analysis(
     fig.tight_layout(rect=[0, 0.03, 1, 0.96])
     plt.show()
 
-#%% [markdown]
+# %% [markdown]
 # ### 9.2. Volume Bar Threshold Sweep
 
-#%%
+# %%
 plot_threshold_sweep_analysis(
     df_for_bars=df_for_bars,
     bar_creation_func=create_volume_bars,
@@ -838,10 +852,10 @@ plot_threshold_sweep_analysis(
     sweep_title="Volume Bars (BTC)"
 )
 
-#%% [markdown]
+# %% [markdown]
 # ### 9.3. Dollar Bar Threshold Sweep
 
-#%%
+# %%
 plot_threshold_sweep_analysis(
     df_for_bars=df_for_bars,
     bar_creation_func=create_dollar_bars,
@@ -849,10 +863,10 @@ plot_threshold_sweep_analysis(
     sweep_title="Dollar Bars (USDT)"
 )
 
-#%% [markdown]
+# %% [markdown]
 # ### 9.4. Price Change Bar Threshold Sweep
 
-#%%
+# %%
 # Calculate absolute fractional price change to use for the metric series
 abs_frac_change = df['close'].pct_change().abs().dropna()
 
@@ -863,14 +877,14 @@ plot_threshold_sweep_analysis(
     sweep_title="Price Change Bars"
 )
 
-#%% [markdown]
+# %% [markdown]
 # ### 9.5. Analysis of Tick Imbalance Bar Returns
 #
 # Finally, we'll analyze the returns from Tick Imbalance Bars (TIBs). These bars are formed based on the cumulative imbalance of tick signs (+1 for upticks, -1 for downticks), using a dynamic threshold based on the expected imbalance. This method is designed to adapt to changes in market order flow.
 #
 # Note: We are applying this to 1-hour data, where each bar is treated as a single "tick". This analysis is more powerful when applied to high-frequency tick data.
 
-#%%
+# %%
 print("\nAnalyzing statistical properties of Tick Imbalance Bar returns...")
 
 # Create Tick Imbalance Bars from the hourly data.
@@ -887,7 +901,7 @@ if not tick_imbalance_bars.empty:
 else:
     print("Could not create Tick Imbalance Bars, possibly due to insufficient data.")
 
-#%%
+# %%
 # Plot the cumulative imbalance, the dynamic thresholds, and the bar sampling points
 if not tick_imbalance_bars.empty:
     print("Plotting Tick Imbalance Bar sampling process...")
@@ -928,12 +942,12 @@ if not tick_imbalance_bars.empty:
 else:
     print("No Tick Imbalance Bars were created, skipping plot.")
 
-#%% [markdown]
+# %% [markdown]
 # ## 10. Threshold Sweep Analysis on 1-Minute Data
 #
 # We will now repeat the entire threshold sweep analysis using 1-minute resolution data. This higher frequency data will allow us to see if the same patterns hold and how the much smaller time interval affects the choice of thresholds and the resulting statistical properties.
 
-#%%
+# %%
 print("\n--- Starting Analysis on 1-Minute Data ---")
 
 # --- 1. Load and Prepare 1-Minute Data ---
@@ -953,10 +967,10 @@ print("1-minute data loaded and prepared. Shape:", df_1m.shape)
 # Create the DataFrame for bar creation functions
 df_for_bars_1m = df_1m.reset_index().rename(columns={'timestamp': 'date'})
 
-#%% [markdown]
+# %% [markdown]
 # ### 10.1. Volume Bar Threshold Sweep (1-Minute Data)
 
-#%%
+# %%
 plot_threshold_sweep_analysis(
     df_for_bars=df_for_bars_1m,
     bar_creation_func=create_volume_bars,
@@ -964,10 +978,10 @@ plot_threshold_sweep_analysis(
     sweep_title="Volume Bars (BTC) from 1-Minute Data"
 )
 
-#%% [markdown]
+# %% [markdown]
 # ### 10.2. Dollar Bar Threshold Sweep (1-Minute Data)
 
-#%%
+# %%
 plot_threshold_sweep_analysis(
     df_for_bars=df_for_bars_1m,
     bar_creation_func=create_dollar_bars,
@@ -975,10 +989,10 @@ plot_threshold_sweep_analysis(
     sweep_title="Dollar Bars (USDT) from 1-Minute Data"
 )
 
-#%% [markdown]
+# %% [markdown]
 # ### 10.3. Price Change Bar Threshold Sweep (1-Minute Data)
 
-#%%
+# %%
 # Calculate absolute fractional price change to use for the metric series
 abs_frac_change_1m = df_1m['close'].pct_change().abs().dropna()
 
@@ -989,12 +1003,12 @@ plot_threshold_sweep_analysis(
     sweep_title="Price Change Bars from 1-Minute Data"
 )
 
-#%% [markdown]
+# %% [markdown]
 # ### 10.4. Summary of 1-Minute Data Analysis
 #
 # The analysis on 1-minute data generally confirms the findings from the hourly data: using activity-based bars tends to improve the statistical properties of the returns series. However, the scale of the thresholds is much smaller due to the finer time resolution. The trends of decreasing kurtosis and serial correlation with increasing thresholds remain consistent, reinforcing the validity of this sampling technique across different timeframes.
 
-#%% [markdown]
+# %% [markdown]
 # ## 11. Bar Count Stability Analysis
 #
 # One of the desirable properties of information-driven bars (Volume/Dollar) is that they tend to produce a more stable number of bars per period (e.g., per week) compared to time bars, especially when market activity fluctuates.
@@ -1006,13 +1020,13 @@ plot_threshold_sweep_analysis(
 #
 # We will measure this stability using the Coefficient of Variation (CV) of the weekly bar counts.
 
-#%%
+# %%
 def analyze_bar_count_stability(bars_df, bar_type_name, frequency='W'):
     """
     Analyzes the stability of bar counts over a specified frequency (default: Weekly).
     """
     # Resample to get counts per period
-    counts = bars_df['close'].resample(frequency).count()
+    counts = bars_df['Close'].resample(frequency).count()
     
     # Filter out incomplete periods (first and last if they might be partial)
     counts = counts[counts > 0]
@@ -1031,7 +1045,7 @@ def analyze_bar_count_stability(bars_df, bar_type_name, frequency='W'):
 print("Analyzing stability of weekly bar counts...")
 
 # 1. Time Bars (1H)
-counts_time, cv_time = analyze_bar_count_stability(df, "1-Hour Time Bars")
+counts_time, cv_time = analyze_bar_count_stability(df_for_bars, "1-Hour Time Bars")
 
 # 2. Volume Bars (from Section 7 - Mean Threshold)
 counts_vol, cv_vol = analyze_bar_count_stability(volume_bars, "Volume Bars")
@@ -1039,7 +1053,7 @@ counts_vol, cv_vol = analyze_bar_count_stability(volume_bars, "Volume Bars")
 # 3. Dollar Bars (from Section 7 - Mean Threshold)
 counts_dollar, cv_dollar = analyze_bar_count_stability(dollar_bars, "Dollar Bars")
 
-#%%
+# %%
 # Plot the weekly counts
 print("Plotting weekly bar counts...")
 plt.figure(figsize=(15, 6))
@@ -1053,16 +1067,16 @@ plt.ylabel('Number of Bars per Week')
 plt.legend()
 plt.show()
 
-#%% [markdown]
+# %% [markdown]
 # **Interpretation:**
 # A lower Coefficient of Variation (CV) indicates more stable sampling. Ideally, volume or dollar bars should show a more constant rate of information arrival (stable bar counts) compared to time bars.
 
-#%% [markdown]
+# %% [markdown]
 # ### 11.1. Threshold Sweep for Bar Count Stability
 #
 # We will now perform a sweep across different thresholds to see how the average weekly bar count and its standard deviation change. This helps in selecting a threshold that targets a specific number of bars per week while understanding the associated variability.
 
-#%%
+# %%
 def plot_bar_count_sweep(
     df_for_bars: pd.DataFrame,
     bar_creation_func,
@@ -1079,14 +1093,13 @@ def plot_bar_count_sweep(
     
     results = []
     
-    from tqdm.notebook import tqdm
-    for threshold in tqdm(thresholds, desc=f"Sweeping {title}"):
+    for threshold in thresholds:
         if threshold <= 0: continue
         
         bars = bar_creation_func(df_for_bars, threshold)
         
         # Calculate counts per period
-        counts = bars['close'].resample(frequency).count()
+        counts = bars['Close'].resample(frequency).count()
         counts = counts[counts > 0]
         
         if len(counts) < 2:
@@ -1149,17 +1162,17 @@ plot_bar_count_sweep(
     title="Dollar Bars (USDT)"
 )
 
-#%% [markdown]
+# %% [markdown]
 # ## 12. t-SNE Analysis of Feature Sets
 #
 # In this section, we explore the structure of the market data by visualizing a rich feature set using t-SNE (t-Distributed Stochastic Neighbor Embedding). The goal is to see if different market regimes or predictable patterns form distinct clusters in a low-dimensional space.
 #
 # We will create a feature set for time, volume, and dollar bars, and then use PCA for initial dimensionality reduction followed by t-SNE for visualization. The points in the resulting 2D plot will be colored by the sign of the return in the next period to see if the features can help separate future positive and negative price movements.
 
-#%% [markdown]
+# %% [markdown]
 # ### 12.1. Helper Functions for Feature Engineering and Visualization
 
-#%%
+# %%
 def create_feature_set(bars_df: pd.DataFrame, vol_col: str = 'Volume BTC', window: int = 20):
     """
     Creates a feature set from a given bar DataFrame.
@@ -1253,39 +1266,39 @@ def run_tsne_analysis(features: pd.DataFrame, target: pd.Series, title: str):
     plt.grid(True)
     plt.show()
 
-#%% [markdown]
+# %% [markdown]
 # ### 12.2. t-SNE on Time Bar Features
 # We first apply the analysis to the standard 1-hour time bars.
 
-#%%
+# %%
 # We will use the hourly data 'df'
 features_time, target_time = create_feature_set(df)
 run_tsne_analysis(features_time, target_time, "1-Hour Time Bars")
 
-#%% [markdown]
+# %% [markdown]
 # ### 12.3. t-SNE on Volume Bar Features
 # Next, we apply the analysis to volume bars, which sample based on market activity (BTC traded).
 
-#%%
+# %%
 # We use the volume bars created earlier
 features_volume, target_volume = create_feature_set(volume_bars, vol_col='Volume BTC')
 run_tsne_analysis(features_volume, target_volume, "Volume Bars")
 
-#%% [markdown]
+# %% [markdown]
 # ### 12.4. t-SNE on Dollar Bar Features
 # Finally, we repeat the analysis for dollar bars, which sample based on the value traded (USDT).
 
-#%%
+# %%
 # We use the dollar bars created earlier
 features_dollar, target_dollar = create_feature_set(dollar_bars, vol_col='Volume USDT')
 run_tsne_analysis(features_dollar, target_dollar, "Dollar Bars")
 
-#%% [markdown]
+# %% [markdown]
 # ### 12.5. Analysis of t-SNE Results
 #
 # The t-SNE plots visualize the structure within the high-dimensional feature space. If distinct, well-separated clusters appear, it suggests that the market exhibits different regimes that are captured by our features. If the colors (representing future returns) are separated into different regions of the plot, it indicates that the feature set has some predictive power.
 #
 # Typically, financial data is very noisy, so perfectly separated clusters are rare. However, even subtle patterns, such as regions with a higher density of one color, can provide valuable insights for model development. The comparison across bar types can also reveal which sampling method leads to a feature space with more discernible structures.
 
-#%%
+# %%
 

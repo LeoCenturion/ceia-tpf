@@ -1,3 +1,19 @@
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     formats: ipynb,py:percent
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.19.1
+#   kernelspec:
+#     display_name: Python 3 (ipykernel)
+#     language: python
+#     name: python3
+# ---
+
 # %% [markdown]
 # # Combinatorial Symmetric Cross-Validation (CSCV) Analysis
 #
@@ -11,11 +27,16 @@ import sys
 import os
 current_dir = os.getcwd()
 # Navigate up one level to the project root (e.g., /path/to/my_project)
-project_root = os.path.abspath(os.path.join(current_dir, '../src'))
+project_root = os.path.abspath(os.path.join(current_dir, '..'))
 # Add the project root to sys.path so Python can find 'src' as a top-level package
 if project_root not in sys.path:
     sys.path.append(project_root)
 
+
+# %%
+project_root
+
+# %%
 import itertools
 import pandas as pd
 import numpy as np
@@ -91,7 +112,7 @@ class MaCrossWithStopLoss(Strategy):
 # %%
 # Load data from a CSV file
 # Ensure this path is correct relative to where you run the script
-DATA_PATH = "data/BTCUSDT_consolidated_klines.csv"
+DATA_PATH = '/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1h/BTCUSDT_consolidated_klines.csv'
 START_DATE = "2022-01-01"
 data = fetch_historical_data(data_path=DATA_PATH, start_date=START_DATE, timeframe="1d")
 data = adjust_data_to_ubtc(data)

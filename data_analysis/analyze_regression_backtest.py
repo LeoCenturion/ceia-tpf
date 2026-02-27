@@ -1,11 +1,27 @@
-#%%
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     formats: ipynb,py:percent
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.19.1
+#   kernelspec:
+#     display_name: Python 3 (ipykernel)
+#     language: python
+#     name: python3
+# ---
+
+# %%
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Configuration
-RESULTS_FILE = 'regression_backtest_results.csv'
+RESULTS_FILE = 'predictions_trial_0.csv'
 # Load the backtest results
 try:
     results_df = pd.read_csv(RESULTS_FILE, index_col='timestamp', parse_dates=True)
@@ -23,15 +39,12 @@ results_df['absolute_percentage_error'] = np.abs(results_df['percentage_error'])
 print("\nError Statistics:")
 print(results_df[['error', 'absolute_error', 'percentage_error', 'absolute_percentage_error']].describe())
 
-#%%
+# %%
 # --- Comparison of multiple backtest results ---
 
 
 RESULTS_FILES = [
-    'regression_backtest_results.csv',
-    'regression_backtest_results_7d.csv',
-    'regression_backtest_results_14d.csv',
-    'regression_backtest_results_365d.csv'
+    'predictions_trial_0.csv'
 ]
 
 all_stats_list = []
@@ -109,7 +122,7 @@ if summary_metrics:
     plt.suptitle('Comparison of Summary Error Metrics', fontsize=16)
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.show()
-#%%
+# %%
 # --- Detailed analysis of primary file continues below ---
 print(f"\n--- Detailed Analysis for: {RESULTS_FILE} ---")
 
@@ -135,7 +148,7 @@ plt.grid(True, linestyle='--', alpha=0.6)
 plt.tight_layout()
 plt.show()
 
-#%%
+# %%
 plt.figure(figsize=(15, 6))
 # Histogram
 plt.subplot(1, 2, 1)
@@ -156,7 +169,7 @@ plt.grid(True, linestyle='--', alpha=0.6)
 plt.tight_layout()
 plt.show()
 
-#%%
+# %%
 plt.figure(figsize=(15, 6))
 # Histogram
 plt.subplot(1, 2, 1)
@@ -177,10 +190,10 @@ plt.grid(True, linestyle='--', alpha=0.6)
 plt.tight_layout()
 plt.show()
 
-#%%
+# %%
 # 2. Plot the relationship between the absolute value of the error and the amount of periods since last refit
 # Convert periods_since_refit to days (assuming hourly data, 24 periods per day)
-results_df['days_since_refit'] = results_df['periods_since_refit'] / 24
+results_df['days_since_refit'] = results_df['hours_since_last_refit'] / 24
 results_df['days_since_refit'] = results_df['days_since_refit'].astype(int)
 plt.figure(figsize=(12, 7))
 sns.boxplot(
@@ -196,7 +209,7 @@ plt.grid(True, linestyle='--', alpha=0.6)
 plt.legend(title='Days Since Refit')
 plt.tight_layout()
 plt.show()
-#%%
+# %%
 # 3. Plot the error through time
 plt.figure(figsize=(15, 7))
 plt.plot(results_df.index, results_df['error'], label='Prediction Error', color='darkorange', alpha=0.8)
@@ -209,7 +222,7 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 
-#%%
+# %%
 # Optional: Plot absolute percentage error through time
 plt.figure(figsize=(15, 7))
 plt.plot(results_df.index, results_df['absolute_percentage_error'], label='Absolute Percentage Error', color='purple', alpha=0.8)
@@ -222,10 +235,10 @@ plt.tight_layout()
 plt.show()
 
 
-#%%
+# %%
 # 4. Compare MAPE of mean vs percentile predictions
 # Configuration
-RESULTS_FILE = 'predictions_trial_1.csv'
+RESULTS_FILE = 'predictions_trial_0.csv'
 # Load the backtest results
 try:
     results_df = pd.read_csv(RESULTS_FILE, index_col='timestamp', parse_dates=True)
@@ -265,19 +278,19 @@ if prediction_cols:
     plt.tight_layout()
     plt.show()
 
-#%%
+# %%
 # 5. Plot actual vs. predicted values over time
 plt.figure(figsize=(15, 8))
-
+df = results_df['2024-11-1':'2024-11-15']
 # Plot actual closing price
-plt.plot(results_df.index, results_df['actual_close'], label='Actual Close', color='blue', linewidth=1.5)
+plt.plot(df.index, df['actual_close'], label='Actual Close', color='blue', linewidth=1.5)
 
 # Plot mean prediction
-plt.plot(results_df.index, results_df['mean'], label='Mean Prediction', color='orange', linestyle='--', linewidth=1.5)
+plt.plot(df.index, df['mean'], label='Mean Prediction', color='orange', linestyle='--', linewidth=1.5)
 
 # Plot prediction intervals (e.g., 10th to 90th percentile)
-if '0.1' in results_df.columns and '0.9' in results_df.columns:
-    plt.fill_between(results_df.index, results_df['0.1'], results_df['0.9'], color='orange', alpha=0.2, label='10-90th Percentile Range')
+if '0.1' in df.columns and '0.9' in df.columns:
+    plt.fill_between(df.index, df['0.1'], df['0.9'], color='orange', alpha=0.2, label='10-90th Percentile Range')
 
 plt.title('Actual vs. Predicted Close Price Over Time', fontsize=16)
 plt.xlabel('Date', fontsize=12)
@@ -287,11 +300,11 @@ plt.grid(True, linestyle='--', alpha=0.6)
 plt.tight_layout()
 plt.show()
 
-#%%
+# %%
 # 6. Binarize signals and evaluate classification performance
 from sklearn.metrics import classification_report, confusion_matrix
 
-binarization_threshold = 0.57 / 100  # 0.57%
+binarization_threshold = 0 / 100  # 0.57%
 
 # Columns to binarize
 cols_to_binarize = ['actual_close'] + [col for col in prediction_cols if col in results_df.columns]
@@ -357,7 +370,7 @@ plt.xlabel('Predicted Label')
 plt.ylabel('True Label')
 plt.show()
 
-#%%
+# %%
 # 7. Compare F1-scores for Up/Down predictions across all predictions
 f1_results = {}
 y_true = binarized_df['actual_close']
@@ -395,3 +408,5 @@ plt.ylim(0, 1) # F1-score is between 0 and 1
 plt.grid(axis='y', linestyle='--', alpha=0.7)
 plt.tight_layout()
 plt.show()
+
+# %%

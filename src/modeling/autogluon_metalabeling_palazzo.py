@@ -365,7 +365,8 @@ def main():
     run_pipeline(
         pipeline=pipeline,
         model_cls=AutoGluonAdapter, # This will be the class for the meta-model
-        raw_data=raw_data,
+        raw_data=raw_d
+        ata,
         model_params=model_params,
         experiment_name="MetaLabeling_Palazzo_Pipeline",
         data_path=data_path,
