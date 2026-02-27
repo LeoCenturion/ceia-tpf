@@ -1,0 +1,245 @@
+import os
+import numpy as np
+import pandas as pd
+from sklearn.metrics import (
+    classification_report,
+    precision_score,
+    f1_score,
+)
+
+from src.data_analysis.data_analysis import fetch_historical_data
+from src.modeling.chronos_feature_pipeline import ChronosFeaturePipeline
+from src.modeling.autogluon_adapter import AutoGluonAdapter
+from src.modeling.pipeline_runner import run_pipeline
+from src.modeling import PurgedKFold
+from src.constants import VOLUME_COL, CLOSE_COL
+from src.modeling.mlflow_utils import MLflowLogger
+
+
+class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
+    """
+    Pipeline that implements Meta-Labeling on top of Chronos features using AutoGluon.
+    It splits data into Train/Test, uses CV on Train to generate OOF predictions,
+    trains a Meta-Model to predict correctness of Primary Model,
+    and then evaluates on Test.
+    """
+
+    def __init__(self, config):
+        super().__init__(config)
+
+    def generate_oof_predictions(self, X, y, t1, sw, model):
+        """
+        Generates Out-Of-Fold predictions for the given dataset using PurgedKFold.
+        Returns a DataFrame with [true_label, primary_pred, primary_prob]
+        """
+        cv = PurgedKFold(
+            n_splits=self.config["n_splits"],
+            t1=t1,
+            pct_embargo=self.config["pct_embargo"],
+        )
+
+        oof_preds = pd.Series(index=X.index, dtype=float)
+        oof_probs = pd.Series(index=X.index, dtype=float)
+        fold_f1_scores = []
+
+        print(f"Generating OOF predictions with {self.config['n_splits']} folds...")
+
+        for i, (train_idx, val_idx) in enumerate(cv.split(X, y)):
+            # Split
+            X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
+            y_train = y.iloc[train_idx]
+            y_val = y.iloc[val_idx]
+            sw_train = sw.iloc[train_idx]
+
+            # Since model is AutoGluonAdapter, we instantiate it new for each fold
+            # to ensure it's a fresh model.
+            fold_model = type(model)(**model.get_params())
+            
+            # AutoGluon handles data scaling internally, so no manual scaling/PCA here
+            fold_model.fit(X_train, y_train, sample_weight=sw_train.values)
+
+            # Predict
+            val_pred = fold_model.predict(X_val)
+            val_prob = fold_model.predict_proba(X_val)[:, 1]
+
+            # Score
+            fold_f1 = f1_score(y_val, val_pred, average="weighted")
+            fold_f1_scores.append(fold_f1)
+            print(f"Fold {i + 1} F1 Score: {fold_f1:.4f}")
+
+            # Store OOF
+            fold_indices = X.iloc[val_idx].index
+            oof_preds.loc[fold_indices] = val_pred
+            oof_probs.loc[fold_indices] = val_prob
+
+        print(f"Average OOF CV F1 Score: {np.mean(fold_f1_scores):.4f}")
+
+        return pd.DataFrame(
+            {"true_label": y, "primary_pred": oof_preds, "primary_prob": oof_probs},
+            index=X.index,
+        )
+
+    def log_results(self, logger, primary_model, meta_model, metrics, X_test, y_test, t1_test, primary_test_pred, final_decision):
+        """
+        Log Meta-Labeling specific artifacts and metrics.
+        """
+        logger.log_metrics(metrics)
+
+        # Capture and log full classification reports as artifacts
+        baseline_report = classification_report(y_test, primary_test_pred, output_dict=True)
+        meta_labeling_report = classification_report(y_test, final_decision, output_dict=True)
+
+        logger.log_artifact_dict(baseline_report, "baseline_classification_report.json")
+        logger.log_artifact_dict(meta_labeling_report, "meta_labeling_classification_report.json")
+
+        # Log AutoGluon Meta-Model Leaderboard
+        if hasattr(meta_model, 'leaderboard') and X_test is not None and y_test is not None:
+            print("\n--- AutoGluon Meta-Model Leaderboard ---")
+            leaderboard_data = X_test.copy()
+            leaderboard_data["primary_prob"] = primary_model.predict_proba(X_test)[:, 1]
+            leaderboard_data["primary_pred"] = primary_model.predict(X_test)
+            # The meta-model was trained on meta_labels derived from primary model's correctness.
+            # We need to recreate meta_labels for test set for leaderboard.
+            meta_labels_test = (primary_test_pred == y_test).astype(int)
+            leaderboard_data[meta_model.label] = meta_labels_test
+
+            leaderboard = meta_model.leaderboard(leaderboard_data, silent=True)
+            print(leaderboard)
+            
+            if leaderboard is not None and not leaderboard.empty:
+                best_meta_model_score = leaderboard.iloc[0]['score_test']
+                best_meta_model_name = leaderboard.iloc[0]['model']
+                logger.log_metrics({"test_f1_best_meta_model": best_meta_model_score})
+                logger.log_params({"best_meta_model_name": best_meta_model_name})
+                
+                lb_path = "autogluon_meta_leaderboard.csv"
+                leaderboard.to_csv(lb_path)
+                logger.log_artifact(lb_path)
+                if os.path.exists(lb_path):
+                    os.remove(lb_path)
+
+    def run(self, raw_data, model_cls, model_params):
+        """
+        Runs the full meta-labeling experiment.
+        """
+        primary_model_params = model_params.get("primary_model_params", {})
+        meta_model_config = model_params.get("meta_model_config", {})
+
+        # Primary model is AutoGluonAdapter
+        primary_model = model_cls(**primary_model_params)
+
+        bars = self.step_1_data_structuring(raw_data)
+        features = self.step_2_feature_engineering(bars)
+        labels, sample_weights, t1 = self.step_3_labeling_and_weighting(bars)
+
+        # Alignment
+        common_idx = features.index.intersection(labels.index).intersection(sample_weights.index).intersection(t1.index)
+        X = features.loc[common_idx]
+        y = labels.loc[common_idx]
+        sw = sample_weights.loc[common_idx]
+        t1 = t1.loc[common_idx]
+        if isinstance(y, pd.DataFrame):
+            y = y.iloc[:, 0]
+
+        # Time-series split
+        split_idx = int(len(X) * 0.8)
+        X_train, y_train, sw_train, t1_train = X.iloc[:split_idx], y.iloc[:split_idx], sw.iloc[:split_idx], t1.iloc[:split_idx]
+        X_test, y_test = X.iloc[split_idx:], y.iloc[split_idx:]
+
+        # Generate OOF predictions
+        oof_df = self.generate_oof_predictions(X_train, y_train, t1_train, sw_train, primary_model)
+
+        # Create meta-labels and meta-dataset
+        meta_labels = (oof_df["primary_pred"] == oof_df["true_label"]).astype(int)
+        X_meta_train = X_train.copy()
+        X_meta_train["primary_prob"] = oof_df["primary_prob"]
+
+        # Train meta-model (also AutoGluon)
+        meta_model = model_cls(**meta_model_config)
+        meta_model.fit(X_meta_train, meta_labels)
+
+        # Train final primary model on all training data
+        primary_final = model_cls(**primary_model_params)
+        primary_final.fit(X_train, y_train, sample_weight=sw_train.values)
+
+        # Evaluate on test set
+        primary_test_pred = primary_final.predict(X_test)
+        primary_test_prob = primary_final.predict_proba(X_test)[:, 1]
+
+        X_meta_test = X_test.copy()
+        X_meta_test["primary_prob"] = primary_test_prob
+        meta_test_pred = meta_model.predict(X_meta_test)
+        
+        final_decision = (primary_test_pred == 1) & (meta_test_pred == 1)
+        final_decision = final_decision.astype(int)
+
+        # --- Metrics ---
+        prec_baseline = precision_score(y_test, primary_test_pred, pos_label=1, zero_division=0)
+        prec_meta = precision_score(y_test, final_decision, pos_label=1, zero_division=0)
+
+        metrics = {
+            "baseline_precision": prec_baseline,
+            "metalabeling_precision": prec_meta,
+            "baseline_f1_weighted": f1_score(y_test, primary_test_pred, average="weighted"),
+            "metalabeling_f1_weighted": f1_score(y_test, final_decision, average="weighted")
+        }
+        
+        return primary_final, meta_model, metrics, X_test, y_test, t1.iloc[split_idx:], primary_test_pred, final_decision
+
+
+def main():
+    data_path = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv"
+    raw_data = fetch_historical_data(
+        symbol="BTC/USDT",
+        timeframe="1m",
+        data_path=data_path,
+    )
+    raw_data.rename(columns={VOLUME_COL: "volume", CLOSE_COL: "close"}, inplace=True)
+
+    # Configuration for the pipeline (mostly for feature engineering)
+    pipeline_config = {
+        "volume_threshold": 50000,
+        "tau": 0.7,
+        "n_splits": 3,
+        "pct_embargo": 0.01,
+        "use_pca": False,
+        "chronos_model_name": "amazon/chronos-t5-tiny",
+        "chronos_window_size": 128,
+    }
+
+    # Primary Model (AutoGluon) parameters
+    primary_model_params = {
+        'label': 'label',
+        'eval_metric': 'f1_weighted',
+        'presets': 'medium_quality',
+        'time_limit': 600,
+        'path': 'AutogluonModels/chronos_primary'
+    }
+
+    # Meta Model (AutoGluon) parameters
+    meta_model_config = {
+        'label': 'label',
+        'eval_metric': 'f1',
+        'presets': 'best_quality',
+        'time_limit': 300,
+        'path': 'AutogluonModels/chronos_meta'
+    }
+    
+    model_params = {
+        "primary_model_params": primary_model_params,
+        "meta_model_config": meta_model_config,
+    }
+
+    pipeline = ChronosMetaLabelingPipeline(pipeline_config)
+
+    run_pipeline(
+        pipeline=pipeline,
+        model_cls=AutoGluonAdapter, # This is the class for both models
+        raw_data=raw_data,
+        model_params=model_params,
+        experiment_name="Chronos_MetaLabeling_Pipeline",
+        data_path=data_path,
+    )
+
+if __name__ == "__main__":
+    main()
