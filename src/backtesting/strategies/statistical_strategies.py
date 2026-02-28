@@ -32,6 +32,21 @@ def kalman_filter_indicator(series: np.ndarray) -> np.ndarray:
     return filtered_state_means.flatten()
 
 
+class SmaCross(TrialStrategy):
+    n1 = 10
+    n2 = 20
+
+    def init(self):
+        self.sma1 = self.I(lambda x: pd.Series(x).rolling(self.n1).mean(), self.data.Close)
+        self.sma2 = self.I(lambda x: pd.Series(x).rolling(self.n2).mean(), self.data.Close)
+
+    def next(self):
+        if self.sma1 > self.sma2:
+            self.signal = 1
+        else:
+            self.signal = 0
+
+
 class ProphetStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
     """
     Intractable. Prophet doesn't take data when predicting, so if we train every 30 days then all 30 days will have the same prediction.

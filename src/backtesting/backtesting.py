@@ -21,7 +21,30 @@ from src.data_analysis import (
 class TrialStrategy(Strategy):
     """Base strategy class for Optuna trials with artifact saving."""
 
-    # trades_df = pd.DataFrame()
+    def __init__(self, broker, data, params):
+        super().__init__(broker, data, params)
+        self.signal = 0
+
+    def predict(self, data):
+        """
+        Generates batch predictions for a given dataset.
+        This method will be used by CPCV.
+        """
+        self._data = data
+        # 1. Use the strategy's init() to set up indicators on the provided data.
+        self.I(lambda x: x, data.Close, name="Close")
+        self.init()
+
+        # 2. Create an array to hold the signals
+        signals = np.zeros(len(data), dtype=int)
+
+        # 3. Loop through the data to generate signals using the logic from next()
+        for i in range(len(data)):
+            self._index = i
+            self.next()
+            signals[i] = self.signal
+
+        return pd.Series(signals, index=data.index)
 
     def save_artifacts(self, trial, stats, bt):
         """Save backtest plot and trades to MLflow."""
