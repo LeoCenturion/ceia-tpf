@@ -57,16 +57,31 @@ class PurgedKFold(_BaseKFold):
             test_indices = indices[test_start_idx:test_end_idx]
 
             # --- Training set before test set ---
-            test_start_time = self.t1.index[test_start_idx]
-            train_indices_before_times = self.t1[self.t1 <= test_start_time].index
-            train_indices_before = self.t1.index.searchsorted(
-                train_indices_before_times
-            )
+            # Handle case where test_start_idx is 0 or out of bounds for t1.index
+            if test_start_idx >= len(self.t1.index):
+                test_start_time = None # Should not happen if test_ranges are valid
+            else:
+                test_start_time = self.t1.index[test_start_idx]
+
+            if test_start_time is not None:
+                train_indices_before_times = self.t1[self.t1 <= test_start_time].index
+                train_indices_before = self.t1.index.searchsorted(
+                    train_indices_before_times
+                )
+            else:
+                train_indices_before = np.array([])
 
             # --- Training set after test set ---
-            latest_end_in_test = self.t1.iloc[test_indices].max()
+            # Handle case where test_indices is empty
+            if len(test_indices) == 0:
+                latest_end_in_test = None
+            else:
+                latest_end_in_test = self.t1.iloc[test_indices].max() # This is where the error likely occurred before
 
-            first_start_after_test_idx = self.t1.index.searchsorted(latest_end_in_test)
+            if latest_end_in_test is not None:
+                first_start_after_test_idx = self.t1.index.searchsorted(latest_end_in_test)
+            else:
+                first_start_after_test_idx = len(indices) # Effectively no 'after' training set if test is empty
 
             train_indices_after = indices[first_start_after_test_idx + embargo_size :]
 

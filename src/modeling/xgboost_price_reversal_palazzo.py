@@ -286,7 +286,7 @@ def aggregate_to_volume_bars(df, volume_threshold=50000):
 
     for index, row in df.iterrows():
         current_bar_data.append(row)
-        cumulative_volume += row["volume"]
+        cumulative_volume += row[VOLUME_COL]
         if cumulative_volume >= volume_threshold:
             bar_df = pd.DataFrame(current_bar_data)
 
@@ -296,12 +296,12 @@ def aggregate_to_volume_bars(df, volume_threshold=50000):
             open_price = bar_df[OPEN_COL].iloc[0]
             high_price = bar_df[HIGH_COL].max()
             low_price = bar_df[LOW_COL].min()
-            close_price = bar_df["close"].iloc[-1]
+            close_price = bar_df[CLOSE_COL].iloc[-1]
 
             # Calculate intra-bar volatility for labeling (σv)
             # The paper uses log-returns for some calculations.
             bar_log_returns = np.log(
-                bar_df["close"] / bar_df["close"].shift(1)
+                bar_df[CLOSE_COL] / bar_df[CLOSE_COL].shift(1)
             ).dropna()
             intra_bar_std = bar_log_returns.std()
 
@@ -310,8 +310,8 @@ def aggregate_to_volume_bars(df, volume_threshold=50000):
                     "open_time": open_time,
                     "close_time": close_time,
                     "open_price": open_price,
-                    "High": high_price,
-                    "Low": low_price,
+                    HIGH_COL: high_price,
+                    LOW_COL: low_price,
                     "close_price": close_price,
                     "total_volume": cumulative_volume,
                     "intra_bar_std": intra_bar_std if len(bar_log_returns) > 1 else 0,

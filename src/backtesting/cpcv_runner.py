@@ -12,6 +12,7 @@ from src.backtesting.backtesting import TrialStrategy
 from src.backtesting.strategies.statistical_strategies import SmaCross
 from src.data_analysis.data_analysis import fetch_historical_data, adjust_data_to_ubtc
 from src.modeling.mlflow_utils import MLflowLogger
+from src.modeling.chronos_metalabeling_pipeline import ChronosMetaLabelingPipeline
 
 def run_cpcv_for_strategy(
     data: pd.DataFrame,
@@ -52,8 +53,30 @@ def run_cpcv_for_strategy(
                 data, t1, train_indices, test_indices, embargo_pct
             )
             
-            # Instantiate and run the strategy to get batch predictions
-            strategy_instance = strategy_class(broker=None, data=test_data, params=strategy_params)
+            # If using ChronosMetaLabelingCPCVStrategy, train the pipeline here
+            if strategy_class.__name__ == "ChronosMetaLabelingCPCVStrategy":
+                try:
+                    pipeline_config = strategy_params.get("pipeline_config", {})
+                    current_pipeline = ChronosMetaLabelingPipeline(config=pipeline_config)
+                    
+                    train_df = _train_data
+                    
+                    # Fit the pipeline on the current training data
+                    current_pipeline.fit(train_df, model_cls=strategy_params['model_cls'], model_params=strategy_params['model_params'])
+                    
+                    # Pass the trained pipeline instance to the strategy
+                    strategy_instance = strategy_class(
+                        broker=None, 
+                        data=test_data, 
+                        params={**strategy_params, "trained_pipeline": current_pipeline}
+                    )
+                except ValueError as e:
+                    print(f"Skipping split due to error during pipeline fitting: {e}")
+                    continue # Skip to the next split
+            else:
+                # Existing logic for other strategies
+                strategy_instance = strategy_class(broker=None, data=test_data, params=strategy_params)
+
             predictions = strategy_instance.predict(test_data)
 
             for group_idx in test_split:
@@ -76,8 +99,8 @@ def run_cpcv_for_strategy(
                 
                 # Dummy calculation for now:
                 path_returns = data['Close'].pct_change().loc[path_predictions.index] * path_predictions
-                path_sharpe = path_returns.mean() / path_returns.std() * np.sqrt(365) # Annualized Sharpe
-                if np.isinf(path_sharpe):
+                path_sharpe = path_returns.mean() / path_returns.std() * np.sqrt(365*24) # Annualized Sharpe for hourly data
+                if np.isinf(path_sharpe) or np.isnan(path_sharpe):
                     path_sharpe = 0
                 path_sharpe_ratios.append(path_sharpe)
                 

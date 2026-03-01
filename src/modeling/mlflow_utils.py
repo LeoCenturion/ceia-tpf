@@ -17,11 +17,11 @@ class MLflowLogger:
         mlflow.set_experiment(experiment_name)
         self.run = None
 
-    def start_run(self, run_name=None):
+    def start_run(self, run_name=None, nested=False):
         """Start a new MLflow run."""
         if run_name is None:
             run_name = f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        self.run = mlflow.start_run(run_name=run_name)
+        self.run = mlflow.start_run(run_name=run_name, nested=nested)
         return self.run
 
     def log_params(self, params, prefix=None):

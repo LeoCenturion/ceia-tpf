@@ -26,6 +26,9 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
 
     def __init__(self, config):
         super().__init__(config)
+        self.primary_model_ = None
+        self.meta_model_ = None
+        self.t1_train_ = None
 
     def generate_oof_predictions(self, X, y, t1, sw, model):
         """
@@ -118,17 +121,19 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
                 if os.path.exists(lb_path):
                     os.remove(lb_path)
 
-    def run(self, raw_data, model_cls, model_params):
+    def fit(self, raw_data: pd.DataFrame, model_cls, model_params):
         """
-        Runs the full meta-labeling experiment.
+        Trains the primary and meta-models and stores them on the instance.
         """
         primary_model_params = model_params.get("primary_model_params", {})
         meta_model_config = model_params.get("meta_model_config", {})
 
-        # Primary model is AutoGluonAdapter
-        primary_model = model_cls(**primary_model_params)
+        primary_model_init = model_cls(**primary_model_params)
 
         bars = self.step_1_data_structuring(raw_data)
+        if bars.empty:
+            raise ValueError("No volume bars created from the provided data. Cannot fit model.")
+        
         features = self.step_2_feature_engineering(bars)
         labels, sample_weights, t1 = self.step_3_labeling_and_weighting(bars)
 
@@ -140,14 +145,15 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
         t1 = t1.loc[common_idx]
         if isinstance(y, pd.DataFrame):
             y = y.iloc[:, 0]
+        print(f"After alignment - X shape: {X.shape}, y shape: {y.shape}, sw shape: {sw.shape}, t1 shape: {t1.shape}")
 
-        # Time-series split
+        # Time-series split (for OOF and final training)
         split_idx = int(len(X) * 0.8)
         X_train, y_train, sw_train, t1_train = X.iloc[:split_idx], y.iloc[:split_idx], sw.iloc[:split_idx], t1.iloc[:split_idx]
-        X_test, y_test = X.iloc[split_idx:], y.iloc[split_idx:]
-
+        print(f"Before OOF generation - X_train shape: {X_train.shape}, y_train shape: {y_train.shape}, t1_train shape: {t1_train.shape}")
+        
         # Generate OOF predictions
-        oof_df = self.generate_oof_predictions(X_train, y_train, t1_train, sw_train, primary_model)
+        oof_df = self.generate_oof_predictions(X_train, y_train, t1_train, sw_train, primary_model_init)
 
         # Create meta-labels and meta-dataset
         meta_labels = (oof_df["primary_pred"] == oof_df["true_label"]).astype(int)
@@ -155,36 +161,105 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
         X_meta_train["primary_prob"] = oof_df["primary_prob"]
 
         # Train meta-model (also AutoGluon)
-        meta_model = model_cls(**meta_model_config)
-        meta_model.fit(X_meta_train, meta_labels)
+        self.meta_model_ = model_cls(**meta_model_config)
+        self.meta_model_.fit(X_meta_train, meta_labels)
 
         # Train final primary model on all training data
-        primary_final = model_cls(**primary_model_params)
-        primary_final.fit(X_train, y_train, sample_weight=sw_train.values)
+        self.primary_model_ = model_cls(**primary_model_params)
+        self.primary_model_.fit(X_train, y_train, sample_weight=sw_train.values)
+        self.t1_train_ = t1_train # Store t1 for potential future use or debugging
 
-        # Evaluate on test set
-        primary_test_pred = primary_final.predict(X_test)
-        primary_test_prob = primary_final.predict_proba(X_test)[:, 1]
 
-        X_meta_test = X_test.copy()
-        X_meta_test["primary_prob"] = primary_test_prob
-        meta_test_pred = meta_model.predict(X_meta_test)
+    def predict(self, data_window: pd.DataFrame) -> int:
+        """
+        Predicts a single signal (0 or 1) for the latest data point in the provided window.
+        Assumes self.primary_model_ and self.meta_model_ are already trained.
+        """
+        if self.primary_model_ is None or self.meta_model_ is None:
+            raise RuntimeError("Models not fitted. Call .fit() first.")
+
+        # 1. Perform data structuring and feature engineering on the data_window
+        bars = self.step_1_data_structuring(data_window)
+        if bars.empty:
+            return 0 # Cannot make a prediction if no bars are formed
+
+        features = self.step_2_feature_engineering(bars)
         
-        final_decision = (primary_test_pred == 1) & (meta_test_pred == 1)
-        final_decision = final_decision.astype(int)
+        if features.empty:
+            return 0
 
-        # --- Metrics ---
-        prec_baseline = precision_score(y_test, primary_test_pred, pos_label=1, zero_division=0)
-        prec_meta = precision_score(y_test, final_decision, pos_label=1, zero_division=0)
+        # Get the latest feature set for prediction
+        latest_features = features.iloc[-1:]
 
-        metrics = {
-            "baseline_precision": prec_baseline,
-            "metalabeling_precision": prec_meta,
-            "baseline_f1_weighted": f1_score(y_test, primary_test_pred, average="weighted"),
-            "metalabeling_f1_weighted": f1_score(y_test, final_decision, average="weighted")
-        }
+        # 2. Predict with primary model
+        primary_pred = self.primary_model_.predict(latest_features)
+        primary_prob = self.primary_model_.predict_proba(latest_features)[:, 1]
+
+        # 3. Predict with meta-model
+        X_meta_single = latest_features.copy()
+        X_meta_single["primary_prob"] = primary_prob
+        meta_pred = self.meta_model_.predict(X_meta_single)
+
+        # 4. Final Decision
+        final_decision = (primary_pred == 1) & (meta_pred == 1)
         
-        return primary_final, meta_model, metrics, X_test, y_test, t1.iloc[split_idx:], primary_test_pred, final_decision
+        return final_decision.astype(int).iloc[0] # Return single int
+
+    def run(self, raw_data: pd.DataFrame, model_cls, model_params, experiment_name="Chronos_Pipeline_Run_tmp"):
+        """
+        Runs the full meta-labeling experiment, maintaining backward compatibility.
+        Uses the new fit and predict methods internally.
+        """
+        logger = MLflowLogger(experiment_name=experiment_name)
+        with logger.start_run(run_name=f"Chronos_MetaLabeling_Run", nested=True):
+            logger.log_params({"pipeline_config": self.config, "model_params": model_params})
+
+            # Fit the pipeline
+            self.fit(raw_data, model_cls, model_params)
+
+            # Re-generate features and labels for evaluation on the full raw_data
+            bars = self.step_1_data_structuring(raw_data)
+            features = self.step_2_feature_engineering(bars)
+            labels, sample_weights, t1 = self.step_3_labeling_and_weighting(bars)
+            
+            common_idx = features.index.intersection(labels.index).intersection(sample_weights.index).intersection(t1.index)
+            X = features.loc[common_idx]
+            y = labels.loc[common_idx]
+            # sw = sample_weights.loc[common_idx] # Not directly used in final prediction metrics here
+            t1 = t1.loc[common_idx]
+            if isinstance(y, pd.DataFrame):
+                y = y.iloc[:, 0]
+
+            # Time-series split for evaluation
+            split_idx = int(len(X) * 0.8)
+            X_test, y_test = X.iloc[split_idx:], y.iloc[split_idx:]
+            t1_test = t1.iloc[split_idx:]
+
+            # Generate predictions for the test set using the fitted models
+            primary_test_pred = self.primary_model_.predict(X_test)
+            primary_test_prob = self.primary_model_.predict_proba(X_test)[:, 1]
+
+            X_meta_test = X_test.copy()
+            X_meta_test["primary_prob"] = primary_test_prob
+            meta_test_pred = self.meta_model_.predict(X_meta_test)
+            
+            final_decision = (primary_test_pred == 1) & (meta_test_pred == 1)
+            final_decision = final_decision.astype(int)
+
+            # --- Metrics ---
+            prec_baseline = precision_score(y_test, primary_test_pred, pos_label=1, zero_division=0)
+            prec_meta = precision_score(y_test, final_decision, pos_label=1, zero_division=0)
+
+            metrics = {
+                "baseline_precision": prec_baseline,
+                "metalabeling_precision": prec_meta,
+                "baseline_f1_weighted": f1_score(y_test, primary_test_pred, average="weighted"),
+                "metalabeling_f1_weighted": f1_score(y_test, final_decision, average="weighted")
+            }
+
+            self.log_results(logger, self.primary_model_, self.meta_model_, metrics, X_test, y_test, t1_test, primary_test_pred, final_decision)
+            
+            return self.primary_model_, self.meta_model_, metrics, X_test, y_test, t1_test, primary_test_pred, final_decision
 
 
 def main():
@@ -195,6 +270,9 @@ def main():
         data_path=data_path,
     )
     raw_data.rename(columns={VOLUME_COL: "volume", CLOSE_COL: "close"}, inplace=True)
+    
+    # Use a smaller subset of data for quick testing
+    raw_data = raw_data.iloc[-1000000:] # Using last 1000000 bars for a much larger training set
 
     # Configuration for the pipeline (mostly for feature engineering)
     pipeline_config = {
@@ -212,8 +290,8 @@ def main():
         'label': 'label',
         'eval_metric': 'f1_weighted',
         'presets': 'medium_quality',
-        'time_limit': 600,
-        'path': 'AutogluonModels/chronos_primary'
+        'time_limit': 60,
+        'path': 'AutogluonModels/tmp_chronos_primary' # tmp prefix
     }
 
     # Meta Model (AutoGluon) parameters
@@ -221,8 +299,8 @@ def main():
         'label': 'label',
         'eval_metric': 'f1',
         'presets': 'best_quality',
-        'time_limit': 300,
-        'path': 'AutogluonModels/chronos_meta'
+        'time_limit': 30,
+        'path': 'AutogluonModels/tmp_chronos_meta' # tmp prefix
     }
     
     model_params = {
@@ -237,7 +315,7 @@ def main():
         model_cls=AutoGluonAdapter, # This is the class for both models
         raw_data=raw_data,
         model_params=model_params,
-        experiment_name="Chronos_MetaLabeling_Pipeline",
+        experiment_name="tmp_Chronos_MetaLabeling_Pipeline", # tmp prefix
         data_path=data_path,
     )
 
