@@ -1,3 +1,4 @@
+import logging
 import argparse
 import pandas as pd
 import mplfinance as mpf
@@ -59,11 +60,11 @@ def plot_trades(transactions_file, symbol):
     try:
         trades_df = pd.read_csv(transactions_file)
     except FileNotFoundError:
-        print(f"Error: Transactions file not found at '{transactions_file}'")
+        logging.debug(f"Error: Transactions file not found at '{transactions_file}'")
         return
 
     if trades_df.empty:
-        print("Transactions file is empty. Nothing to plot.")
+        logging.debug("Transactions file is empty. Nothing to plot.")
         return
 
     trades_df[TIMESTAMP_COL] = pd.to_datetime(trades_df[TIMESTAMP_COL])
@@ -72,7 +73,7 @@ def plot_trades(transactions_file, symbol):
     start_date = trades_df[TIMESTAMP_COL].min() - pd.Timedelta(hours=1)
     end_date = trades_df[TIMESTAMP_COL].max() + pd.Timedelta(hours=1)
 
-    print(f"Fetching historical data for {symbol} from {start_date} to {end_date}...")
+    logging.debug(f"Fetching historical data for {symbol} from {start_date} to {end_date}...")
 
     # Binance API expects strings for dates
     ohlc_df = get_historical_data(
@@ -80,7 +81,7 @@ def plot_trades(transactions_file, symbol):
     )
 
     if ohlc_df.empty:
-        print("Could not fetch historical data for the specified range. Cannot plot.")
+        logging.debug("Could not fetch historical data for the specified range. Cannot plot.")
         return
 
     add_plots = []
@@ -155,7 +156,7 @@ def plot_trades(transactions_file, symbol):
                 )
             )
 
-    print("Generating plot...")
+    logging.debug("Generating plot...")
 
     # Plotting
     mpf.plot(
@@ -172,7 +173,7 @@ def plot_trades(transactions_file, symbol):
         update_width_config=dict(line_width=0.7),
     )  # Legend properties are automatically handled by addplot labels
 
-    print("Plot displayed.")
+    logging.debug("Plot displayed.")
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+import logging
 import os
 
 import numpy as np
@@ -28,7 +29,7 @@ class ChronosFeaturePipeline(PalazzoXGBoostPipeline):
 
     @timer
     def step_2_feature_engineering(self, bars):
-        print("Step 2: Generating Chronos features and combining with tabular...")
+        logging.debug("Step 2: Generating Chronos features and combining with tabular...")
 
         # 1. Generate standard tabular features using parent logic
         tabular_features = super().step_2_feature_engineering(
@@ -119,13 +120,13 @@ class ChronosFeaturePipeline(PalazzoXGBoostPipeline):
         Log AutoGluon specific artifacts (Leaderboard).
         """
         if hasattr(model, "leaderboard") and X_test is not None and y_test is not None:
-            print("\n--- AutoGluon Leaderboard ---")
+            logging.debug("\n--- AutoGluon Leaderboard ---")
             leaderboard_data = X_test.copy()
             leaderboard_data[model.label] = (
                 y_test  # Use model.label for AutoGluon's target column
             )
             leaderboard = model.leaderboard(leaderboard_data, silent=True)
-            print(leaderboard)
+            logging.debug(leaderboard)
 
             # Log Best Model Score
             if leaderboard is not None and not leaderboard.empty:

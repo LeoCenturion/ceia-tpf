@@ -1,3 +1,4 @@
+import logging
 import pandas as pd
 import numpy as np
 from backtesting import Backtest
@@ -9,7 +10,7 @@ import itertools
 
 from src.backtesting.backtesting import TrialStrategy, run_optimizations
 
-logging.getLogger("prophet").setLevel(logging.WARNING)
+logger = logging.getLogger(__name__)
 
 try:
     from arch import arch_model
@@ -68,11 +69,11 @@ class ProphetStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outsi
 
     def next(self):
         if len(self.data.Close) > 1 and len(self.data.Close) % self.refit_period == 0:
-            # print(f"Refitting, idx {len(self.data)} len {len(self.data.index[-self.lookback_length:])}")
+            # logging.debug(f"Refitting, idx {len(self.data)} len {len(self.data.index[-self.lookback_length:])}")
             prophet_data = pd.DataFrame({"ds": self.data.index, "y": self.data.Close})
             self.model = Prophet()
             self.model.fit(prophet_data)
-            # print(f"Model refitted")
+            # logging.debug(f"Model refitted")
 
         # Generate forecast if model is fitted
         if self.model:
@@ -296,7 +297,7 @@ class KalmanARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-o
             self.kalman_state_mean, self.kalman_state_covariance = self.kf.filter(
                 series
             )
-            print(self.kalman_state_mean)
+            logger.debug(self.kalman_state_mean)
             self.kalman_mean_history.append(self.kalman_state_mean[:, 0].flatten())
         else:
             self.kalman_state_mean, self.kalman_state_covariance = (
@@ -304,7 +305,7 @@ class KalmanARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-o
                     self.kalman_state_mean, self.kalman_state_covariance, series
                 )
             )
-            print(self.kalman_state_mean)
+            logger.debug(self.kalman_state_mean)
             self.kalman_mean_history.append(self.kalman_state_mean[:, 0].flatten())
         return self.kalman_mean_history
 
@@ -313,7 +314,7 @@ class KalmanARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-o
 
         # Refit model periodically and if we have enough data
         if len(self.data) % self.refit_period == 0:
-            # print(f"retraining KalmanARIMA. IDX ${len(self.data)}")
+            # logging.debug(f"retraining KalmanARIMA. IDX ${len(self.data)}")
             try:
                 model = sm.tsa.ARIMA(
                     self.kalman_filtered_data, order=(self.p, self.d, self.q)
@@ -333,14 +334,14 @@ class KalmanARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-o
 
                 # New logic: buy if forecast is > threshold % of current price
                 if forecast_processed > self.threshold and not self.position.is_long:
-                    # print(f'forecast: {forecast_processed}, trhesh: {self.threshold}, buying')
+                    # logging.debug(f'forecast: {forecast_processed}, trhesh: {self.threshold}, buying')
                     self.buy(
                         sl=price * (1 - self.stop_loss),
                         tp=price * (1 + self.take_profit),
                     )
                 # Sell if forecast is < threshold % of current price
                 elif forecast_processed < self.threshold and not self.position.is_short:
-                    # print(f'forecast: {forecast_processed}, trhesh: {self.threshold}, selling')
+                    # logging.debug(f'forecast: {forecast_processed}, trhesh: {self.threshold}, selling')
                     self.sell(
                         sl=price * (1 + self.stop_loss),
                         tp=price * (1 - self.take_profit),
@@ -498,7 +499,7 @@ def find_best_arima_params(
             # Errors can occur for certain parameter combinations
             continue
 
-    print(f"Best ARIMA{best_order} model found with AIC: {best_aic}")
+    logging.debug(f"Best ARIMA{best_order} model found with AIC: {best_aic}")
     return best_order, best_model
 
 
@@ -551,13 +552,13 @@ def run_strategy_backtest(data, strategy, threshold):
     """
     Runs a single backtest for the strategy on the full dataset.
     """
-    print("Running single backtest for KalmanARIMAStrategy...")
+    logger.debug("Running single backtest for KalmanARIMAStrategy...")
     bt = Backtest(data, strategy, cash=10_000, commission=0.002)
     stats = bt.run(threshold=threshold)
-    print(stats)
+    logger.debug(stats)
     plot_filename = "kalman_arima_backtest.html"
     bt.plot(filename=plot_filename, open_browser=False)
-    print(f"Backtest plot saved to {plot_filename}")
+    logger.debug(f"Backtest plot saved to {plot_filename}")
     return stats
 
 

@@ -1,3 +1,4 @@
+import logging
 """Data fetching and processing utilities."""
 
 import ccxt
@@ -26,7 +27,7 @@ def timer(func):
         result = func(*args, **kwargs)
         end_time = time.perf_counter()
         duration = end_time - start_time
-        print(f"\n>>> Function '{func.__name__}' executed in {duration:.4f} seconds")
+        logging.debug(f"\n>>> Function '{func.__name__}' executed in {duration:.4f} seconds")
         return result
 
     return wrapper

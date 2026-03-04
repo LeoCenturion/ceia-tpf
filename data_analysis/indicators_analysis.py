@@ -1,3 +1,4 @@
+import logging
 # ---
 # jupyter:
 #   jupytext:
@@ -36,11 +37,12 @@ sns.set(style="whitegrid")
 sys.path.append('src')
 try:
     from rf_price_reversal import create_features
-    print("Successfully imported create_features from rf_price_reversal.")
+    logging.debug("Successfully imported create_features from rf_price_reversal.")
 except ImportError as e:
-    print(f"Error importing create_features: {e}")
-    print("Please ensure the script is run from the project root directory.")
+    logging.debug(f"Error importing create_features: {e}")
+    logging.debug("Please ensure the script is run from the project root directory.")
 
+logger = logging.getLogger(__name__)
 
 # %% [markdown]
 # ## 2. Load and Prepare Data
@@ -54,7 +56,7 @@ df['timestamp'] = pd.to_datetime(df['date'])
 df.set_index('timestamp', inplace=True)
 df.sort_index(inplace=True)
 
-print("Data loaded and prepared. Shape:", df.shape)
+logging.debug("Data loaded and prepared. Shape:", df.shape)
 
 # %% [markdown]
 # ## 3. Generate Features and Analyze Correlations
@@ -70,23 +72,23 @@ df_for_features = df.rename(columns={
     'volume': 'Volume'
 })
 
-print("Generating features...")
+logging.debug("Generating features...")
 features_df = create_features(df_for_features)
 # Drop rows with NaNs that might have been created by indicators with larger windows
 features_df.dropna(inplace=True)
-print("Features generated. Shape:", features_df.shape)
+logging.debug("Features generated. Shape:", features_df.shape)
 
 # It's good practice to drop columns with no variance before correlation
 features_df = features_df.loc[:, features_df.apply(pd.Series.nunique) != 1]
-print(f"Shape after removing constant columns: {features_df.shape}")
+logging.debug(f"Shape after removing constant columns: {features_df.shape}")
 
 
 # %%
 # Calculate and plot the correlation matrix
-print("Calculating feature correlation matrix...")
+logging.debug("Calculating feature correlation matrix...")
 correlation_matrix = features_df.corr()
 
-print("Plotting correlation heatmap...")
+logging.debug("Plotting correlation heatmap...")
 plt.figure(figsize=(25, 25))
 sns.heatmap(correlation_matrix, cmap='coolwarm', annot=False)
 plt.title('Cross-Correlation Matrix of Technical Features', fontsize=20)
@@ -106,7 +108,7 @@ np.fill_diagonal(abs_corr.values, np.nan)
 corr_pairs = abs_corr.unstack().dropna()
 
 # --- Find and print most correlated pairs ---
-print("--- Top 10 Most Correlated Feature Pairs ---")
+logging.debug("--- Top 10 Most Correlated Feature Pairs ---")
 sorted_pairs = corr_pairs.sort_values(ascending=False)
 seen_most = set()
 top_pairs = []
@@ -119,11 +121,11 @@ for index, value in sorted_pairs.items():
     if len(top_pairs) >= 10:
         break
 for (feat1, feat2), corr in top_pairs:
-    print(f"{feat1:<30} | {feat2:<30} | {corr:.4f}")
+    logging.debug(f"{feat1:<30} | {feat2:<30} | {corr:.4f}")
 
 
 # --- Find and print least correlated pairs ---
-print("\n--- Top 10 Least Correlated Feature Pairs ---")
+logging.debug("\n--- Top 10 Least Correlated Feature Pairs ---")
 sorted_pairs_asc = corr_pairs.sort_values(ascending=True)
 seen_least = set()
 bottom_pairs = []
@@ -136,7 +138,7 @@ for index, value in sorted_pairs_asc.items():
     if len(bottom_pairs) >= 10:
         break
 for (feat1, feat2), corr in bottom_pairs:
-    print(f"{feat1:<30} | {feat2:<30} | {corr:.4f}")
+    logging.debug(f"{feat1:<30} | {feat2:<30} | {corr:.4f}")
 
 # %% [markdown]
 # ### Analysis

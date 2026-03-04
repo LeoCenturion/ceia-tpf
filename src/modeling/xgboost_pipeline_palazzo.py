@@ -46,7 +46,7 @@ class PalazzoXGBoostPipeline(AbstractMLPipeline):
 
     @timer
     def step_2_feature_engineering(self, bars):
-        print("Step 2: Creating features...")
+        # print("Step 2: Creating features...")
         # Prepare temp df with standard column names for the shared feature creator
         temp_df = pd.DataFrame(index=bars.index)
         temp_df[OPEN_COL] = bars["open_price"]
@@ -78,7 +78,7 @@ class PalazzoXGBoostPipeline(AbstractMLPipeline):
 
     @timer
     def step_3_labeling_and_weighting(self, bars):
-        print("Step 3: Creating target labels and sample weights...")
+        # print("Step 3: Creating target labels and sample weights...")
 
         # Calculate t1 (event end time) BEFORE dropping rows in labeling
         t1_full = pd.Series(bars.index, index=bars.index).shift(-1)

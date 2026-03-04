@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 import pandas as pd
@@ -33,9 +34,9 @@ client = Client(API_KEY, API_SECRET, testnet=True)
 try:
     server_time = client.get_server_time()
     client.timestamp_offset = server_time["serverTime"] - int(time.time() * 1000)
-    print(f"Time offset with Binance server: {client.timestamp_offset}ms")
+    logging.debug(f"Time offset with Binance server: {client.timestamp_offset}ms")
 except Exception as e:
-    print(f"Could not sync time with Binance: {e}")
+    logging.debug(f"Could not sync time with Binance: {e}")
 
 
 TRANSACTION_LOG_FILE = "transactions.csv"
@@ -173,7 +174,7 @@ def execute_trade(
 
     if signal == "BUY":
         if current_position_value + trade_amount <= max_capital:
-            print(f"Executing BUY order for {trade_amount} USDT worth of {symbol}")
+            logging.debug(f"Executing BUY order for {trade_amount} USDT worth of {symbol}")
             try:
                 # For SPOT market orders, we can specify quoteOrderQty for the amount in quote currency (USDT)
                 order = client.create_order(
@@ -182,7 +183,7 @@ def execute_trade(
                     type=ORDER_TYPE_MARKET,
                     quoteOrderQty=trade_amount,
                 )
-                print(order)
+                logging.debug(order)
 
                 # Log the transaction
                 executed_qty = float(order["executedQty"])
@@ -201,10 +202,10 @@ def execute_trade(
                     open_position_quantity + executed_qty
                 )  # Return the new total quantity
             except Exception as e:
-                print(f"An error occurred during BUY: {e}")
+                logging.debug(f"An error occurred during BUY: {e}")
                 return open_position_quantity  # No change in position
         else:
-            print(
+            logging.debug(
                 f"BUY signal ignored. Order would exceed max capital. Current value: {current_position_value:.2f} USDT, Max capital: {max_capital} USDT."
             )
             return open_position_quantity
@@ -216,7 +217,7 @@ def execute_trade(
             min_qty = symbol_info["min_qty"]
             min_notional = symbol_info["min_notional"]
         except ValueError as e:
-            print(f"Error getting symbol info: {e}. Cannot execute SELL order safely.")
+            logging.debug(f"Error getting symbol info: {e}. Cannot execute SELL order safely.")
             return open_position_quantity
 
         # Round quantity to the correct precision, rounding down
@@ -228,22 +229,22 @@ def execute_trade(
 
         # Check if rounded quantity is valid
         if rounded_quantity <= 0:
-            print(
+            logging.debug(
                 f"SELL signal ignored. Rounded quantity is {rounded_quantity}, which is too small to trade."
             )
             return open_position_quantity
         if rounded_quantity < min_qty:
-            print(
+            logging.debug(
                 f"SELL signal ignored. Rounded quantity {rounded_quantity} is less than minimum quantity {min_qty}."
             )
             return open_position_quantity
         if rounded_quantity * current_price < min_notional:
-            print(
+            logging.debug(
                 f"SELL signal ignored. Notional value {rounded_quantity * current_price:.2f} is less than minimum notional {min_notional}."
             )
             return open_position_quantity
 
-        print(f"Executing SELL order for {rounded_quantity} {symbol}")
+        logging.debug(f"Executing SELL order for {rounded_quantity} {symbol}")
         try:
             # When selling, we specify the quantity of the base asset (BTC)
             order = client.create_order(
@@ -252,7 +253,7 @@ def execute_trade(
                 type=ORDER_TYPE_MARKET,
                 quantity=rounded_quantity,
             )
-            print(order)
+            logging.debug(order)
 
             # Log the transaction
             executed_qty = float(order["executedQty"])
@@ -269,7 +270,7 @@ def execute_trade(
 
             return 0.0  # Position is now closed
         except Exception as e:
-            print(f"An error occurred during SELL: {e}")
+            logging.debug(f"An error occurred during SELL: {e}")
             return open_position_quantity  # Position is still open
     return open_position_quantity  # No trade executed, return current position status
 
@@ -279,10 +280,10 @@ def main(strategy_func, trade_amount, max_capital):
     Main trading loop.
     """
     open_position_quantity = 0.0
-    print("Starting trading bot...")
-    print(f"Using strategy: {strategy_func.__name__}")
-    print(f"Trade amount: {trade_amount} USDT")
-    print(f"Max capital: {max_capital} USDT")
+    logging.debug("Starting trading bot...")
+    logging.debug(f"Using strategy: {strategy_func.__name__}")
+    logging.debug(f"Trade amount: {trade_amount} USDT")
+    logging.debug(f"Max capital: {max_capital} USDT")
 
     try:
         while True:
@@ -290,7 +291,7 @@ def main(strategy_func, trade_amount, max_capital):
                 # We need enough data for MACD calculation, e.g., long_window + signal_window
                 df = get_historical_data(symbol, timeframe, "100 minutes ago UTC")
                 if len(df) < 26 + 9:  # not enough data for MACD
-                    print("Not enough historical data yet. Waiting...")
+                    logging.debug("Not enough historical data yet. Waiting...")
                     time.sleep(60)
                     continue
 
@@ -302,7 +303,7 @@ def main(strategy_func, trade_amount, max_capital):
                     if open_position_quantity > 0
                     else "No"
                 )
-                print(
+                logging.debug(
                     f"Timestamp: {pd.Timestamp.now()}, Price: {current_price:.2f}, Signal: {signal}, Position: {position_open_str}"
                 )
 
@@ -319,11 +320,11 @@ def main(strategy_func, trade_amount, max_capital):
                 # Wait for the next candle
                 time.sleep(60)
             except Exception as e:
-                print(f"An error occurred in the main loop: {e}")
+                logging.debug(f"An error occurred in the main loop: {e}")
                 # Wait a bit before retrying to avoid spamming on persistent errors
                 time.sleep(60)
     except KeyboardInterrupt:
-        print("\nStopping bot...")
+        logging.debug("\nStopping bot...")
     finally:
         if open_position_quantity > 0:
             # Get symbol info for graceful shutdown
@@ -333,7 +334,7 @@ def main(strategy_func, trade_amount, max_capital):
                 min_qty = symbol_info["min_qty"]
                 min_notional = symbol_info["min_notional"]
             except ValueError as e:
-                print(
+                logging.debug(
                     f"Error getting symbol info on shutdown: {e}. Attempting to sell with original quantity (may fail)."
                 )
                 decimal_places = 8  # Fallback to a common high precision
@@ -347,12 +348,12 @@ def main(strategy_func, trade_amount, max_capital):
             )
 
             if rounded_quantity <= 0:
-                print(
+                logging.debug(
                     f"Warning: Open position quantity {open_position_quantity} rounded to {rounded_quantity} is too small to sell on exit. Position not closed."
                 )
                 return  # Exit finally without trying to sell 0 quantity
             if rounded_quantity < min_qty:
-                print(
+                logging.debug(
                     f"Warning: Open position quantity {rounded_quantity} is less than min_qty {min_qty}. Position not closed."
                 )
                 return
@@ -365,7 +366,7 @@ def main(strategy_func, trade_amount, max_capital):
                 if not df_latest.empty:
                     current_price_for_shutdown = df_latest[CLOSE_COL.lower()].iloc[-1]
             except Exception as e:
-                print(
+                logging.debug(
                     f"Warning: Could not get current price for min_notional check on shutdown: {e}. Proceeding without check."
                 )
 
@@ -373,12 +374,12 @@ def main(strategy_func, trade_amount, max_capital):
                 current_price_for_shutdown > 0
                 and rounded_quantity * current_price_for_shutdown < min_notional
             ):
-                print(
+                logging.debug(
                     f"Warning: Notional value {rounded_quantity * current_price_for_shutdown:.2f} is less than minimum notional {min_notional}. Position not closed on exit."
                 )
                 return
 
-            print(f"Closing open position of {rounded_quantity} {symbol}...")
+            logging.debug(f"Closing open position of {rounded_quantity} {symbol}...")
             try:
                 order = client.create_order(
                     symbol=symbol,
@@ -386,8 +387,8 @@ def main(strategy_func, trade_amount, max_capital):
                     type=ORDER_TYPE_MARKET,
                     quantity=rounded_quantity,
                 )
-                print("Position closed successfully.")
-                print(order)
+                logging.debug("Position closed successfully.")
+                logging.debug(order)
 
                 # Log the final transaction
                 executed_qty = float(order["executedQty"])
@@ -404,7 +405,7 @@ def main(strategy_func, trade_amount, max_capital):
                     strategy_func.__name__,
                 )
             except Exception as e:
-                print(f"An error occurred while closing position on exit: {e}")
+                logging.debug(f"An error occurred while closing position on exit: {e}")
 
 
 if __name__ == "__main__":
@@ -435,7 +436,7 @@ if __name__ == "__main__":
 
     if args.trade_amount < 11:
         # Binance minimum order size is often around 10 USDT. Setting a bit higher.
-        print(
+        logging.debug(
             "Warning: trade-amount is very low. Binance might reject the order. Recommended: > 11 USDT."
         )
 

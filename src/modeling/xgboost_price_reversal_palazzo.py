@@ -279,7 +279,7 @@ def aggregate_to_volume_bars(df, volume_threshold=50000):
     Aggregates time-series data into volume bars based on a volume threshold.
     This follows the core concept of the dissertation (Section 3.3).
     """
-    print(f"Step 2: Aggregating data into volume bars of {volume_threshold} units...")
+    # print(f"Step 2: Aggregating data into volume bars of {volume_threshold} units...")
     bars = []
     current_bar_data = []
     cumulative_volume = 0
@@ -325,9 +325,9 @@ def aggregate_to_volume_bars(df, volume_threshold=50000):
     volume_bars_df = pd.DataFrame(bars)
 
     if volume_bars_df.empty:
-        print(
-            "Warning: No volume bars created. Threshold might be too high for the dataset."
-        )
+        # print(
+        #     "Warning: No volume bars created. Threshold might be too high for the dataset."
+        # )
         return volume_bars_df
 
     # Calculate bar returns (rv), which will be used for labeling
@@ -335,7 +335,7 @@ def aggregate_to_volume_bars(df, volume_threshold=50000):
         volume_bars_df["close_price"] / volume_bars_df["open_price"]
     ) - 1
 
-    print(f"Aggregation complete. {len(volume_bars_df)} volume bars created.\n")
+    # print(f"Aggregation complete. {len(volume_bars_df)} volume bars created.\n")
     return volume_bars_df
 
 
@@ -347,7 +347,7 @@ def create_labels(df, tau=0.35):
     Creates target labels based on the triple-barrier method variation
     described in Section 3.3.2, Equation 3.1.
     """
-    print("Step 3: Creating target labels...")
+    # print("Step 3: Creating target labels...")
     df["label"] = 0
     # Shift returns and volatility to use future information for labeling ONLY
     df["next_bar_return"] = df["bar_return"].shift(-1)
@@ -365,9 +365,9 @@ def create_labels(df, tau=0.35):
     df.dropna(subset=["next_bar_return"], inplace=True)
     df.drop(columns=["next_bar_return"], inplace=True)
     # print(len(df))
-    print(
-        f"Labeling complete. Class distribution:\n{df['label'].value_counts(normalize=True)}\n"
-    )
+    # print(
+    #     f"Labeling complete. Class distribution:\n{df['label'].value_counts(normalize=True)}\n"
+    # )
     return df
 
 
@@ -492,7 +492,7 @@ def create_features(df):
     Creates simple features for the model. The paper uses 796 features;
     we will simulate a few for demonstration (Section 3.3.3).
     """
-    print("Step 4: Creating features...")
+    # print("Step 4: Creating features...")
     df["feature_return_lag_1"] = df["bar_return"].shift(1)
     df["feature_volatility_lag_1"] = df["intra_bar_std"].shift(1)
     df["feature_rolling_mean_return_5"] = (
@@ -520,7 +520,7 @@ def create_features(df):
     # Drop rows with NaNs created by lagging/rolling features
     df.dropna(inplace=True)
     df.reset_index(drop=True, inplace=True)
-    print("Features created.\n")
+    # print("Features created.\n")
     return df
 
 
@@ -541,9 +541,9 @@ def select_features(
         if abs(corr) >= corr_threshold and p_value < p_value_threshold:
             selected_features.append(col)
 
-    print(
-        f"Selected {len(selected_features)} features out of {len(X.columns)} based on correlation criteria."
-    )
+    # print(
+    #     f"Selected {len(selected_features)} features out of {len(X.columns)} based on correlation criteria."
+    # )
     return selected_features
 
 
@@ -580,7 +580,7 @@ def manual_backtest(
     y_pred = []
     scaler = StandardScaler()
 
-    print("Starting walk-forward backtest...")
+    # print("Starting walk-forward backtest...")
     # Walk forward
     for i in range(len(X_test)):
         current_split_index = split_index + i

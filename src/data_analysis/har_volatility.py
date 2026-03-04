@@ -1,3 +1,4 @@
+import logging
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
@@ -106,7 +107,7 @@ def backtest_har_volatility(
     Returns:
         DataFrame containing actual and forecasted realized volatility.
     """
-    print(
+    logging.debug(
         f"Fetching {symbol} {timeframe} historical data from {start_date} to {end_date}..."
     )
 
@@ -123,7 +124,7 @@ def backtest_har_volatility(
     raw_data.set_index("timestamp", inplace=True)
     raw_data = raw_data.sort_index()
 
-    print("Calculating daily realized volatility...")
+    logging.debug("Calculating daily realized volatility...")
     daily_rv = calculate_realized_volatility(raw_data, forecast_freq)
     har_df = build_har_model_data(daily_rv)
 
@@ -156,7 +157,7 @@ def backtest_har_volatility(
 
     results = []
 
-    print("Starting HAR model backtest...")
+    logging.debug("Starting HAR model backtest...")
     # Loop through the dates for forecasting
     for i in range(first_forecast_date_idx, len(all_dates)):
         current_forecast_date = all_dates[i]
@@ -170,7 +171,7 @@ def backtest_har_volatility(
         train_har_df = har_df.loc[har_df.index <= train_window_end_date]
 
         if len(train_har_df) < min_train_size:
-            print(
+            logging.debug(
                 f"Skipping {current_forecast_date}: not enough data for HAR training ({len(train_har_df)}/{min_train_size})"
             )
             continue
@@ -188,11 +189,11 @@ def backtest_har_volatility(
                     "forecast_rv": forecast_rv,
                 }
             )
-            print(
+            logging.debug(
                 f"Date: {current_forecast_date.strftime('%Y-%m-%d')}, Actual RV: {actual_rv:.8f}, Forecast RV: {forecast_rv:.8f}"
             )
         except Exception as e:
-            print(
+            logging.debug(
                 f"Error forecasting for {current_forecast_date.strftime('%Y-%m-%d')}: {e}"
             )
             results.append(
@@ -208,7 +209,7 @@ def backtest_har_volatility(
 
 
 if __name__ == "__main__":
-    print("Running HAR Volatility Backtest...")
+    logging.debug("Running HAR Volatility Backtest...")
     # Define backtest parameters
     symbol = "BTCUSDT"
     timeframe = "5m"
@@ -225,20 +226,20 @@ if __name__ == "__main__":
     )
 
     if not backtest_results.empty:
-        print("\nBacktest Results:")
-        print(backtest_results.head())
-        print("\nEvaluation Metrics:")
+        logging.debug("\nBacktest Results:")
+        logging.debug(backtest_results.head())
+        logging.debug("\nEvaluation Metrics:")
         # Evaluate performance (e.g., RMSE)
         rmse = np.sqrt(
             (
                 (backtest_results["actual_rv"] - backtest_results["forecast_rv"]) ** 2
             ).mean()
         )
-        print(f"Root Mean Squared Error (RMSE): {rmse:.8f}")
+        logging.debug(f"Root Mean Squared Error (RMSE): {rmse:.8f}")
 
         # You might want to save these results
         results_path = "har_backtest_results.csv"
         backtest_results.to_csv(results_path)
-        print(f"Backtest results saved to {results_path}")
+        logging.debug(f"Backtest results saved to {results_path}")
     else:
-        print("No backtest results generated.")
+        logging.debug("No backtest results generated.")

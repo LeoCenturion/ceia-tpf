@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger(__name__)
 import os
 
 import mlflow
@@ -40,7 +42,7 @@ class ChronosStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outsi
 
         initial_train_df = full_df.iloc[:split_idx]
 
-        print(
+        logger.debug(
             f"[{initial_train_df.index[-1]}] Performing initial fine-tuning on {split_idx} data points..."
         )
 
@@ -69,10 +71,10 @@ class ChronosStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outsi
                     }
                 },
             )
-            print(f"[{initial_train_df.index[-1]}] Initial fine-tuning complete.")
+            logger.debug(f"[{initial_train_df.index[-1]}] Initial fine-tuning complete.")
             self.periods_since_refit = 0  # Reset counter
         except Exception as e:  # pylint: disable=broad-exception-caught
-            print(f"[{initial_train_df.index[-1]}] Initial model fitting failed: {e}")
+            logger.debug(f"[{initial_train_df.index[-1]}] Initial model fitting failed: {e}")
             self.predictor = None
             self.periods_since_refit = np.inf
 
@@ -85,7 +87,7 @@ class ChronosStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outsi
             return
         # --- Model Refitting ---
         if self.periods_since_refit >= self.refit_every:
-            print(f"[{self.data.index[-1]}] Refitting Chronos model...")
+            logger.debug(f"[{self.data.index[-1]}] Refitting Chronos model...")
 
             # Prepare data for AutoGluon. Use all available columns as features.
             history_df = self.data.df.copy()
@@ -112,10 +114,10 @@ class ChronosStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outsi
                         }
                     },
                 )
-                print(f"[{self.data.index[-1]}] Model refit complete.")
+                logger.debug(f"[{self.data.index[-1]}] Model refit complete.")
                 self.periods_since_refit = 0  # Reset counter
             except Exception as e:  # pylint: disable=broad-exception-caught
-                print(f"[{self.data.index[-1]}] Model fitting failed: {e}")
+                logger.debug(f"[{self.data.index[-1]}] Model fitting failed: {e}")
                 self.predictor = None  # Ensure predictor is None if fit fails
 
         if self._last_prediction is not None:
@@ -216,12 +218,12 @@ class PrecomputedChronosStrategy(TrialStrategy):
             if self.predictions_df.index.tz is not None:
                 self.predictions_df.index = self.predictions_df.index.tz_localize(None)
         except FileNotFoundError:
-            print(
+            logger.debug(
                 f"Error: Predictions file not found at '{self.predictions_file}'. This strategy requires pre-computed predictions."
             )
             self.predictions_df = pd.DataFrame()
         except Exception as e:  # pylint: disable=broad-exception-caught
-            print(f"Error loading predictions file: {e}")
+            logger.debug(f"Error loading predictions file: {e}")
             self.predictions_df = pd.DataFrame()
 
     def next(self):
@@ -239,7 +241,7 @@ class PrecomputedChronosStrategy(TrialStrategy):
             prediction_row = self.predictions_df.loc[current_timestamp]
 
             if self.prediction_column not in prediction_row:
-                print(
+                logger.debug(
                     f"Warning: prediction column '{self.prediction_column}' not found for timestamp {current_timestamp}. Skipping."
                 )
                 return

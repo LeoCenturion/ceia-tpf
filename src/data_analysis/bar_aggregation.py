@@ -1,3 +1,4 @@
+import logging
 """
 Functions for creating volume, dollar, and price change bars from tick data.
 """
@@ -155,22 +156,22 @@ def main():
 
     args = parser.parse_args()
 
-    print(f"Loading data from {args.input_csv}...")
+    logging.debug(f"Loading data from {args.input_csv}...")
     try:
         df = pd.read_csv(args.input_csv)
     except FileNotFoundError:
-        print(f"Error: Input file not found at {args.input_csv}")
+        logging.debug(f"Error: Input file not found at {args.input_csv}")
         return
 
     # The bar creation functions expect a 'timestamp' column.
     # In the main function, the index is not set, so we check columns.
     if TIMESTAMP_COL not in df.columns:
-        print(
+        logging.debug(
             f"Error: Input CSV must contain a 'timestamp' column. Found columns: {df.columns.tolist()}"
         )
         return
 
-    print(f"Creating {args.bar_type} bars with threshold {args.threshold}...")
+    logging.debug(f"Creating {args.bar_type} bars with threshold {args.threshold}...")
 
     if args.bar_type == "volume":
         result_df = create_volume_bars(df, args.threshold)
@@ -180,18 +181,18 @@ def main():
         result_df = create_price_change_bars(df, args.threshold)
     else:
         # This case should not be reached due to argparse choices
-        print(f"Error: Unknown bar type '{args.bar_type}'")
+        logging.debug(f"Error: Unknown bar type '{args.bar_type}'")
         return
 
-    print(f"Successfully created {len(result_df)} bars.")
+    logging.debug(f"Successfully created {len(result_df)} bars.")
 
     if args.output_csv:
-        print(f"Saving results to {args.output_csv}...")
+        logging.debug(f"Saving results to {args.output_csv}...")
         result_df.to_csv(args.output_csv, index=True)
-        print("Done.")
+        logging.debug("Done.")
     else:
-        print("\n--- Resulting Bars ---")
-        print(result_df.to_string())
+        logging.debug("\n--- Resulting Bars ---")
+        logging.debug(result_df.to_string())
 
 
 def _get_signed_ticks(price_series: pd.Series) -> pd.Series:

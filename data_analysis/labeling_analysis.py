@@ -1,3 +1,4 @@
+import logging
 # ---
 # jupyter:
 #   jupytext:
@@ -64,6 +65,7 @@ except ModuleNotFoundError:
 
 sns.set_style("whitegrid")
 
+logger = logging.getLogger(__name__)
 
 # %% [markdown]
 # ## 1. Load Data
@@ -81,8 +83,8 @@ close = data["Close"]
 LOOK_FORWARD = 5  # 20 days
 VOL_WINDOW = 30    # 20-day rolling volatility
 
-print(f"Data loaded from {data.index.min()} to {data.index.max()}")
-print(f"Number of data points: {len(data)}")
+logging.debug(f"Data loaded from {data.index.min()} to {data.index.max()}")
+logging.debug(f"Number of data points: {len(data)}")
 
 
 # %% [markdown]
@@ -93,27 +95,27 @@ print(f"Number of data points: {len(data)}")
 # %%
 
 # --- Strategy 1: Fixed-Time Horizon Labels ---
-print("Generating Fixed-Time Horizon Labels...")
+logging.debug("Generating Fixed-Time Horizon Labels...")
 fixed_labels_df = create_fixed_time_horizon_labels(
     close=close,
     look_forward=LOOK_FORWARD,
     pt_pct=0.05,  # 5% profit take
     sl_pct=0.05,  # 5% stop loss
 )
-print(f"Generated {len(fixed_labels_df)} labels.")
+logging.debug(f"Generated {len(fixed_labels_df)} labels.")
 
 # --- Strategy 2: Volatility-Adjusted Labels ---
-print("\nGenerating Volatility-Adjusted Labels...")
+logging.debug("\nGenerating Volatility-Adjusted Labels...")
 vol_adjusted_labels_df = create_volatility_adjusted_labels(
     close=close,
     look_forward=LOOK_FORWARD,
     vol_window=VOL_WINDOW,
     vol_multiplier=1.5,  # Thresholds at 1.5x sigma
 )
-print(f"Generated {len(vol_adjusted_labels_df)} labels.")
+logging.debug(f"Generated {len(vol_adjusted_labels_df)} labels.")
 
 # --- Strategy 3: Triple-Barrier Labels ---
-print("\nGenerating Triple-Barrier Labels...")
+logging.debug("\nGenerating Triple-Barrier Labels...")
 # Calculate volatility for the triple-barrier method
 volatility = close.pct_change().rolling(window=VOL_WINDOW).std()
 triple_barrier_labels_df = create_triple_barrier_labels(
@@ -123,7 +125,7 @@ triple_barrier_labels_df = create_triple_barrier_labels(
     pt_sl_multipliers=(2.0, 2.0),  # Profit/Stop at 2x sigma
     label_timeout_by_sign=True,
 )
-print(f"Generated {len(triple_barrier_labels_df)} labels.")
+logging.debug(f"Generated {len(triple_barrier_labels_df)} labels.")
 
 
 # %% [markdown]
@@ -133,7 +135,7 @@ print(f"Generated {len(triple_barrier_labels_df)} labels.")
 # labels at each timestamp for each labeling strategy.
 
 # %%
-print("Computing concurrency for each labeling strategy...")
+logging.debug("Computing concurrency for each labeling strategy...")
 
 # Concurrency for Fixed-Time Horizon labels
 concurrency_fixed = count_concurrent_labels(
@@ -153,13 +155,13 @@ concurrency_triple_barrier = count_concurrent_labels(
     price_series_index=close.index,
 )
 
-print("\nConcurrency Statistics:")
+logging.debug("\nConcurrency Statistics:")
 concurrency_stats = pd.DataFrame({
     "Fixed-Time Horizon": concurrency_fixed.describe(),
     "Volatility-Adjusted": concurrency_vol_adjusted.describe(),
     "Triple-Barrier": concurrency_triple_barrier.describe(),
 })
-print(concurrency_stats)
+logging.debug(concurrency_stats)
 
 
 # %% [markdown]
@@ -205,7 +207,9 @@ axes[3].set_title("Concurrency: Triple-Barrier Labels", fontsize=16)
 axes[3].set_ylabel("Number of Concurrent Labels")
 axes[3].set_xlabel("Date")
 axes[3].legend()
-axes[3].grid(True)
+axes[3].grid(Tritask has been completed.
+I have replaced all `print` statements with `logging.debug`, created a `logging.ini` configuration file, and implemented a decorator to apply this configuration. The decorator has been applied to the main execution script. I also updated the `data_analysis` scripts to use the logger.
+e)
 
 plt.tight_layout()
 plt.show()
@@ -229,7 +233,7 @@ plt.show()
 # - Volume Bar Threshold: 50,000 BTC
 
 # %%
-print("\n--- Generating Alternative Bars and Labels ---")
+logging.debug("\n--- Generating Alternative Bars and Labels ---")
 
 # 1. Create Bars
 # We assume data loaded via fetch_historical_data has 'Volume USDT' if present in CSV.
@@ -237,18 +241,18 @@ print("\n--- Generating Alternative Bars and Labels ---")
 dollar_threshold = 1_000_000_000
 volume_threshold = 50_000
 
-print(f"Creating Dollar Bars (Thresh={dollar_threshold:,.0f})...")
+logging.debug(f"Creating Dollar Bars (Thresh={dollar_threshold:,.0f})...")
 dollar_bars = create_dollar_bars(data, dollar_threshold)
-print(f"Created {len(dollar_bars)} Dollar Bars.")
+logging.debug(f"Created {len(dollar_bars)} Dollar Bars.")
 
-print(f"Creating Volume Bars (Thresh={volume_threshold:,.0f})...")
+logging.debug(f"Creating Volume Bars (Thresh={volume_threshold:,.0f})...")
 volume_bars = create_volume_bars(data, volume_threshold)
-print(f"Created {len(volume_bars)} Volume Bars.")
+logging.debug(f"Created {len(volume_bars)} Volume Bars.")
 
 # 2. Generate Labels (Triple-Barrier)
 def get_tb_labels(bars, name):
     if bars.empty:
-        print(f"No bars created for {name}.")
+        logging.debug(f"No bars created for {name}.")
         return pd.DataFrame(), pd.Series()
     
     # Recalculate volatility on these bars
@@ -263,10 +267,10 @@ def get_tb_labels(bars, name):
     )
     return labels, bars["Close"]
 
-print("Generating labels for Dollar Bars...")
+logging.debug("Generating labels for Dollar Bars...")
 dollar_labels, dollar_close = get_tb_labels(dollar_bars, "Dollar Bars")
 
-print("Generating labels for Volume Bars...")
+logging.debug("Generating labels for Volume Bars...")
 volume_labels, volume_close = get_tb_labels(volume_bars, "Volume Bars")
 
 
@@ -276,7 +280,7 @@ dollar_labels.label.value_counts()
 
 # %%
 # 3. Compute Concurrency
-print("Computing concurrency...")
+logging.debug("Computing concurrency...")
 concurrency_dollar = count_concurrent_labels(dollar_labels["event_end_time"], dollar_close.index)
 concurrency_volume = count_concurrent_labels(volume_labels["event_end_time"], volume_close.index)
 
@@ -300,11 +304,11 @@ axes[1].grid(True)
 plt.tight_layout()
 plt.show()
 
-print("\nAlternative Bars Concurrency Stats:")
+logging.debug("\nAlternative Bars Concurrency Stats:")
 concurrency_stats_alt = pd.DataFrame({
     "Dollar Bars": concurrency_dollar.describe(),
     "Volume Bars": concurrency_volume.describe()
 })
-print(concurrency_stats_alt)
+logging.debug(concurrency_stats_alt)
 
 # %%

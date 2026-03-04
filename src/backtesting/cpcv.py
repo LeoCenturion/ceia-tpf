@@ -1,8 +1,11 @@
+import logging
 from itertools import combinations
 from math import comb
 
 import numpy as np
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 def partition_data(data: pd.DataFrame, n_groups: int) -> list:
@@ -93,7 +96,7 @@ def construct_backtest_paths(all_predictions: dict, n_groups: int, k: int):
     """
     num_paths = get_num_paths(n_groups, k)
     if num_paths == 0:
-        print("No complete paths can be constructed.")
+        logger.debug("No complete paths can be constructed.")
         return []
 
     paths = []
@@ -104,7 +107,7 @@ def construct_backtest_paths(all_predictions: dict, n_groups: int, k: int):
                 current_path_preds.append(all_predictions[g][i])
             else:
                 # This should not happen if the math is correct
-                print(f"Warning: Not enough predictions for group {g} to form path {i}.")
+                logger.debug(f"Warning: Not enough predictions for group {g} to form path {i}.")
                 continue
 
         # Concatenate and sort by time index to form a complete path

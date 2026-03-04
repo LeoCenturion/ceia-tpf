@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger(__name__)
 import pandas as pd
 import numpy as np
 from backtesting import Strategy
@@ -524,7 +526,7 @@ def select_features(
         if abs(corr) >= corr_threshold and p_value < p_value_threshold:
             selected_features.append(col)
 
-    print(
+    logger.debug(
         f"Selected {len(selected_features)} features out of {len(X.columns)} based on correlation criteria."
     )
     return selected_features

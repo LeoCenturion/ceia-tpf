@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger(__name__)
 import pandas as pd
 import numpy as np
 from backtesting import Strategy
@@ -154,9 +156,9 @@ class XGBoostPriceReversalPalazzoStrategy(Strategy):  # pylint: disable=attribut
             self.in_trade = False
 
         # Periodically refit the model
-        # print(f"bar_id {bar_idx}; loopback_length {self.lookback_length}; % = {(bar_idx - self.lookback_length) % self.refit_period}")
+        # logging.debug(f"bar_id {bar_idx}; loopback_length {self.lookback_length}; % = {(bar_idx - self.lookback_length) % self.refit_period}")
         if (bar_idx - self.lookback_length) % self.refit_period == 0:
-            # print("retraining")
+            # logging.debug("retraining")
             end_idx = bar_idx
             start_idx = max(0, end_idx - self.lookback_length)
             train_df = self.processed_data.iloc[start_idx:end_idx]
@@ -202,7 +204,7 @@ class XGBoostPriceReversalPalazzoStrategy(Strategy):  # pylint: disable=attribut
 
             scaled_features = self.scaler.transform(X_current_raw)
             prediction = self.model.predict(scaled_features)[0]
-            # print(f'predicted {prediction}')
+            # logging.debug(f'predicted {prediction}')
             if prediction == 1 and not self.position:
                 self.buy()
                 self.in_trade = True

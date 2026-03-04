@@ -1,3 +1,4 @@
+import logging
 # -*- coding: utf-8 -*-
 # ---
 # jupyter:
@@ -23,7 +24,7 @@ import sys
 
 # Add project root to path
 project_root = os.path.abspath(os.path.join(os.getcwd(), ".."))
-print(project_root)
+logging.debug(project_root)
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
@@ -49,6 +50,7 @@ from src.constants import VOLUME_COL, CLOSE_COL
 
 sns.set_theme(style="whitegrid")
 plt.rcParams["figure.figsize"] = (12, 6)
+logger = logging.getLogger(__name__)
 
 # %%
 def plot_importance(importance_series, title, color="skyblue"):
@@ -56,7 +58,7 @@ def plot_importance(importance_series, title, color="skyblue"):
     Helper function to plot feature importance.
     """
     if importance_series.empty:
-        print(f"No positive importance found for {title}")
+        logging.debug(f"No positive importance found for {title}")
         return
         
     plt.figure(figsize=(15, 6))
@@ -79,14 +81,14 @@ def plot_correlation_heatmap(data_dict, title):
     df = pd.DataFrame(data_dict).dropna()
     
     if df.empty:
-        print(f"No overlapping features found for correlation heatmap: {title}")
+        logging.debug(f"No overlapping features found for correlation heatmap: {title}")
         return
 
     cols = df.columns
     n = len(cols)
     corr_matrix = np.zeros((n, n))
     
-    print(f"\nComputing Weighted Kendall's Tau Correlation Matrix for: {list(cols)}")
+    logging.debug(f"\nComputing Weighted Kendall's Tau Correlation Matrix for: {list(cols)}")
     
     for i in range(n):
         for j in range(n):
@@ -109,20 +111,20 @@ def plot_original_features(features, y, cv, sample_weights, t1, model_params):
     """
     Computes and plots MDI, MDA, and SFI for original features.
     """
-    print("\n--- Analyzing Original Features ---")
+    logging.debug("\n--- Analyzing Original Features ---")
     
     # Align features with target
     X = features.loc[y.index]
     
     # 1. MDI (Requires fitting a model on original features)
-    print("Computing MDI for Original Features...")
+    logging.debug("Computing MDI for Original Features...")
     model = RandomForestClassifier(**model_params)
     model.fit(X, y, sample_weight=sample_weights)
     mdi = feature_importance_mdi(model, X, y)
     plot_importance(mdi, "Original Features - MDI", "skyblue")
     
     # 2. MDA
-    print("Computing MDA for Original Features...")
+    logging.debug("Computing MDA for Original Features...")
     model_mda = RandomForestClassifier(**model_params)
     mda = feature_importance_mda(model_mda, X, y, cv, sample_weights, t1)
     # Invert log-loss: we want (Loss_perm - Loss_orig)
@@ -134,7 +136,7 @@ def plot_original_features(features, y, cv, sample_weights, t1, model_params):
     plot_importance(plot_mda, "Original Features - MDA", "salmon")
     
     # 3. SFI
-    print("Computing SFI for Original Features...")
+    logging.debug("Computing SFI for Original Features...")
     model_sfi = RandomForestClassifier(**model_params)
     sfi = feature_importance_sfi(model_sfi, X, y, cv, sample_weights, t1)
     plot_importance(sfi.sort_values(ascending=False), "Original Features - SFI", "lightgreen")
@@ -159,7 +161,7 @@ def plot_chronos_features(features, y, cv, sample_weights, t1, model_params):
     """
     Computes and plots MDI, MDA, and SFI for Chronos+tabular features.
     """
-    print("\n--- Analyzing Chronos + Tabular Features ---")
+    logging.debug("\n--- Analyzing Chronos + Tabular Features ---")
 
     # Align features with target and handle potential NaNs from feature engineering
     common_index = features.index.intersection(y.index).intersection(sample_weights.index)
@@ -170,14 +172,14 @@ def plot_chronos_features(features, y, cv, sample_weights, t1, model_params):
 
 
     # 1. MDI
-    print("Computing MDI for Chronos Features...")
+    logging.debug("Computing MDI for Chronos Features...")
     model = RandomForestClassifier(**model_params)
     model.fit(X, y_aligned, sample_weight=sample_weights_aligned)
     mdi = feature_importance_mdi(model, X, y_aligned)
     plot_importance(mdi, "Chronos Features - MDI", "skyblue")
 
     # 2. MDA
-    print("Computing MDA for Chronos Features...")
+    logging.debug("Computing MDA for Chronos Features...")
     model_mda = RandomForestClassifier(**model_params)
     mda = feature_importance_mda(model_mda, X, y_aligned, cv, sample_weights_aligned, t1_aligned)
     # Invert log-loss: we want (Loss_perm - Loss_orig)
@@ -189,7 +191,7 @@ def plot_chronos_features(features, y, cv, sample_weights, t1, model_params):
     plot_importance(plot_mda, "Chronos Features - MDA", "salmon")
 
     # 3. SFI
-    print("Computing SFI for Chronos Features...")
+    logging.debug("Computing SFI for Chronos Features...")
     model_sfi = RandomForestClassifier(**model_params)
     sfi = feature_importance_sfi(model_sfi, X, y_aligned, cv, sample_weights_aligned, t1_aligned)
     plot_importance(sfi.sort_values(ascending=False), "Chronos Features - SFI", "lightgreen")
@@ -214,15 +216,15 @@ def plot_pca_features(X_pca, y, cv, sample_weights, t1, trained_model):
     """
     Computes and plots MDI, MDA, and SFI for PCA features.
     """
-    print("\n--- Analyzing PCA Features ---")
+    logging.debug("\n--- Analyzing PCA Features ---")
     
     # 1. MDI (Use trained_model which is already fitted on X_pca)
-    print("Computing MDI for PCA Features...")
+    logging.debug("Computing MDI for PCA Features...")
     mdi = feature_importance_mdi(trained_model, X_pca, y)
     plot_importance(mdi, "PCA Features - MDI", "skyblue")
     
     # 2. MDA
-    print("Computing MDA for PCA Features...")
+    logging.debug("Computing MDA for PCA Features...")
     # Use clone to ensure fresh model for MDA CV
     mda = feature_importance_mda(clone(trained_model), X_pca, y, cv, sample_weights, t1)
     mda = -mda
@@ -233,7 +235,7 @@ def plot_pca_features(X_pca, y, cv, sample_weights, t1, trained_model):
     plot_importance(plot_mda, "PCA Features - MDA", "salmon")
     
     # 3. SFI (Run on PCA features)
-    print("Computing SFI for PCA Features...")
+    logging.debug("Computing SFI for PCA Features...")
     sfi = feature_importance_sfi(trained_model, X_pca, y, cv, sample_weights, t1)
     plot_importance(sfi.sort_values(ascending=False), "PCA Features - SFI", "lightgreen")
     
@@ -244,7 +246,7 @@ def compare_pca_importance(mdi_ortho, mda_ortho, sfi_ortho, pca, X_pca):
     """
     Computes Weighted Kendall's Tau for MDI, MDA, SFI vs PCA Explained Variance.
     """
-    print("\n--- Comparing ML Importance vs PCA Explained Variance ---")
+    logging.debug("\n--- Comparing ML Importance vs PCA Explained Variance ---")
     
     explained_variance = pd.Series(
         pca.explained_variance_ratio_, index=X_pca.columns, name="Explained Variance"
@@ -316,13 +318,13 @@ raw_tick_data = fetch_historical_data(
 raw_tick_data.index = pd.to_datetime(raw_tick_data.index)
 raw_tick_data.rename(columns={VOLUME_COL: "volume", CLOSE_COL: "close"}, inplace=True)
 
-print(f"Data loaded: {raw_tick_data.shape}")
+logging.debug(f"Data loaded: {raw_tick_data.shape}")
 
 # %%
 # --- Pipeline Execution ---
 model_params = {"n_estimators": 100, "random_state": 42, "n_jobs": -1}
 
-print("Running ML Pipeline with base parameters... (This may take a few minutes)")
+logging.debug("Running ML Pipeline with base parameters... (This may take a few minutes)")
 pipeline = MachineLearningPipeline(config)
 model = RandomForestClassifier(**model_params)
 
@@ -334,8 +336,8 @@ features = pipeline.step_2_feature_engineering(bars)
 # Note: y returned by run_cv is already aligned with X, sample_weights, and t1
 trained_model, scores, X, y, sample_weights, t1, pca = pipeline.run_cv(raw_tick_data, model)
 
-print(f"\nCross-validation F1 Scores: {scores}")
-print(f"Average F1 Score: {np.mean(scores):.4f}")
+logging.debug(f"\nCross-validation F1 Scores: {scores}")
+logging.debug(f"Average F1 Score: {np.mean(scores):.4f}")
 
 # %%
 # Define CV for feature importance
@@ -365,14 +367,14 @@ sample_weights.mean()
 # --- Pipeline Execution ---
 model_params = {"n_estimators": 1000, "random_state": 42, "n_jobs": -1, "min_samples_leaf": 0.05, "max_features":1}
 
-print("\nRunning ML Pipeline with high-complexity model... (This may take a few minutes)")
+logging.debug("\nRunning ML Pipeline with high-complexity model... (This may take a few minutes)")
 # The original features ('features') are the same, so we can reuse them from the previous run.
 # The pipeline config is also the same.
 model = RandomForestClassifier(**model_params)
 trained_model, scores, X, y, sample_weights, t1, pca = pipeline.run_cv(raw_tick_data, model)
 
-print(f"\nCross-validation F1 Scores: {scores}")
-print(f"Average F1 Score: {np.mean(scores):.4f}")
+logging.debug(f"\nCross-validation F1 Scores: {scores}")
+logging.debug(f"Average F1 Score: {np.mean(scores):.4f}")
 
 # %%
 # Define CV for feature importance
@@ -415,7 +417,7 @@ config_wl = {
 
 model_params = {"n_estimators": 1000, "random_state": 42, "n_jobs": -1, "min_samples_leaf": 0.05}
 
-print("\nRunning ML Pipeline with feature whitelist... (This may take a few minutes)")
+logging.debug("\nRunning ML Pipeline with feature whitelist... (This may take a few minutes)")
 pipeline_wl = MachineLearningPipeline(config_wl)
 model = RandomForestClassifier(**model_params)
 
@@ -426,8 +428,8 @@ features = pipeline_wl.step_2_feature_engineering(bars)
 # Now, call the main CV runner
 trained_model, scores, X, y, sample_weights, t1, pca = pipeline_wl.run_cv(raw_tick_data, model)
 
-print(f"\nCross-validation F1 Scores: {scores}")
-print(f"Average F1 Score: {np.mean(scores):.4f}")
+logging.debug(f"\nCross-validation F1 Scores: {scores}")
+logging.debug(f"Average F1 Score: {np.mean(scores):.4f}")
 
 # %%
 # Define CV for feature importance
@@ -461,8 +463,8 @@ from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 top_n_features = 5
 top_features = sfi_orig.sort_values(ascending=False).head(top_n_features).index
 
-print(f"\n--- Top {top_n_features} SFI Features for ACF/PACF Analysis ---")
-print(top_features.tolist())
+logging.debug(f"\n--- Top {top_n_features} SFI Features for ACF/PACF Analysis ---")
+logging.debug(top_features.tolist())
 
 features_aligned = features.loc[X.index]
 
@@ -497,17 +499,17 @@ try:
         "chronos_stride": 1,
     }
 
-    print("\n--- Running Chronos Feature Pipeline ---")
+    logging.debug("\n--- Running Chronos Feature Pipeline ---")
     chronos_pipeline = ChronosFeaturePipeline(chronos_config)
 
     # Manually execute pipeline steps to get features, labels, and weights
-    print("Step 1: Data Structuring...")
+    logging.debug("Step 1: Data Structuring...")
     bars = chronos_pipeline.step_1_data_structuring(raw_tick_data)
 
-    print("Step 2: Generating Chronos + Tabular Features...")
+    logging.debug("Step 2: Generating Chronos + Tabular Features...")
     chronos_features_raw = chronos_pipeline.step_2_feature_engineering(bars)
 
-    print("Step 3: Labeling and Weighting...")
+    logging.debug("Step 3: Labeling and Weighting...")
     labels_series, chronos_sample_weights_raw, t1_series_raw = chronos_pipeline.step_3_labeling_and_weighting(bars)
     
     # Align all data before analysis
@@ -536,10 +538,10 @@ try:
     )
 
 except ImportError as e:
-    print(f"\nCould not run Chronos analysis due to missing libraries: {e}")
-    print("Please ensure 'torch' and 'chronos-ts' are installed.")
+    logging.debug(f"\nCould not run Chronos analysis due to missing libraries: {e}")
+    logging.debug("Please ensure 'torch' and 'chronos-ts' are installed.")
 except Exception as e:
-    print(f"\nAn error occurred during the Chronos feature analysis: {e}")
+    logging.debug(f"\nAn error occurred during the Chronos feature analysis: {e}")
 
 
 # %%

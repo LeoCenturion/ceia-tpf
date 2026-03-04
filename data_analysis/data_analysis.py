@@ -1,3 +1,4 @@
+import logging
 # ---
 # jupyter:
 #   jupytext:
@@ -48,7 +49,7 @@ from statsmodels.stats.diagnostic import acorr_ljungbox
 # Set plot style
 sns.set(style="whitegrid")
 
-print("Libraries loaded.")
+logging.debug("Libraries loaded.")
 
 # %% [markdown]
 # ### Helper Functions
@@ -78,8 +79,8 @@ df.sort_index(inplace=True)
 # The original 'date' column is now redundant. Drop it to prevent conflicts.
 df.drop(columns=['date'], inplace=True)
 
-print("Data loaded and prepared. Shape:", df.shape)
-print(df.head())
+logging.debug("Data loaded and prepared. Shape:", df.shape)
+logging.debug(df.head())
 
 # %% [markdown]
 # ## 3. Analyze Close Price Percentage Change
@@ -93,14 +94,14 @@ df['close_pct_change'] = (df['close'].pct_change()) * 100
 # Drop the first row with a NaN value resulting from the pct_change operation
 df.dropna(subset=['close_pct_change'], inplace=True)
 
-print("Close price percentage change calculated.")
-print(df[['close', 'close_pct_change']].head())
+logging.debug("Close price percentage change calculated.")
+logging.debug(df[['close', 'close_pct_change']].head())
 
 # %% [markdown]
 # ### 3.1. Time Series Plot of Price Percentage Change
 
 # %%
-print("Plotting the close price percentage change over time...")
+logging.debug("Plotting the close price percentage change over time...")
 plt.figure(figsize=(15, 7))
 plt.plot(df.index, df['close_pct_change'], label='Close Price Percentage Change', linewidth=0.7)
 plt.title('BTC/USDT Hourly Close Price Percentage Change Over Time')
@@ -116,7 +117,7 @@ plt.show()
 # ### 3.2. Distribution of Price Percentage Change
 
 # %%
-print("Plotting the distribution of the close price percentage change...")
+logging.debug("Plotting the distribution of the close price percentage change...")
 plt.figure(figsize=(12, 6))
 sns.histplot(df['close_pct_change'], bins=100, kde=True)
 plt.title('Distribution of Hourly Close Price Percentage Change')
@@ -131,8 +132,8 @@ plt.show()
 # ### 3.3. Descriptive Statistics
 
 # %%
-print("Descriptive Statistics for Close Price Percentage Change:")
-print(df['close_pct_change'].describe())
+logging.debug("Descriptive Statistics for Close Price Percentage Change:")
+logging.debug(df['close_pct_change'].describe())
 
 # %% [markdown]
 # The mean is very close to zero. The standard deviation confirms the significant volatility, and the min/max values highlight the extreme hourly percentage swings present in the data.
@@ -143,19 +144,19 @@ print(df['close_pct_change'].describe())
 # We perform an ADF test to formally check if the percentage change series is stationary. The null hypothesis is that the series is non-stationary.
 
 # %%
-print("Performing Augmented Dickey-Fuller (ADF) test for stationarity...")
+logging.debug("Performing Augmented Dickey-Fuller (ADF) test for stationarity...")
 adf_result = adfuller(df['close_pct_change'])
 
-print(f'ADF Statistic: {adf_result[0]:.4f}')
-print(f'p-value: {adf_result[1]:.4f}')
-print('Critical Values:')
+logging.debug(f'ADF Statistic: {adf_result[0]:.4f}')
+logging.debug(f'p-value: {adf_result[1]:.4f}')
+logging.debug('Critical Values:')
 for key, value in adf_result[4].items():
-    print(f'\t{key}: {value:.3f}')
+    logging.debug(f'\t{key}: {value:.3f}')
 
 if adf_result[1] <= 0.05:
-    print("\nResult: The series is stationary (p-value <= 0.05).")
+    logging.debug("\nResult: The series is stationary (p-value <= 0.05).")
 else:
-    print("\nResult: The series is not stationary (p-value > 0.05).")
+    logging.debug("\nResult: The series is not stationary (p-value > 0.05).")
 
 
 # %% [markdown]
@@ -165,7 +166,7 @@ else:
 # ### 3.5. Zoomed-in Histogram of Price Percentage Change
 
 # %%
-print("Plotting the zoomed-in distribution for price changes between -0.1% and 0.1%...")
+logging.debug("Plotting the zoomed-in distribution for price changes between -0.1% and 0.1%...")
 zoomed_data = df['close_pct_change'].loc[(df['close_pct_change'] >= -0.1) & (df['close_pct_change'] <= 0.1)]
 
 plt.figure(figsize=(12, 6))
@@ -182,7 +183,7 @@ plt.show()
 # ### 3.6. Cumulative Distribution of Absolute Price Change
 
 # %%
-print("Plotting the Cumulative Distribution Function (CDF) of absolute percentage changes...")
+logging.debug("Plotting the Cumulative Distribution Function (CDF) of absolute percentage changes...")
 df['abs_close_pct_change'] = df['close_pct_change'].abs()
 
 plt.figure(figsize=(12, 6))
@@ -208,11 +209,11 @@ plt.show()
 
 # %%
 # Calculate AO on raw prices
-print("Calculating Awesome Oscillator on raw prices...")
+logging.debug("Calculating Awesome Oscillator on raw prices...")
 df['ao_price'] = awesome_oscillator(df['high'], df['low'])
 
 # Calculate AO on percentage change
-print("Calculating Awesome Oscillator on price percentage changes...")
+logging.debug("Calculating Awesome Oscillator on price percentage changes...")
 df['high_pct_change'] = df['high'].pct_change()
 df['low_pct_change'] = df['low'].pct_change()
 
@@ -221,14 +222,14 @@ high_pct_change_filled = df['high_pct_change'].fillna(0)
 low_pct_change_filled = df['low_pct_change'].fillna(0)
 df['ao_pct_change'] = awesome_oscillator(high_pct_change_filled, low_pct_change_filled)
 
-print("Awesome Oscillators calculated.")
-print(df[['ao_price', 'ao_pct_change']].head())
+logging.debug("Awesome Oscillators calculated.")
+logging.debug(df[['ao_price', 'ao_pct_change']].head())
 
 # %% [markdown]
 # ### 4.1. Plotting Awesome Oscillators
 
 # %%
-print("Plotting Awesome Oscillators for comparison...")
+logging.debug("Plotting Awesome Oscillators for comparison...")
 fig, axes = plt.subplots(2, 1, figsize=(15, 10), sharex=True)
 
 # Plot AO on price
@@ -263,7 +264,7 @@ plt.show()
 # This analysis can help identify if there is momentum or mean-reversion behavior in the short term.
 
 # %%
-print("Analyzing consecutive runs of positive and negative price changes...")
+logging.debug("Analyzing consecutive runs of positive and negative price changes...")
 
 # Determine the sign of the price change, treating 0 as neutral
 signs = np.sign(df['close_pct_change'])
@@ -279,12 +280,12 @@ runs = signs.groupby(blocks).apply(lambda x: x.size * x.iloc[0] if x.iloc[0] != 
 # Filter out any zero-runs that might have occurred at the beginning
 runs = runs[runs != 0]
 
-print("Consecutive runs calculated. Descriptive statistics:")
-print(runs.describe())
+logging.debug("Consecutive runs calculated. Descriptive statistics:")
+logging.debug(runs.describe())
 
 # %%
 # Plot a histogram of the runs
-print("\nPlotting the histogram of consecutive runs...")
+logging.debug("\nPlotting the histogram of consecutive runs...")
 plt.figure(figsize=(14, 7))
 sns.histplot(runs, discrete=True, stat="count", shrink=0.8)
 plt.title('Histogram of Consecutive Hourly Price Change Runs')
@@ -305,7 +306,7 @@ plt.show()
 # We will focus on transitions between runs of length -5 to +5.
 
 # %%
-print("Calculating run transition probabilities...")
+logging.debug("Calculating run transition probabilities...")
 # Create a DataFrame of consecutive run pairs
 transitions = pd.DataFrame({'from': runs, 'to': runs.shift(-1)}).dropna()
 transitions = transitions.astype(int)
@@ -323,12 +324,12 @@ run_range = [i for i in run_range if i != 0]
 
 transition_matrix = transition_probabilities.reindex(index=run_range, columns=run_range, fill_value=0)
 
-print("Transition Matrix (-5 to +5):")
-print(transition_matrix.to_string(float_format="%.3f"))
+logging.debug("Transition Matrix (-5 to +5):")
+logging.debug(transition_matrix.to_string(float_format="%.3f"))
 
 # %%
 # Plot the transition matrix as a heatmap
-print("\nPlotting the transition probability heatmap...")
+logging.debug("\nPlotting the transition probability heatmap...")
 plt.figure(figsize=(12, 10))
 sns.heatmap(transition_matrix.T, annot=True, cmap='viridis', fmt='.2f', linewidths=.5)
 plt.title('Transition Probability Between Consecutive Run Lengths (-5 to +5)')
@@ -350,7 +351,7 @@ plt.show()
 # `P(Run extends to N+1 | Run has reached length N) = (Total number of runs with length >= N+1) / (Total number of runs with length >= N)`
 
 # %%
-print("Calculating conditional probabilities of run continuation...")
+logging.debug("Calculating conditional probabilities of run continuation...")
 
 positive_runs = runs[runs > 0]
 negative_runs = runs[runs < 0]
@@ -377,12 +378,12 @@ for n in run_lengths_to_check:
 prob_df = pd.DataFrame(continuation_probs, index=[f'{i} -> {i+1}' for i in run_lengths_to_check])
 prob_df.index.name = 'Run Extension'
 
-print("Conditional Probabilities of Run Continuation:")
-print(prob_df.to_string(float_format="%.3f"))
+logging.debug("Conditional Probabilities of Run Continuation:")
+logging.debug(prob_df.to_string(float_format="%.3f"))
 
 # %%
 # Plot the continuation probabilities
-print("\nPlotting the run continuation probabilities...")
+logging.debug("\nPlotting the run continuation probabilities...")
 prob_df.plot(kind='bar', figsize=(14, 7), rot=0)
 plt.title('Conditional Probability of a Run Continuing')
 plt.xlabel('Run Length Extension (From N to N+1)')
@@ -400,7 +401,7 @@ plt.show()
 # This section calculates standard performance metrics for a simple "buy and hold" strategy over the entire dataset. This provides a baseline against which any active trading strategy can be compared.
 
 # %%
-print("Calculating Buy and Hold performance metrics...")
+logging.debug("Calculating Buy and Hold performance metrics...")
 
 # --- 1. Calculate Daily Returns ---
 # Resample hourly data to daily data to get daily returns
@@ -431,11 +432,11 @@ drawdown = (cumulative_returns / peak) - 1
 max_drawdown = drawdown.min()
 
 # --- 4. Print Results ---
-print("\n--- Buy and Hold Performance Summary ---")
-print(f"Total Return: {total_return:.2%}")
-print(f"Annualized Volatility: {annualized_volatility:.2%}")
-print(f"Sharpe Ratio: {sharpe_ratio:.2f}")
-print(f"Maximum Drawdown: {max_drawdown:.2%}")
+logging.debug("\n--- Buy and Hold Performance Summary ---")
+logging.debug(f"Total Return: {total_return:.2%}")
+logging.debug(f"Annualized Volatility: {annualized_volatility:.2%}")
+logging.debug(f"Sharpe Ratio: {sharpe_ratio:.2f}")
+logging.debug(f"Maximum Drawdown: {max_drawdown:.2%}")
 
 # %% [markdown]
 # ## 7. Volume and Dollar Bar Analysis
@@ -449,14 +450,14 @@ print(f"Maximum Drawdown: {max_drawdown:.2%}")
 # This approach samples data more frequently during high-activity periods and less frequently during low-activity periods, potentially providing a better signal for analysis and strategy development. We will use the average hourly volume and dollar value as thresholds to create these bars.
 
 # %%
-print("Creating Volume and Dollar bars...")
+logging.debug("Creating Volume and Dollar bars...")
 
 # Calculate thresholds based on the average hourly activity
 avg_hourly_btc_volume = df['Volume BTC'].mean()
 avg_hourly_usdt_volume = df['Volume USDT'].mean()
 
-print(f"Using Volume Threshold: {avg_hourly_btc_volume:.2f} BTC")
-print(f"Using Dollar Threshold: ${avg_hourly_usdt_volume:,.2f} USDT")
+logging.debug(f"Using Volume Threshold: {avg_hourly_btc_volume:.2f} BTC")
+logging.debug(f"Using Dollar Threshold: ${avg_hourly_usdt_volume:,.2f} USDT")
 
 # The bar creation functions expect a 'date' column.
 # We reset the index to turn the 'timestamp' index into a column, then rename it to 'date'.
@@ -471,9 +472,9 @@ df_for_bars = fetch_historical_data(
 volume_bars = create_volume_bars(df_for_bars, volume_threshold=avg_hourly_btc_volume)
 dollar_bars = create_dollar_bars(df_for_bars, dollar_threshold=avg_hourly_usdt_volume)
 
-print(f"\nNumber of original 1-hour bars: {len(df)}")
-print(f"Number of volume bars created: {len(volume_bars)}")
-print(f"Number of dollar bars created: {len(dollar_bars)}")
+logging.debug(f"\nNumber of original 1-hour bars: {len(df)}")
+logging.debug(f"Number of volume bars created: {len(volume_bars)}")
+logging.debug(f"Number of dollar bars created: {len(dollar_bars)}")
 
 # %% [markdown]
 # The number of bars created is very similar to the original number of hourly bars, which is expected since we used the average hourly activity as the threshold. However, the timing of these bars will now be irregular.
@@ -484,7 +485,7 @@ print(f"Number of dollar bars created: {len(dollar_bars)}")
 # First, let's look at the trading volume (in USDT) from the original hourly data to see how activity varies over time.
 
 # %%
-print("Plotting hourly trading volume over time...")
+logging.debug("Plotting hourly trading volume over time...")
 plt.figure(figsize=(15, 7))
 plt.plot(df.index, df['Volume USDT'], label='Hourly Volume (USDT)', color='purple', alpha=0.7, linewidth=0.8)
 plt.title('Hourly Trading Volume (USDT) Over Time')
@@ -499,7 +500,7 @@ plt.show()
 # Next, we'll examine the distribution of the volumes within the bars we created. Since we defined a fixed threshold for bar creation, we expect the volumes to be clustered around that threshold.
 
 # %%
-print("Plotting the distribution of volumes within the generated bars...")
+logging.debug("Plotting the distribution of volumes within the generated bars...")
 fig, axes = plt.subplots(1, 2, figsize=(16, 6))
 
 # Distribution of BTC volume in Volume Bars
@@ -526,7 +527,7 @@ plt.show()
 # ### 7.2. Comparison of Close Prices
 
 # %%
-print("Plotting comparison of close prices across bar types...")
+logging.debug("Plotting comparison of close prices across bar types...")
 plt.figure(figsize=(15, 8))
 
 # Plot the close prices for each bar type
@@ -549,7 +550,7 @@ plt.show()
 # A key feature of volume and dollar bars is their variable duration in time. Let's analyze the distribution of these durations.
 
 # %%
-print("Analyzing the distribution of bar durations...")
+logging.debug("Analyzing the distribution of bar durations...")
 
 # Calculate duration in hours for each bar
 volume_bars['duration_hours'] = volume_bars.index.to_series().diff().dt.total_seconds() / 3600
@@ -574,11 +575,11 @@ plt.show()
 # The distributions show that most bars complete in under an hour, which is expected as we used the average hourly volume as a threshold. The right-skewed tail indicates that some bars take much longer to form, corresponding to periods of very low market activity.
 
 # %%
-print("Descriptive statistics for bar durations (in hours):")
-print("\n--- Volume Bar Duration ---")
-print(volume_bars['duration_hours'].describe())
-print("\n--- Dollar Bar Duration ---")
-print(dollar_bars['duration_hours'].describe())
+logging.debug("Descriptive statistics for bar durations (in hours):")
+logging.debug("\n--- Volume Bar Duration ---")
+logging.debug(volume_bars['duration_hours'].describe())
+logging.debug("\n--- Dollar Bar Duration ---")
+logging.debug(dollar_bars['duration_hours'].describe())
 
 # %% [markdown]
 # ## 8. Statistical Properties of Returns for Different Bar Types
@@ -595,55 +596,55 @@ def analyze_returns_properties(returns: pd.Series, bar_type: str):
     """
     Performs and prints a statistical analysis of a returns series.
     """
-    print(f"\n--- Analysis of Returns for {bar_type} ---")
+    logging.debug(f"\n--- Analysis of Returns for {bar_type} ---")
     returns = returns.dropna()
     if len(returns) < 20:
-        print("  - Not enough data points for analysis.")
-        print("-" * 50)
+        logging.debug("  - Not enough data points for analysis.")
+        logging.debug("-" * 50)
         return
 
     # 1. Gaussian Distribution Properties
-    print("\n1. Gaussian Distribution Properties:")
+    logging.debug("\n1. Gaussian Distribution Properties:")
     jb_test = stats.jarque_bera(returns)
-    print(f"  - Skewness: {returns.skew():.4f}")
-    print(f"  - Kurtosis: {returns.kurtosis():.4f} (Excess kurtosis)")
-    print(f"  - Jarque-Bera Test Statistic: {jb_test.statistic:.4f}, p-value: {jb_test.pvalue:.4f}")
+    logging.debug(f"  - Skewness: {returns.skew():.4f}")
+    logging.debug(f"  - Kurtosis: {returns.kurtosis():.4f} (Excess kurtosis)")
+    logging.debug(f"  - Jarque-Bera Test Statistic: {jb_test.statistic:.4f}, p-value: {jb_test.pvalue:.4f}")
     if jb_test.pvalue < 0.05:
-        print("  - Result: The distribution is likely non-Gaussian (p-value < 0.05).")
+        logging.debug("  - Result: The distribution is likely non-Gaussian (p-value < 0.05).")
     else:
-        print("  - Result: The distribution may be Gaussian (p-value >= 0.05).")
+        logging.debug("  - Result: The distribution may be Gaussian (p-value >= 0.05).")
 
     # 2. Serial Correlation (Autocorrelation)
-    print("\n2. Serial Correlation (Ljung-Box Test):")
+    logging.debug("\n2. Serial Correlation (Ljung-Box Test):")
     # Ensure there are enough observations for the test
     lags = min(10, len(returns) // 5)
     if lags > 0:
         lb_test = acorr_ljungbox(returns, lags=[lags], return_df=True)
         p_value = lb_test['lb_pvalue'].iloc[0]
-        print(f"  - Ljung-Box p-value (lag {lags}): {p_value:.4f}")
+        logging.debug(f"  - Ljung-Box p-value (lag {lags}): {p_value:.4f}")
         if p_value < 0.05:
-            print("  - Result: Significant serial correlation detected (p-value < 0.05).")
+            logging.debug("  - Result: Significant serial correlation detected (p-value < 0.05).")
         else:
-            print("  - Result: No significant serial correlation detected (p-value >= 0.05).")
+            logging.debug("  - Result: No significant serial correlation detected (p-value >= 0.05).")
     else:
-        print("  - Not enough data to perform Ljung-Box test.")
+        logging.debug("  - Not enough data to perform Ljung-Box test.")
 
     # 3. Homoscedasticity (Variability over time) using Levene's test
-    print("\n3. Homoscedasticity (Levene's Test):")
+    logging.debug("\n3. Homoscedasticity (Levene's Test):")
     mid_point = len(returns) // 2
     part1 = returns.iloc[:mid_point]
     part2 = returns.iloc[mid_point:]
     if len(part1) > 5 and len(part2) > 5:
         levene_test = stats.levene(part1, part2)
-        print(f"  - Levene Test Statistic: {levene_test.statistic:.4f}, p-value: {levene_test.pvalue:.4f}")
+        logging.debug(f"  - Levene Test Statistic: {levene_test.statistic:.4f}, p-value: {levene_test.pvalue:.4f}")
         if levene_test.pvalue < 0.05:
-            print("  - Result: The variances are unequal (heteroscedastic, p-value < 0.05).")
+            logging.debug("  - Result: The variances are unequal (heteroscedastic, p-value < 0.05).")
         else:
-            print("  - Result: The variances are equal (homoscedastic, p-value >= 0.05).")
+            logging.debug("  - Result: The variances are equal (homoscedastic, p-value >= 0.05).")
     else:
-        print("  - Not enough data to perform Levene's test.")
+        logging.debug("  - Not enough data to perform Levene's test.")
 
-    print("-" * 50)
+    logging.debug("-" * 50)
 
 # %% [markdown]
 # ### 8.1. Analysis of Time Bar Returns (Baseline)
@@ -658,7 +659,7 @@ analyze_returns_properties(time_bar_returns, "1-Hour Time Bars")
 # We'll analyze returns from volume bars created using three different thresholds: the mean hourly volume, the 75th percentile, and the 90th percentile.
 
 # %%
-print("\nAnalyzing statistical properties of Volume Bar returns...")
+logging.debug("\nAnalyzing statistical properties of Volume Bar returns...")
 
 volume_thresholds = {
     'Mean': df['Volume BTC'].mean(),
@@ -678,7 +679,7 @@ for label, threshold in volume_thresholds.items():
 # We'll do the same analysis for dollar bars, using thresholds based on the mean, 75th, and 90th percentiles of hourly USDT volume.
 
 # %%
-print("\nAnalyzing statistical properties of Dollar Bar returns...")
+logging.debug("\nAnalyzing statistical properties of Dollar Bar returns...")
 
 dollar_thresholds = {
     'Mean': df['Volume USDT'].mean(),
@@ -759,7 +760,7 @@ def plot_threshold_sweep_analysis(
     Performs a sweep of thresholds for a bar creation function and plots the statistical
     properties of the resulting returns series.
     """
-    print(f"\n--- Starting Threshold Sweep Analysis for {sweep_title} ---")
+    logging.debug(f"\n--- Starting Threshold Sweep Analysis for {sweep_title} ---")
     
     # Define threshold range
     min_threshold = metric_series.mean()
@@ -784,11 +785,11 @@ def plot_threshold_sweep_analysis(
     results_df = pd.DataFrame(results).dropna()
     
     if results_df.empty:
-        print("Could not generate sufficient data for plotting.")
+        logging.debug("Could not generate sufficient data for plotting.")
         return
 
     # Plotting
-    print(f"Plotting results for {sweep_title}...")
+    logging.debug(f"Plotting results for {sweep_title}...")
     fig, axes = plt.subplots(3, 2, figsize=(16, 18))
     fig.suptitle(f'Statistical Properties of Returns vs. Threshold for {sweep_title}', fontsize=16)
     axes = axes.flatten()
@@ -885,7 +886,7 @@ plot_threshold_sweep_analysis(
 # Note: We are applying this to 1-hour data, where each bar is treated as a single "tick". This analysis is more powerful when applied to high-frequency tick data.
 
 # %%
-print("\nAnalyzing statistical properties of Tick Imbalance Bar returns...")
+logging.debug("\nAnalyzing statistical properties of Tick Imbalance Bar returns...")
 
 # Create Tick Imbalance Bars from the hourly data.
 # We'll use an initial bar size estimate of 24 hours (1 day) as a starting point,
@@ -899,12 +900,12 @@ if not tick_imbalance_bars.empty:
     returns = tick_imbalance_bars['close'].pct_change()
     analyze_returns_properties(returns, "Tick Imbalance Bars (from 1-hour data)")
 else:
-    print("Could not create Tick Imbalance Bars, possibly due to insufficient data.")
+    logging.debug("Could not create Tick Imbalance Bars, possibly due to insufficient data.")
 
 # %%
 # Plot the cumulative imbalance, the dynamic thresholds, and the bar sampling points
 if not tick_imbalance_bars.empty:
-    print("Plotting Tick Imbalance Bar sampling process...")
+    logging.debug("Plotting Tick Imbalance Bar sampling process...")
 
     # Limit plot to a smaller window for readability if the dataset is large
     plot_window = df_for_bars.index[:5000] # Plot first ~5000 data points
@@ -940,7 +941,7 @@ if not tick_imbalance_bars.empty:
     plt.grid(True, which="both", ls="--", alpha=0.5)
     plt.show()
 else:
-    print("No Tick Imbalance Bars were created, skipping plot.")
+    logging.debug("No Tick Imbalance Bars were created, skipping plot.")
 
 # %% [markdown]
 # ## 10. Threshold Sweep Analysis on 1-Minute Data
@@ -948,11 +949,11 @@ else:
 # We will now repeat the entire threshold sweep analysis using 1-minute resolution data. This higher frequency data will allow us to see if the same patterns hold and how the much smaller time interval affects the choice of thresholds and the resulting statistical properties.
 
 # %%
-print("\n--- Starting Analysis on 1-Minute Data ---")
+logging.debug("\n--- Starting Analysis on 1-Minute Data ---")
 
 # --- 1. Load and Prepare 1-Minute Data ---
 DATA_PATH_1M = '/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/monthly/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv'
-print(f"Loading 1-minute data from: {DATA_PATH_1M}")
+logging.debug(f"Loading 1-minute data from: {DATA_PATH_1M}")
 df_1m = pd.read_csv(DATA_PATH_1M)
 
 # Convert to datetime and set as index
@@ -962,7 +963,7 @@ df_1m.set_index('timestamp', inplace=True)
 df_1m.sort_index(inplace=True)
 df_1m.drop(columns=['date'], inplace=True)
 
-print("1-minute data loaded and prepared. Shape:", df_1m.shape)
+logging.debug("1-minute data loaded and prepared. Shape:", df_1m.shape)
 
 # Create the DataFrame for bar creation functions
 df_for_bars_1m = df_1m.reset_index().rename(columns={'timestamp': 'date'})
@@ -1035,14 +1036,14 @@ def analyze_bar_count_stability(bars_df, bar_type_name, frequency='W'):
     std_count = counts.std()
     cv = std_count / mean_count if mean_count > 0 else np.nan
     
-    print(f"--- Stability Analysis for {bar_type_name} ({frequency}) ---")
-    print(f"Mean Count: {mean_count:.2f}")
-    print(f"Std Dev:    {std_count:.2f}")
-    print(f"CV:         {cv:.4f}")
+    logging.debug(f"--- Stability Analysis for {bar_type_name} ({frequency}) ---")
+    logging.debug(f"Mean Count: {mean_count:.2f}")
+    logging.debug(f"Std Dev:    {std_count:.2f}")
+    logging.debug(f"CV:         {cv:.4f}")
     
     return counts, cv
 
-print("Analyzing stability of weekly bar counts...")
+logging.debug("Analyzing stability of weekly bar counts...")
 
 # 1. Time Bars (1H)
 counts_time, cv_time = analyze_bar_count_stability(df_for_bars, "1-Hour Time Bars")
@@ -1055,7 +1056,7 @@ counts_dollar, cv_dollar = analyze_bar_count_stability(dollar_bars, "Dollar Bars
 
 # %%
 # Plot the weekly counts
-print("Plotting weekly bar counts...")
+logging.debug("Plotting weekly bar counts...")
 plt.figure(figsize=(15, 6))
 plt.plot(counts_time.index, counts_time, label=f'Time Bars (CV={cv_time:.2f})', alpha=0.7)
 plt.plot(counts_vol.index, counts_vol, label=f'Volume Bars (CV={cv_vol:.2f})', alpha=0.7)
@@ -1085,7 +1086,7 @@ def plot_bar_count_sweep(
     frequency: str = 'W',
     num_steps: int = 30
 ):
-    print(f"\n--- Sweeping Bar Count Stability for {title} ---")
+    logging.debug(f"\n--- Sweeping Bar Count Stability for {title} ---")
     
     min_threshold = metric_series.mean() * 0.5
     max_threshold = metric_series.max() * 2
@@ -1115,7 +1116,7 @@ def plot_bar_count_sweep(
     results_df = pd.DataFrame(results)
     
     if results_df.empty:
-        print("Not enough data to plot.")
+        logging.debug("Not enough data to plot.")
         return
 
     # Plotting
@@ -1222,9 +1223,9 @@ def run_tsne_analysis(features: pd.DataFrame, target: pd.Series, title: str):
     """
     Performs PCA and t-SNE on features and plots the result.
     """
-    print(f"Running t-SNE analysis for {title}...")
+    logging.debug(f"Running t-SNE analysis for {title}...")
     if features.empty:
-        print("Feature set is empty. Skipping analysis.")
+        logging.debug("Feature set is empty. Skipping analysis.")
         return
 
     # 1. Scale features
@@ -1234,7 +1235,7 @@ def run_tsne_analysis(features: pd.DataFrame, target: pd.Series, title: str):
     # 2. Apply PCA to reduce dimensionality first (helps t-SNE)
     pca = PCA(n_components=10, random_state=42)
     features_pca = pca.fit_transform(features_scaled)
-    print(f"Explained variance by 10 PCA components: {np.sum(pca.explained_variance_ratio_):.2%}")
+    logging.debug(f"Explained variance by 10 PCA components: {np.sum(pca.explained_variance_ratio_):.2%}")
 
     # 3. Apply t-SNE
     tsne = TSNE(n_components=2, perplexity=30, n_iter=1000, random_state=42)

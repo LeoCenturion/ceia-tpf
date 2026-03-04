@@ -1,4 +1,5 @@
 """Backtesting framework with Optuna optimization and MLflow logging."""
+import logging
 
 import os
 import re
@@ -17,6 +18,8 @@ from src.data_analysis import (
     fetch_historical_data,
 )
 
+
+logger = logging.getLogger(__name__)
 
 class TrialStrategy(Strategy):
     """Base strategy class for Optuna trials with artifact saving."""
@@ -107,13 +110,13 @@ def optimize_strategy(  # pylint: disable=too-many-arguments
             mlflow.log_params(params)
 
             for key, value in stats.items():
-                print(f" key value {key} {value} {type(value)}")
+                logger.debug(f" key value {key} {value} {type(value)}")
                 if isinstance(value, pd.Timestamp):
                     value = value.timestamp()
                 if isinstance(value, pd.Timedelta):
                     value = value.total_seconds()
                 if not np.issubdtype(type(value), np.number):
-                    print("skipping")
+                    logger.debug("skipping")
                     continue
                 sanitized_key = sanitize_metric_name(key)
                 mlflow.log_metric(sanitized_key, value)
@@ -138,7 +141,7 @@ def optimize_strategy(  # pylint: disable=too-many-arguments
     try:
         return study.best_params
     except ValueError:
-        print(f"Study {study_name} finished, but no best trial was found.")
+        logger.debug(f"Study {study_name} finished, but no best trial was found.")
         return None
 
 
@@ -166,13 +169,13 @@ def optimize_classification_strategy(  # pylint: disable=too-many-arguments
             mlflow.log_params(params)
 
             for key, value in stats.items():
-                print(f" key value {key} {value} {type(value)}")
+                logger.debug(f" key value {key} {value} {type(value)}")
                 if isinstance(value, pd.Timestamp):
                     value = value.timestamp()
                 if isinstance(value, pd.Timedelta):
                     value = value.total_seconds()
                 if not np.issubdtype(type(value), np.number):
-                    print("skipping")
+                    logger.debug("skipping")
                     continue
                 sanitized_key = sanitize_metric_name(key)
                 mlflow.log_metric(sanitized_key, value)
@@ -226,7 +229,7 @@ def optimize_classification_strategy(  # pylint: disable=too-many-arguments
     try:
         return study.best_params
     except ValueError:
-        print(f"Study {study_name} finished, but no best trial was found.")
+        logger.debug(f"Study {study_name} finished, but no best trial was found.")
         return None
 
 
@@ -266,7 +269,7 @@ def run_optimizations(  # pylint: disable=too-many-arguments
         with mlflow.start_run(run_name=f"Optimize_{name}"):
             mlflow.log_param("start_date", actual_start_date)
             mlflow.log_param("end_date", actual_end_date)
-            print(f"Optimizing {name}...")
+            logger.debug(f"Optimizing {name}...")
             optimize_strategy(
                 data,
                 strategy,
@@ -274,7 +277,7 @@ def run_optimizations(  # pylint: disable=too-many-arguments
                 study_name=f"{experiment_name}-{name}",
                 n_jobs=n_jobs,
             )
-            print(f"Optimization for {name} complete.")
+            logger.debug(f"Optimization for {name} complete.")
 
 
 def run_classification_optimizations(  # pylint: disable=too-many-arguments
@@ -311,7 +314,7 @@ def run_classification_optimizations(  # pylint: disable=too-many-arguments
         with mlflow.start_run(run_name=f"Optimize_{name}"):
             mlflow.log_param("start_date", actual_start_date)
             mlflow.log_param("end_date", actual_end_date)
-            print(f"Optimizing {name}...")
+            logger.debug(f"Optimizing {name}...")
             optimize_classification_strategy(
                 data,
                 strategy,
@@ -319,7 +322,7 @@ def run_classification_optimizations(  # pylint: disable=too-many-arguments
                 study_name=f"{experiment_name}-{name}",
                 n_jobs=n_jobs,
             )
-            print(f"Optimization for {name} complete.")
+            logger.debug(f"Optimization for {name} complete.")
 
 
 def combinatorial_symmetric_cv(performance_matrix: pd.DataFrame, S: int = 16):
@@ -354,7 +357,7 @@ def combinatorial_symmetric_cv(performance_matrix: pd.DataFrame, S: int = 16):
     # Step 1: Partition the Data
     # Ensure blocks are of equal size for symmetry.
     if T % S != 0:
-        print(f"Warning: Data length {T} is not divisible by S {S}. Trimming data.")
+        logger.debug(f"Warning: Data length {T} is not divisible by S {S}. Trimming data.")
         performance_matrix = performance_matrix.iloc[: T - (T % S)]
         T = performance_matrix.shape[0]
 
@@ -371,12 +374,12 @@ def combinatorial_symmetric_cv(performance_matrix: pd.DataFrame, S: int = 16):
 
     omega_values = []
     num_combinations = len(training_set_indices_combinations)
-    print(f"Running {num_combinations} combinations for CSCV...")
+    logger.debug(f"Running {num_combinations} combinations for CSCV...")
 
     # Step 3: The Evaluation Loop
     for i, training_indices in enumerate(training_set_indices_combinations):
         if (i + 1) % 1000 == 0:
-            print(f"Processing combination {i + 1}/{num_combinations}...")
+            logger.debug(f"Processing combination {i + 1}/{num_combinations}...")
 
         training_blocks = [blocks[j] for j in training_indices]
         training_set = pd.concat(training_blocks)

@@ -1,3 +1,4 @@
+import logging
 import pandas as pd
 import os
 import glob
@@ -46,7 +47,7 @@ def load_single_csv(filepath):
 
 # 1. Usar glob para encontrar todos los archivos CSV
 all_files = glob.glob(os.path.join(DATA_DIR, FILE_PATTERN))
-print(f"Found {len(all_files)} CSV files to process.")
+logging.debug(f"Found {len(all_files)} CSV files to process.")
 
 # 2. Leer todos los archivos en una lista de DataFrames
 list_of_dfs = []
@@ -57,7 +58,7 @@ for file in tqdm(all_files, desc="Loading and cleaning files"):
             df_chunk = load_single_csv(file)
             list_of_dfs.append(df_chunk)
     except Exception as e:
-        print(f"Skipping file {file} due to error: {e}")
+        logging.debug(f"Skipping file {file} due to error: {e}")
         continue
 
 # 3. Concatenar y finalizar el DataFrame
@@ -69,16 +70,16 @@ if list_of_dfs:
     final_df = final_df.sort_index()
 
     # Opcional: Mostrar información del DataFrame final
-    print(f"\n--- Final Data Summary ---")
-    print(f"Total rows after concat: {len(final_df)}")
-    print(f"Number of unique timestamps: {len(final_df.index.unique())}")
+    logging.debug(f"\n--- Final Data Summary ---")
+    logging.debug(f"Total rows after concat: {len(final_df)}")
+    logging.debug(f"Number of unique timestamps: {len(final_df.index.unique())}")
     final_df.info(memory_usage='deep')
 
     # 4. Guardar el DataFrame consolidado en un solo archivo CSV
-    print(f"\nSaving consolidated data to: {OUTPUT_FILE_PATH}")
+    logging.debug(f"\nSaving consolidated data to: {OUTPUT_FILE_PATH}")
     # index=True asegura que la columna 'date' (el índice) se guarde en el CSV
     final_df.to_csv(OUTPUT_FILE_PATH, index=True) 
 
-    print("Consolidation complete.")
+    logging.debug("Consolidation complete.")
 else:
-    print("No data loaded.")
+    logging.debug("No data loaded.")

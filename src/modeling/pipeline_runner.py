@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import pandas as pd
 import json # Added this import
@@ -39,7 +40,7 @@ def run_pipeline(
             logger.log_params({"model_class": model_cls.__name__})
 
         # 3. Run Pipeline
-        print(f"Running pipeline: {pipeline.__class__.__name__} ({pipeline.problem_type})")
+        logging.debug(f"Running pipeline: {pipeline.__class__.__name__} ({pipeline.problem_type})")
         
         # This is a bit of a hack to handle the meta-labeling pipeline's different signature
         if "MetaLabeling" in pipeline.__class__.__name__:
@@ -54,12 +55,12 @@ def run_pipeline(
             # Log CV Metrics
             avg_score = np.mean(scores)
             metric_name = "avg_cv_f1" if pipeline.problem_type == "classification" else "avg_cv_mase"
-            print(f"\nAverage CV Score: {avg_score:.4f}")
+            logging.debug(f"\nAverage CV Score: {avg_score:.4f}")
             logger.log_metrics({metric_name: avg_score})
 
             # 4. Final Evaluation
             if pipeline.problem_type == "classification" and model is not None:
-                print("\nFinal Classification Report (Sample Split):")
+                logging.debug("\nFinal Classification Report (Sample Split):")
                 split_idx = int(len(X) * (1 - test_size))
                 X_train, X_test = X.iloc[:split_idx], X.iloc[split_idx:]
                 y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
@@ -69,7 +70,7 @@ def run_pipeline(
                 y_pred = model_report.predict(X_test)
                 
                 report_dict = classification_report(y_test, y_pred, output_dict=True)
-                print(classification_report(y_test, y_pred))
+                logging.debug(classification_report(y_test, y_pred))
                 
                 logger.log_metrics({
                     "test_accuracy": report_dict['accuracy'],
@@ -84,7 +85,7 @@ def run_pipeline(
             return trained_model, scores, X, y
 
     except Exception as e:
-        print(f"Pipeline execution failed: {e}")
+        logging.debug(f"Pipeline execution failed: {e}")
         raise
     finally:
         logger.end_run()

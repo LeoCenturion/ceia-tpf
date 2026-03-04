@@ -14,7 +14,6 @@ It follows the machine learning cycle outlined by Lopez de Prado that consists o
 
 4. Backtesters Once a strategy prototype is complete, backtesters rigorously assess its profitability under various scenarios. Rather than just running a historical simulation, they evaluate the strategy against alternative scenarios and calculate the Probability of Backtest Overfitting (PBO). To prevent selection bias and overfitting, backtesters report their results directly to management, not back to the strategists.
 
-
 In the `src` directory you'll find
 
 - data_analysis: corresponding to data curation and feature engineering
@@ -30,3 +29,7 @@ This project uses poetry. Dependencies are defined in pyproject.toml. To run pyt
 Utility scripts are in scripts/
 
 Data analysis notebooks and sctipts are found in data_analysis/. Before modifying files there you should always run make sync-notebooks. After creating a new script/notebooks you should run make pair-notebooks
+
+## Dependency Rules
+
+- No module in `src/modeling` can import from `src/backtesting`
