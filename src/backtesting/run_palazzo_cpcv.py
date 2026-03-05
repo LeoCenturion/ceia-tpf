@@ -3,8 +3,10 @@ import numpy as np
 import xgboost as xgb
 from sklearn.metrics import f1_score, classification_report
 
+from itertools import combinations
+import pandas as pd
+
 from src.data_analysis.data_analysis import fetch_historical_data
-from src.modeling import PurgedKFold
 from src.modeling.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
 from src.utils.logging_config import setup_logging
 
@@ -21,6 +23,7 @@ class PalazzoXGBoostCPCVPipeline(PalazzoXGBoostPipeline):
         """
         Runs Combinatorially Purged Cross-Validation.
         """
+        # pylint: disable=too-many-locals
         logger.info("Starting CPCV process...")
 
         # Step 1-3: Use parent methods to get processed data
@@ -36,49 +39,119 @@ class PalazzoXGBoostCPCVPipeline(PalazzoXGBoostPipeline):
         X = features.loc[common_index]
         y = y.loc[common_index]
         sample_weights = sample_weights.loc[common_index]
-        t1 = t1_from_labeling.loc[common_index]  # Use t1 from labeling, aligned
+        t1 = t1_from_labeling.loc[common_index]
 
         logger.info(f"Data aligned. X shape: {X.shape}, y shape: {y.shape}")
 
-        # Setup PurgedKFold
-        n_splits = self.config.get("n_splits", 5)
+        # CPCV parameters
+        n_paths = self.config.get("n_paths", 10)
+        k_test_paths = self.config.get("k_test_paths", 2)
         pct_embargo = self.config.get("pct_embargo", 0.01)
-        cv = PurgedKFold(n_splits=n_splits, t1=t1, pct_embargo=pct_embargo)
+
         logger.info(
-            f"Using PurgedKFold with n_splits={n_splits}, pct_embargo={pct_embargo}"
+            f"Running CPCV with n_paths={n_paths}, k_test_paths={k_test_paths}, pct_embargo={pct_embargo}"
         )
+
+        path_indices = np.array_split(np.arange(len(X)), n_paths)
+        test_path_combinations = list(combinations(range(n_paths), k_test_paths))
+
+        logger.info(f"Total combinations to test: {len(test_path_combinations)}")
 
         scores = []
         fold = 0
-        for train_indices, test_indices in cv.split(X):
+        for test_path_idxs in test_path_combinations:
             fold += 1
-            logger.info(f"--- Fold {fold}/{n_splits} ---")
-            X_train, X_test = X.iloc[train_indices], X.iloc[test_indices]
-            y_train, y_test = y.iloc[train_indices], y.iloc[test_indices]
-            sw_train = sample_weights.iloc[train_indices]
+            logger.info(f"--- Fold {fold}/{len(test_path_combinations)} ---")
+            logger.info(f"Test path indices: {test_path_idxs}")
 
-            logger.info(f"Train size: {len(X_train)}, Test size: {len(X_test)}")
+            # Define train and test paths
+            train_path_idxs = np.setdiff1d(range(n_paths), test_path_idxs)
+            train_indices_orig = np.concatenate(
+                [path_indices[i] for i in train_path_idxs if len(path_indices[i]) > 0]
+            )
+            test_indices = np.concatenate(
+                [path_indices[i] for i in test_path_idxs if len(path_indices[i]) > 0]
+            )
+
+            if len(test_indices) == 0 or len(train_indices_orig) == 0:
+                logger.warning(f"Skipping fold {fold} due to empty train or test set.")
+                continue
+
+            # Get time ranges for each test path for purging/embargo
+            test_path_time_ranges = []
+            for path_idx in test_path_idxs:
+                path_inds = path_indices[path_idx]
+                if len(path_inds) > 0:
+                    test_path_time_ranges.append(
+                        (X.index[path_inds[0]], X.index[path_inds[-1]])
+                    )
+
+            # Purging: remove training samples that overlap with test period
+            train_times = X.index[train_indices_orig]
+            train_t1 = t1.loc[train_times]
+
+            purge_mask = pd.Series(False, index=train_times)
+            for start_time, end_time in test_path_time_ranges:
+                purge_mask |= (train_times >= start_time) & (train_times <= end_time)
+                purge_mask |= (train_t1 >= start_time) & (train_t1 <= end_time)
+
+            train_indices_purged = train_indices_orig[~purge_mask.values]
+
+            # Embargo: remove training samples that immediately follow a test period
+            embargo_td = (X.index[-1] - X.index[0]) * pct_embargo
+            train_indices_final = train_indices_purged
+            if embargo_td.total_seconds() > 0 and len(train_indices_purged) > 0:
+                embargo_mask = pd.Series(False, index=X.index[train_indices_purged])
+                for _, end_time in test_path_time_ranges:
+                    embargo_start = end_time
+                    embargo_end = end_time + embargo_td
+                    embargo_mask |= (X.index[train_indices_purged] > embargo_start) & (
+                        X.index[train_indices_purged] <= embargo_end
+                    )
+                train_indices_final = train_indices_purged[~embargo_mask.values]
+
+            if len(train_indices_final) == 0:
+                logger.warning(
+                    f"Skipping fold {fold} as all training data was purged/embargoed."
+                )
+                continue
+
+            # Final train/test sets
+            X_train, X_test = (
+                X.iloc[train_indices_final],
+                X.iloc[test_indices],
+            )
+            y_train, y_test = (
+                y.iloc[train_indices_final],
+                y.iloc[test_indices],
+            )
+            sw_train = sample_weights.iloc[train_indices_final]
+
+            logger.info(
+                f"Train size: {len(X_train)} (after purge/embargo), Test size: {len(X_test)}"
+            )
 
             model = model_cls(**model_params)
             model.fit(X_train, y_train, sample_weight=sw_train)
-
             preds = model.predict(X_test)
-
-            score = f1_score(y_test, preds)
+            score = f1_score(y_test, preds, zero_division=0)
             scores.append(score)
 
             logger.info(f"Fold {fold} F1 Score: {score:.4f}")
             logger.info(
                 f"Classification report for fold {fold}:\n"
-                f"{classification_report(y_test, preds)}"
+                f"{classification_report(y_test, preds, zero_division=0)}"
             )
 
         logger.info("--- CPCV Results ---")
-        logger.info(f"Individual F1 Scores: {[f'{s:.4f}' for s in scores]}")
-        logger.info(f"Mean F1 Score: {np.mean(scores):.4f}")
-        logger.info(f"Std Dev of F1 Scores: {np.std(scores):.4f}")
+        if scores:
+            logger.info(f"Individual F1 Scores: {[f'{s:.4f}' for s in scores]}")
+            logger.info(f"Mean F1 Score: {np.mean(scores):.4f}")
+            logger.info(f"Std Dev of F1 Scores: {np.std(scores):.4f}")
+        else:
+            logger.warning("No scores were generated, all folds might have been skipped.")
         logger.info("CPCV process finished.")
-        return np.mean(scores)
+        return np.mean(scores) if scores else 0
 
 
 @setup_logging
@@ -104,7 +177,8 @@ def main():
     pipeline_config = {
         "volume_threshold": 50000,
         "tau": 0.7,
-        "n_splits": 5,
+        "n_paths": 10,
+        "k_test_paths": 2,
         "pct_embargo": 0.01,
     }
 
