@@ -52,7 +52,28 @@ class PalazzoXGBoostCPCVPipeline(PalazzoXGBoostPipeline):
             f"Running CPCV with n_paths={n_paths}, k_test_paths={k_test_paths}, pct_embargo={pct_embargo}"
         )
 
-        path_indices = np.array_split(np.arange(len(X)), n_paths)
+        # Split data into N paths based on time, not by number of samples
+        start_time = X.index.min()
+        end_time = X.index.max()
+        path_duration = (end_time - start_time) / n_paths
+
+        time_splits = [start_time + i * path_duration for i in range(n_paths + 1)]
+        # Ensure the last split aligns with the actual end time to include all data
+        time_splits[-1] = end_time
+
+        path_indices = []
+        for i in range(n_paths):
+            start_split = time_splits[i]
+            end_split = time_splits[i + 1]
+
+            # The last path includes its end time
+            if i < n_paths - 1:
+                path_mask = (X.index >= start_split) & (X.index < end_split)
+            else:
+                path_mask = (X.index >= start_split) & (X.index <= end_split)
+
+            indices = np.where(path_mask)[0]
+            path_indices.append(indices)
         test_path_combinations = list(combinations(range(n_paths), k_test_paths))
 
         logger.info(f"Total combinations to test: {len(test_path_combinations)}")
