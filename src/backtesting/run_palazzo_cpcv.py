@@ -92,7 +92,9 @@ class PalazzoXGBoostCPCVPipeline(PalazzoXGBoostPipeline):
 
         # Step 5: Backtest Path Construction
         logger.info("--- Constructing and Evaluating Backtest Paths ---")
-        path_results = construct_backtest_paths(split_predictions, n_groups)
+        path_results = construct_backtest_paths(
+            split_predictions, n_groups, k_test_groups
+        )
 
         path_scores = []
         for i, result in enumerate(path_results):

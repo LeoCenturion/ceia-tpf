@@ -131,18 +131,49 @@ def _find_paths(splits, n_groups):
     return [list(p) for p in unique_paths]
 
 
-def construct_backtest_paths(split_predictions: list, n_groups: int):
+def construct_backtest_paths(
+    split_predictions: list, n_groups: int, k_test_groups: int
+):
     """
-    Stitches together the out-of-sample predictions to form complete backtest paths.
+    Stitches together OOS predictions to form complete backtest paths
+    based on the method described by Lopez de Prado, ensuring each
+    prediction is used in at most one path.
     """
     all_preds = {p["test_path_idxs"]: p for p in split_predictions}
     all_splits = list(all_preds.keys())
 
-    paths = _find_paths(all_splits, n_groups)
-    logger.info(f"Constructed {len(paths)} unique backtest paths.")
+    # Step 1: Find all possible ways to form a complete path (a partition of N groups)
+    all_possible_paths = _find_paths(all_splits, n_groups)
 
+    # Step 2: Greedily select disjoint paths to ensure each prediction is used at most once.
+    selected_paths = []
+    used_splits = set()
+    for path_candidate in all_possible_paths:
+        candidate_splits = set(path_candidate)
+        if used_splits.isdisjoint(candidate_splits):
+            selected_paths.append(path_candidate)
+            used_splits.update(candidate_splits)
+
+    # Lopez de Prado's framework suggests a specific number of paths can be formed.
+    expected_num_paths = (
+        comb(n_groups - 1, k_test_groups - 1)
+        if k_test_groups > 0 and n_groups >= k_test_groups
+        else 0
+    )
+
+    logger.info(
+        f"Constructed {len(selected_paths)} unique, disjoint backtest paths."
+    )
+    if len(selected_paths) < expected_num_paths:
+        logger.warning(
+            f"Could only construct {len(selected_paths)} paths, "
+            f"less than the expected {expected_num_paths}. "
+            "Some predictions will not be used."
+        )
+
+    # Step 3: Assemble the results for the selected paths
     path_results = []
-    for path in paths:
+    for path in selected_paths:
         path_y_true, path_y_pred = [], []
         for split_groups in path:
             if split_groups in all_preds:
