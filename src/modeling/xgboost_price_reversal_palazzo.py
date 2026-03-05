@@ -346,8 +346,13 @@ def create_labels(df, tau=0.35):
     """
     Creates target labels based on the triple-barrier method variation
     described in Section 3.3.2, Equation 3.1.
+    Also returns the event end times (t1) for use in purging.
     """
     # print("Step 3: Creating target labels...")
+
+    # The event horizon for this labeling is the next bar.
+    t1 = pd.Series(df.index, index=df.index).shift(-1)
+
     df["label"] = 0
     # Shift returns and volatility to use future information for labeling ONLY
     df["next_bar_return"] = df["bar_return"].shift(-1)
@@ -361,14 +366,18 @@ def create_labels(df, tau=0.35):
 
     df.loc[cond1 & cond2, "label"] = 1
 
-    # Clean up columns used only for labeling
+    # Clean up columns used only for labeling. This drops the last row.
     df.dropna(subset=["next_bar_return"], inplace=True)
     df.drop(columns=["next_bar_return"], inplace=True)
+
+    # Align t1 with the final dataframe index
+    t1 = t1.reindex(df.index)
+
     # print(len(df))
     # print(
     #     f"Labeling complete. Class distribution:\n{df['label'].value_counts(normalize=True)}\n"
     # )
-    return df
+    return df, t1
 
 
 def _create_reversal_features(df: pd.DataFrame) -> pd.DataFrame:
