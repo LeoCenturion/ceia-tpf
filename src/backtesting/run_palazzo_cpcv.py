@@ -94,7 +94,7 @@ def main():
         start_date="2024-01-01T00:00:00Z",  # Use a smaller subset for quicker testing
     )
     # The pipeline expects lowercase 'volume' and 'close'
-    data.rename(columns={"Volume": "volume", "Close": "close"}, inplace=True)
+    # data.rename(columns={"Volume": "volume", "Close": "close"}, inplace=True)
 
     logger.info(
         f"Running CPCV for Palazzo XGBoost strategy with {len(data)} datapoints"
