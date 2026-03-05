@@ -80,14 +80,10 @@ class PalazzoXGBoostPipeline(AbstractMLPipeline):
     def step_3_labeling_and_weighting(self, bars):
         # print("Step 3: Creating target labels and sample weights...")
 
-        # Calculate t1 (event end time) BEFORE dropping rows in labeling
-        t1_full = pd.Series(bars.index, index=bars.index).shift(-1)
-
-        # Reuse create_labels from palazzo script
-        df_labeled = palazzo_create_labels(bars.copy(), tau=self.config["tau"])
-
-        # Align t1 to the labeled index
-        t1 = t1_full.loc[df_labeled.index]
+        # The `palazzo_create_labels` function is the correct source for the event
+        # end times (t1). It must be modified to return the `t1` series along
+        # with the labeled dataframe.
+        df_labeled, t1 = palazzo_create_labels(bars.copy(), tau=self.config["tau"])
 
         # Balanced weights
         y = df_labeled["label"]

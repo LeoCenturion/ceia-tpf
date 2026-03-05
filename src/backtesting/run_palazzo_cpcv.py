@@ -13,28 +13,32 @@ from src.backtesting.cpcv import (
 )
 from src.data_analysis.data_analysis import fetch_historical_data
 from src.modeling.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
+from src.modeling.mlflow_utils import MLflowLogger
 from src.utils.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
 
 
-class PalazzoXGBoostCPCVPipeline(PalazzoXGBoostPipeline):
+def run_cpcv_for_pipeline(
+    pipeline, raw_data, model_cls, model_params, experiment_name
+):
     """
-    Extends the PalazzoXGBoostPipeline to include a method for running
-    Combinatorially Purged Cross-Validation.
+    Runs Combinatorially Purged Cross-Validation for a given ML pipeline.
     """
+    # pylint: disable=too-many-locals
+    mlflow_logger = MLflowLogger(experiment_name=experiment_name)
+    run_name = f"CPCV_{pipeline.__class__.__name__}"
+    mlflow_logger.start_run(run_name=run_name)
 
-    def run_cpcv(self, raw_data, model_cls, model_params):
-        """
-        Runs Combinatorially Purged Cross-Validation and constructs backtest paths.
-        """
-        # pylint: disable=too-many-locals
+    try:
         logger.info("Starting CPCV process...")
 
-        # Steps 1-3: Data processing
-        bars = self.step_1_data_structuring(raw_data)
-        features = self.step_2_feature_engineering(bars)
-        y, sample_weights, t1_from_labeling = self.step_3_labeling_and_weighting(bars)
+        # Steps 1-3: Data processing from pipeline
+        bars = pipeline.step_1_data_structuring(raw_data)
+        features = pipeline.step_2_feature_engineering(bars)
+        y, sample_weights, t1_from_labeling = pipeline.step_3_labeling_and_weighting(
+            bars
+        )
 
         common_index = features.index.intersection(y.index)
         X, y, sample_weights, t1 = (
@@ -45,10 +49,22 @@ class PalazzoXGBoostCPCVPipeline(PalazzoXGBoostPipeline):
         )
         logger.info(f"Data aligned. X shape: {X.shape}, y shape: {y.shape}")
 
-        # CPCV parameters
-        n_groups = self.config.get("n_groups", 10)
-        k_test_groups = self.config.get("k_test_groups", 2)
-        pct_embargo = self.config.get("pct_embargo", 0.01)
+        # CPCV parameters from pipeline config
+        n_groups = pipeline.config.get("n_groups", 10)
+        k_test_groups = pipeline.config.get("k_test_groups", 2)
+        pct_embargo = pipeline.config.get("pct_embargo", 0.01)
+
+        # Log parameters to MLflow
+        mlflow_logger.log_params(
+            {
+                "pipeline": pipeline.__class__.__name__,
+                "n_groups": n_groups,
+                "k_test_groups": k_test_groups,
+                "pct_embargo": pct_embargo,
+            }
+        )
+        mlflow_logger.log_params(pipeline.config, prefix="pipeline_config")
+        mlflow_logger.log_params(model_params, prefix="model_params")
 
         # Step 1: Data Partitioning (Time-based)
         path_indices = time_based_partition(X.index, n_groups)
@@ -104,22 +120,28 @@ class PalazzoXGBoostCPCVPipeline(PalazzoXGBoostPipeline):
 
         logger.info("--- CPCV Path Results ---")
         if path_scores:
+            mean_f1 = np.mean(path_scores)
+            std_f1 = np.std(path_scores)
             logger.info(
                 f"Individual Path F1 Scores: {[f'{s:.4f}' for s in path_scores]}"
             )
-            logger.info(f"Mean Path F1 Score: {np.mean(path_scores):.4f}")
-            logger.info(f"Std Dev of Path F1 Scores: {np.std(path_scores):.4f}")
+            logger.info(f"Mean Path F1 Score: {mean_f1:.4f}")
+            logger.info(f"Std Dev of Path F1 Scores: {std_f1:.4f}")
+            mlflow_logger.log_metrics({"f1_mean": mean_f1, "f1_std": std_f1})
         else:
             logger.warning("No complete backtest paths were evaluated.")
 
-        logger.info("CPCV process finished.")
-        return path_scores
+    finally:
+        mlflow_logger.end_run()
+
+    logger.info("CPCV process finished.")
+    return path_scores
 
 
 @setup_logging
 def main():
     """
-    Main function to run the CPCV backtest for the PalazzoXGBoostCPCVStrategy.
+    Main function to run the CPCV backtest for the PalazzoXGBoostPipeline.
     """
     data_path = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv"
     data = fetch_historical_data(
@@ -129,7 +151,7 @@ def main():
         start_date="2024-01-01T00:00:00Z",  # Use a smaller subset for quicker testing
     )
     # The pipeline expects lowercase 'volume' and 'close'
-    # data.rename(columns={"Volume": "volume", "Close": "close"}, inplace=True)
+    data.rename(columns={"Volume": "volume", "Close": "close"}, inplace=True)
 
     logger.info(
         f"Running CPCV for Palazzo XGBoost strategy with {len(data)} datapoints"
@@ -159,11 +181,19 @@ def main():
         "min_child_weight": 5,
     }
 
-    cpcv_pipeline = PalazzoXGBoostCPCVPipeline(pipeline_config)
-    path_scores = cpcv_pipeline.run_cpcv(data, xgb.XGBClassifier, model_params)
+    pipeline = PalazzoXGBoostPipeline(pipeline_config)
+    path_scores = run_cpcv_for_pipeline(
+        pipeline=pipeline,
+        raw_data=data,
+        model_cls=xgb.XGBClassifier,
+        model_params=model_params,
+        experiment_name="Palazzo_CPCV_Backtest",
+    )
 
     if not path_scores:
-        logger.error("CPCV execution resulted in no valid paths. Please check data and configuration.")
+        logger.error(
+            "CPCV execution resulted in no valid paths. Please check data and configuration."
+        )
 
 
 if __name__ == "__main__":
