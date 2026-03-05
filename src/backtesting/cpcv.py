@@ -1,4 +1,5 @@
 import logging
+import random
 from itertools import combinations
 from math import comb
 
@@ -145,14 +146,25 @@ def construct_backtest_paths(
     # Step 1: Find all possible ways to form a complete path (a partition of N groups)
     all_possible_paths = _find_paths(all_splits, n_groups)
 
-    # Step 2: Greedily select disjoint paths to ensure each prediction is used at most once.
-    selected_paths = []
-    used_splits = set()
-    for path_candidate in all_possible_paths:
-        candidate_splits = set(path_candidate)
-        if used_splits.isdisjoint(candidate_splits):
-            selected_paths.append(path_candidate)
-            used_splits.update(candidate_splits)
+    # Step 2: Use a randomized greedy heuristic to select disjoint paths.
+    # This is a heuristic for the set-packing problem, which is NP-hard.
+    # We try multiple random orderings to find a better packing.
+    best_path_selection = []
+    for _ in range(20):  # Number of random trials
+        random.shuffle(all_possible_paths)
+
+        current_selection = []
+        used_splits = set()
+        for path_candidate in all_possible_paths:
+            candidate_splits = set(path_candidate)
+            if used_splits.isdisjoint(candidate_splits):
+                current_selection.append(path_candidate)
+                used_splits.update(candidate_splits)
+
+        if len(current_selection) > len(best_path_selection):
+            best_path_selection = current_selection
+
+    selected_paths = best_path_selection
 
     # Lopez de Prado's framework suggests a specific number of paths can be formed.
     expected_num_paths = (

@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 import xgboost as xgb
+import cupy as cp
 from sklearn.metrics import f1_score, classification_report
 
 import pandas as pd
@@ -95,8 +96,16 @@ def run_cpcv_for_pipeline(
             sw_train = sample_weights.iloc[train_indices]
 
             model = model_cls(**model_params)
-            model.fit(X_train, y_train, sample_weight=sw_train)
-            preds = model.predict(X_test)
+
+            # Convert data to cupy arrays for GPU training/prediction
+            X_train_gpu = cp.asarray(X_train.values)
+            y_train_gpu = cp.asarray(y_train.values)
+            sw_train_gpu = cp.asarray(sw_train.values)
+            X_test_gpu = cp.asarray(X_test.values)
+
+            model.fit(X_train_gpu, y_train_gpu, sample_weight=sw_train_gpu)
+            preds_gpu = model.predict(X_test_gpu)
+            preds = cp.asnumpy(preds_gpu)
 
             split_predictions.append(
                 {
