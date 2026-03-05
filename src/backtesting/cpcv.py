@@ -53,32 +53,32 @@ def get_purged_train_test_split(
     test_data = data.loc[test_indices]
 
     # Purging
-    if t1 is not None:
-        test_times = t1[test_data.index]
-        train_times = t1[train_data.index]
+    # if t1 is not None:
+    #     test_times = t1[test_data.index]
+    #     train_times = t1[train_data.index]
 
-        # Events in train_data that overlap with test_data
-        overlapping_events = train_times[
-            (train_times.index >= test_times.index.min())
-            & (train_times.index <= test_times.index.max())
-        ]
+    #     # Events in train_data that overlap with test_data
+    #     overlapping_events = train_times[
+    #         (train_times.index >= test_times.index.min())
+    #         & (train_times.index <= test_times.index.max())
+    #     ]
 
-        # Purge train_data
-        train_data = train_data.drop(index=overlapping_events.index)
+    #     # Purge train_data
+    #     train_data = train_data.drop(index=overlapping_events.index)
 
     # Embargoing
-    embargo_size = int(len(test_data) * embargo_pct)
-    if embargo_size > 0:
-        last_test_time = test_data.index.max()
-        embargo_start_time = last_test_time + pd.Timedelta(
-            seconds=1
-        )  # Start embargo right after the test set
-        embargo_end_time = (
-            embargo_start_time + pd.DateOffset(days=embargo_size)
-        )  # Approximate embargo period
+    # embargo_size = int(len(test_data) * embargo_pct)
+    # if embargo_size > 0:
+    #     last_test_time = test_data.index.max()
+    #     embargo_start_time = last_test_time + pd.Timedelta(
+    #         seconds=1
+    #     )  # Start embargo right after the test set
+    #     embargo_end_time = (
+    #         embargo_start_time + pd.DateOffset(days=embargo_size)
+    #     )  # Approximate embargo period
 
-        # Drop training samples within embargo period
-        train_data = train_data[train_data.index > embargo_end_time]
+    #     # Drop training samples within embargo period
+    #     train_data = train_data[train_data.index > embargo_end_time]
 
     return train_data, test_data
 
