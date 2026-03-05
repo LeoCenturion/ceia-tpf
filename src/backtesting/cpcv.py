@@ -8,15 +8,19 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-def partition_data(data: pd.DataFrame, n_groups: int) -> list:
-    """Partitions the data into N chronological groups."""
-    group_size = len(data) // n_groups
-    groups = []
-    for i in range(n_groups):
-        start = i * group_size
-        end = start + group_size if i < n_groups - 1 else len(data)
-        groups.append(data.iloc[start:end])
-    return groups
+def time_based_partition(index: pd.DatetimeIndex, n_groups: int) -> list:
+    """Partitions data into N groups based on time."""
+    start_time, end_time = index.min(), index.max()
+    path_duration = (end_time - start_time) / n_groups
+    time_splits = [start_time + i * path_duration for i in range(n_groups + 1)]
+    time_splits[-1] = end_time
+    path_indices = [
+        np.where((index >= time_splits[i]) & (index < time_splits[i + 1]))[0]
+        if i < n_groups - 1
+        else np.where((index >= time_splits[i]) & (index <= time_splits[i + 1]))[0]
+        for i in range(n_groups)
+    ]
+    return path_indices
 
 
 def generate_combinatorial_splits(n_groups: int, k: int) -> list:
@@ -29,90 +33,129 @@ def generate_combinatorial_splits(n_groups: int, k: int) -> list:
     return list(zip(train_splits, test_splits))
 
 
-def get_purged_train_test_split(
-    data: pd.DataFrame,
+def purge_and_embargo_split(
+    X: pd.DataFrame,
     t1: pd.Series,
-    train_indices: list,
-    test_indices: list,
-    embargo_pct: float,
+    path_indices: list,
+    train_group_idxs: tuple,
+    test_group_idxs: tuple,
+    pct_embargo: float,
 ):
-    """
-    Applies purging and embargoing to a train-test split.
+    """Applies purging and embargoing to a train-test split."""
+    train_indices_orig = np.concatenate(
+        [path_indices[i] for i in train_group_idxs if path_indices[i].size > 0]
+    )
+    test_indices = np.concatenate(
+        [path_indices[i] for i in test_group_idxs if path_indices[i].size > 0]
+    )
 
-    Args:
-        data (pd.DataFrame): The full dataset.
-        t1 (pd.Series): A series with the end time of each event.
-        train_indices (list): The indices of the training data.
-        test_indices (list): The indices of the testing data.
-        embargo_pct (float): The percentage of the test set size to use for embargoing.
+    if test_indices.size == 0 or train_indices_orig.size == 0:
+        return np.array([]), np.array([])
 
-    Returns:
-        tuple: Purged training data and testing data.
-    """
-    train_data = data.loc[train_indices]
-    test_data = data.loc[test_indices]
+    test_path_time_ranges = [
+        (X.index[path_indices[i][0]], X.index[path_indices[i][-1]])
+        for i in test_group_idxs
+        if path_indices[i].size > 0
+    ]
+    train_times = X.index[train_indices_orig]
+    train_t1 = t1.loc[train_times]
 
     # Purging
-    # if t1 is not None:
-    #     test_times = t1[test_data.index]
-    #     train_times = t1[train_data.index]
+    purge_mask = pd.Series(False, index=train_times)
+    for start, end in test_path_time_ranges:
+        purge_mask |= (train_times >= start) & (train_times <= end)
+        purge_mask |= (train_t1 >= start) & (train_t1 <= end)
+    train_indices_purged = train_indices_orig[~purge_mask.values]
 
-    #     # Events in train_data that overlap with test_data
-    #     overlapping_events = train_times[
-    #         (train_times.index >= test_times.index.min())
-    #         & (train_times.index <= test_times.index.max())
-    #     ]
+    # Embargo
+    embargo_td = (X.index[-1] - X.index[0]) * pct_embargo
+    train_indices_final = train_indices_purged
+    if embargo_td.total_seconds() > 0 and train_indices_purged.size > 0:
+        embargo_mask = pd.Series(False, index=X.index[train_indices_purged])
+        for _, end in test_path_time_ranges:
+            embargo_mask |= (X.index[train_indices_purged] > end) & (
+                X.index[train_indices_purged] <= end + embargo_td
+            )
+        train_indices_final = train_indices_purged[~embargo_mask.values]
 
-    #     # Purge train_data
-    #     train_data = train_data.drop(index=overlapping_events.index)
-
-    # Embargoing
-    # embargo_size = int(len(test_data) * embargo_pct)
-    # if embargo_size > 0:
-    #     last_test_time = test_data.index.max()
-    #     embargo_start_time = last_test_time + pd.Timedelta(
-    #         seconds=1
-    #     )  # Start embargo right after the test set
-    #     embargo_end_time = (
-    #         embargo_start_time + pd.DateOffset(days=embargo_size)
-    #     )  # Approximate embargo period
-
-    #     # Drop training samples within embargo period
-    #     train_data = train_data[train_data.index > embargo_end_time]
-
-    return train_data, test_data
+    return train_indices_final, test_indices
 
 
-def get_num_paths(N, k):
-    """Calculate the number of backtest paths."""
-    if N == 0:
-        return 0
-    return int(k / N * comb(N, k))
+def _find_paths(splits, n_groups):
+    """
+    Finds all unique sets of splits that form a complete partition of the N groups.
+    This is a recursive backtracking algorithm.
+    """
+    memo = {}
+
+    def solve(groups_tuple, available_splits_indices):
+        if not groups_tuple:
+            return [[]]
+        groups_tuple = tuple(sorted(groups_tuple))
+        state = (groups_tuple, available_splits_indices)
+        if state in memo:
+            return memo[state]
+
+        res = []
+        first_group = groups_tuple[0]
+
+        for i in available_splits_indices:
+            split = splits[i]
+            if first_group in split:
+                remaining_groups = tuple(g for g in groups_tuple if g not in split)
+
+                # New available splits are those that do not overlap with the current split
+                new_available_splits_indices = tuple(
+                    j
+                    for j in available_splits_indices
+                    if not set(splits[j]).intersection(split)
+                )
+
+                sub_partitions = solve(remaining_groups, new_available_splits_indices)
+                for p in sub_partitions:
+                    res.append([split] + p)
+
+        memo[state] = res
+        return res
+
+    all_splits_indices = tuple(range(len(splits)))
+    all_groups = tuple(range(n_groups))
+    raw_paths = solve(all_groups, all_splits_indices)
+
+    # Deduplicate paths (the solver might find the same path with splits in a different order)
+    unique_paths = set()
+    for p in raw_paths:
+        canonical_path = tuple(sorted(p))
+        unique_paths.add(canonical_path)
+
+    return [list(p) for p in unique_paths]
 
 
-def construct_backtest_paths(all_predictions: dict, n_groups: int, k: int):
+def construct_backtest_paths(split_predictions: list, n_groups: int):
     """
     Stitches together the out-of-sample predictions to form complete backtest paths.
     """
-    num_paths = get_num_paths(n_groups, k)
-    if num_paths == 0:
-        logger.debug("No complete paths can be constructed.")
-        return []
+    all_preds = {p["test_path_idxs"]: p for p in split_predictions}
+    all_splits = list(all_preds.keys())
 
-    paths = []
-    for i in range(num_paths):
-        current_path_preds = []
-        for g in range(n_groups):
-            if i < len(all_predictions[g]):
-                current_path_preds.append(all_predictions[g][i])
-            else:
-                # This should not happen if the math is correct
-                logger.debug(f"Warning: Not enough predictions for group {g} to form path {i}.")
-                continue
+    paths = _find_paths(all_splits, n_groups)
+    logger.info(f"Constructed {len(paths)} unique backtest paths.")
 
-        # Concatenate and sort by time index to form a complete path
-        if current_path_preds:
-            full_path = pd.concat(current_path_preds).sort_index()
-            paths.append(full_path)
+    path_results = []
+    for path in paths:
+        path_y_true, path_y_pred = [], []
+        for split_groups in path:
+            if split_groups in all_preds:
+                split_results = all_preds[split_groups]
+                path_y_true.append(split_results["y_test"])
+                path_y_pred.append(split_results["preds"])
 
-    return paths
+        if not path_y_true:
+            continue
+
+        path_y_true = np.concatenate(path_y_true)
+        path_y_pred = np.concatenate(path_y_pred)
+
+        path_results.append({"y_true": path_y_true, "y_pred": path_y_pred})
+
+    return path_results
