@@ -16,7 +16,6 @@ from src.modeling.mlflow_utils import MLflowLogger
 from src.utils.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
-print(logger)
 
 def run_cpcv_for_pipeline(
     pipeline, raw_data, model_cls, model_params, experiment_name
