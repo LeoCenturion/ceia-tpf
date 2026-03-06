@@ -1,8 +1,9 @@
 import logging
+import mlflow
 import numpy as np
 import xgboost as xgb
 import cupy as cp
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, classification_report
 
 from src.backtesting.cpcv import (
     construct_backtest_paths,
@@ -121,9 +122,37 @@ def run_cpcv_for_pipeline(
 
         path_scores = []
         for i, result in enumerate(path_results):
-            score = f1_score(result["y_true"], result["y_pred"], zero_division=0)
-            path_scores.append(score)
-            logger.info(f"Path {i+1}/{len(path_results)} F1 Score: {score:.4f}")
+            path_run_name = f"path_{i+1}"
+            with mlflow.start_run(run_name=path_run_name, nested=True):
+                y_true = result["y_true"]
+                y_pred = result["y_pred"]
+
+                # Calculate F1 for class 1 for logging and aggregation
+                score = f1_score(y_true, y_pred, zero_division=0)
+                path_scores.append(score)
+                logger.info(
+                    f"Path {i+1}/{len(path_results)} F1 Score (class 1): {score:.4f}"
+                )
+
+                # Generate detailed classification report
+                report = classification_report(
+                    y_true, y_pred, output_dict=True, zero_division=0
+                )
+
+                # Flatten the report for MLflow logging
+                flat_report = {}
+                for class_label, metrics in report.items():
+                    clean_class_label = class_label.replace(" ", "_")
+                    if isinstance(metrics, dict):
+                        for metric_name, value in metrics.items():
+                            clean_metric_name = metric_name.replace("-", "_")
+                            flat_report[
+                                f"{clean_class_label}_{clean_metric_name}"
+                            ] = value
+                    else:
+                        flat_report[clean_class_label] = metrics
+
+                mlflow.log_metrics(flat_report)
 
         logger.info("--- CPCV Path Results ---")
         if path_scores:
