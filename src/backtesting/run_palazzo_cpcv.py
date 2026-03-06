@@ -2,9 +2,7 @@ import logging
 import numpy as np
 import xgboost as xgb
 import cupy as cp
-from sklearn.metrics import f1_score, classification_report
-
-import pandas as pd
+from sklearn.metrics import f1_score
 
 from src.backtesting.cpcv import (
     construct_backtest_paths,
@@ -18,19 +16,19 @@ from src.modeling.mlflow_utils import MLflowLogger
 from src.utils.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
-
+print(logger)
 
 def run_cpcv_for_pipeline(
     pipeline, raw_data, model_cls, model_params, experiment_name
 ):
     """
     Runs Combinatorially Purged Cross-Validation for a given ML pipeline.
-    """
+    """    
     # pylint: disable=too-many-locals
     mlflow_logger = MLflowLogger(experiment_name=experiment_name)
     run_name = f"CPCV_{pipeline.__class__.__name__}"
     mlflow_logger.start_run(run_name=run_name)
-
+    logger.info("Starting CPCV process...")
     try:
         logger.info("Starting CPCV process...")
 
@@ -71,7 +69,7 @@ def run_cpcv_for_pipeline(
         path_indices = time_based_partition(X.index, n_groups)
 
         # Step 2: Combinatorial Splitting
-        splits = generate_combinatorial_splits(n_groups, k_test_groups)
+        splits = generate_combinatorial_splits(n_groups, k_test_groups)  # 
         logger.info(f"Total combinations to test: {len(splits)}")
 
         # Step 3 & 4: Purging, Embargoing, Training, and Forecasting
@@ -117,6 +115,7 @@ def run_cpcv_for_pipeline(
 
         # Step 5: Backtest Path Construction
         logger.info("--- Constructing and Evaluating Backtest Paths ---")
+
         path_results = construct_backtest_paths(
             split_predictions, n_groups, k_test_groups
         )
