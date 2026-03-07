@@ -164,9 +164,13 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
             )
 
         features = self.step_2_feature_engineering(bars)
-        logger.debug(f"After step_2_feature_engineering, features shape: {features.shape}")
+        logger.debug(
+            f"After step_2_feature_engineering, features shape: {features.shape}"
+        )
         labels, sample_weights, t1 = self.step_3_labeling_and_weighting(bars)
-        logger.debug(f"After step_3_labeling_and_weighting, labels shape: {labels.shape}, sw shape: {sample_weights.shape}, t1 shape: {t1.shape}")
+        logger.debug(
+            f"After step_3_labeling_and_weighting, labels shape: {labels.shape}, sw shape: {sample_weights.shape}, t1 shape: {t1.shape}"
+        )
 
         # Alignment
         common_idx = (
@@ -180,7 +184,9 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
         t1 = t1.loc[common_idx]
         if isinstance(y, pd.DataFrame):
             y = y.iloc[:, 0]
-        logger.debug(f"After alignment - X shape: {X.shape}, y shape: {y.shape}, sw shape: {sw.shape}, t1 shape: {t1.shape}")
+        logger.debug(
+            f"After alignment - X shape: {X.shape}, y shape: {y.shape}, sw shape: {sw.shape}, t1 shape: {t1.shape}"
+        )
 
         # Time-series split (for OOF and final training)
         split_idx = int(len(X) * 0.8)
@@ -190,7 +196,15 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
             sw.iloc[:split_idx],
             t1.iloc[:split_idx],
         )
-        logger.debug(f"Before OOF generation - X_train shape: {X_train.shape}, y_train shape: {y_train.shape}, sw_train shape: {sw_train.shape}, t1_train shape: {t1_train.shape}")
+        X_test, y_test, t1_test = (
+            X.iloc[split_idx:],
+            y.iloc[split_idx:],
+            t1.iloc[split_idx:],
+        )
+
+        logger.debug(
+            f"Before OOF generation - X_train shape: {X_train.shape}, y_train shape: {y_train.shape}, sw_train shape: {sw_train.shape}, t1_train shape: {t1_train.shape}"
+        )
 
         # Generate OOF predictions
         oof_df = self.generate_oof_predictions(
@@ -202,7 +216,9 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
         meta_labels = (oof_df["primary_pred"] == oof_df["true_label"]).astype(int)
         X_meta_train = X_train.copy()
         X_meta_train["primary_prob"] = oof_df["primary_prob"]
-        logger.debug(f"Before meta-model training, X_meta_train shape: {X_meta_train.shape}")
+        logger.debug(
+            f"Before meta-model training, X_meta_train shape: {X_meta_train.shape}"
+        )
 
         # Train meta-model (also AutoGluon)
         self.meta_model_ = model_cls(**meta_model_config)
@@ -212,24 +228,31 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
         self.primary_model_ = model_cls(**primary_model_params)
         self.primary_model_.fit(X_train, y_train, sample_weight=sw_train.values)
         self.t1_train_ = t1_train  # Store t1 for potential future use or debugging
+        return X_test, y_test, t1_test
 
     def predict(self, data_window: pd.DataFrame) -> int:
         """
         Predicts a single signal (0 or 1) for the latest data point in the provided window.
         Assumes self.primary_model_ and self.meta_model_ are already trained.
         """
-        logger.debug(f"Starting predict method with data_window of shape: {data_window.shape}")
+        logger.debug(
+            f"Starting predict method with data_window of shape: {data_window.shape}"
+        )
         if self.primary_model_ is None or self.meta_model_ is None:
             raise RuntimeError("Models not fitted. Call .fit() first.")
 
         # 1. Perform data structuring and feature engineering on the data_window
         bars = self.step_1_data_structuring(data_window)
-        logger.debug(f"After step_1_data_structuring in predict, bars shape: {bars.shape}")
+        logger.debug(
+            f"After step_1_data_structuring in predict, bars shape: {bars.shape}"
+        )
         if bars.empty:
             return 0  # Cannot make a prediction if no bars are formed
 
         features = self.step_2_feature_engineering(bars)
-        logger.debug(f"After step_2_feature_engineering in predict, features shape: {features.shape}")
+        logger.debug(
+            f"After step_2_feature_engineering in predict, features shape: {features.shape}"
+        )
 
         if features.empty:
             return 0
@@ -269,31 +292,11 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
                 {"pipeline_config": self.config, "model_params": model_params}
             )
 
-            # Fit the pipeline
-            self.fit(raw_data, model_cls, model_params)
-
-            # Re-generate features and labels for evaluation on the full raw_data
-            bars = self.step_1_data_structuring(raw_data)
-            features = self.step_2_feature_engineering(bars)
-            labels, sample_weights, t1 = self.step_3_labeling_and_weighting(bars)
-
-            common_idx = (
-                features.index.intersection(labels.index)
-                .intersection(sample_weights.index)
-                .intersection(t1.index)
+            # Fit the pipeline and get test data
+            X_test, y_test, t1_test = self.fit(raw_data, model_cls, model_params)
+            logger.debug(
+                f"After fit and split, X_test shape: {X_test.shape}, y_test shape: {y_test.shape}"
             )
-            X = features.loc[common_idx]
-            y = labels.loc[common_idx]
-            # sw = sample_weights.loc[common_idx] # Not directly used in final prediction metrics here
-            t1 = t1.loc[common_idx]
-            if isinstance(y, pd.DataFrame):
-                y = y.iloc[:, 0]
-
-            # Time-series split for evaluation
-            split_idx = int(len(X) * 0.8)
-            X_test, y_test = X.iloc[split_idx:], y.iloc[split_idx:]
-            t1_test = t1.iloc[split_idx:]
-            logger.debug(f"After train/test split, X_test shape: {X_test.shape}, y_test shape: {y_test.shape}")
 
             # Generate predictions for the test set using the fitted models
             primary_test_pred = self.primary_model_.predict(X_test)
@@ -301,7 +304,9 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
 
             X_meta_test = X_test.copy()
             X_meta_test["primary_prob"] = primary_test_prob
-            logger.debug(f"Before meta-model prediction, X_meta_test shape: {X_meta_test.shape}")
+            logger.debug(
+                f"Before meta-model prediction, X_meta_test shape: {X_meta_test.shape}"
+            )
             meta_test_pred = self.meta_model_.predict(X_meta_test)
 
             final_decision = (primary_test_pred == 1) & (meta_test_pred == 1)

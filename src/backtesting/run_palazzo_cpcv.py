@@ -184,7 +184,7 @@ def main():
         symbol="BTC/USDT",
         timeframe="1m",
         data_path=data_path,
-        start_date="2024-01-01T00:00:00Z",  # Use a smaller subset for quicker testing
+        # start_date="2024-01-01T00:00:00Z",  # Use a smaller subset for quicker testing
     )
 
     logger.info(

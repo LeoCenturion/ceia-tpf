@@ -26,6 +26,8 @@ def time_based_partition(index: pd.DatetimeIndex, n_groups: int) -> list:
 
 def generate_combinatorial_splits(n_groups: int, k: int) -> list:
     """Generates all combinations of training and testing splits."""
+    if k >= n_groups:
+        raise ValueError("k must be smaller than n_groups for combinatorial splits.")
     all_indices = list(range(n_groups))
     test_splits = list(combinations(all_indices, k))
     train_splits = [
