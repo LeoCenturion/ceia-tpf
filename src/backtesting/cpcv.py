@@ -62,7 +62,7 @@ def purge_and_embargo_split(
     ]
     train_times = X.index[train_indices_orig]
     train_t1 = t1.loc[train_times]
-
+    logger.debug(f'Train before purge: {len(train_times)}')
     # Purging
     purge_mask = pd.Series(False, index=train_times)
     for start, end in test_path_time_ranges:

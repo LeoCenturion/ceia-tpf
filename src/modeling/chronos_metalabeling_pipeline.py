@@ -88,7 +88,7 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
 
     def log_results(
         self,
-        logger,
+        mlflow_logger,
         primary_model,
         meta_model,
         metrics,
@@ -101,20 +101,43 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
         """
         Log Meta-Labeling specific artifacts and metrics.
         """
-        logger.log_metrics(metrics)
+        mlflow_logger.log_metrics(metrics)
 
         # Capture and log full classification reports as artifacts
         baseline_report = classification_report(
-            y_test, primary_test_pred, output_dict=True
+            y_test, primary_test_pred, output_dict=True, zero_division=0
         )
         meta_labeling_report = classification_report(
-            y_test, final_decision, output_dict=True
+            y_test, final_decision, output_dict=True, zero_division=0
         )
 
-        logger.log_artifact_dict(baseline_report, "baseline_classification_report.json")
-        logger.log_artifact_dict(
-            meta_labeling_report, "meta_labeling_classification_report.json"
-        )
+        # Flatten and log baseline report metrics
+        flat_baseline_report = {}
+        for class_label, metrics_dict in baseline_report.items():
+            clean_class_label = class_label.replace(" ", "_")
+            if isinstance(metrics_dict, dict):
+                for metric_name, value in metrics_dict.items():
+                    clean_metric_name = metric_name.replace("-", "_")
+                    flat_baseline_report[f"baseline_{clean_class_label}_{clean_metric_name}"] = value
+            else:
+                flat_baseline_report[f"baseline_{clean_class_label}"] = metrics_dict
+        mlflow_logger.log_metrics(flat_baseline_report)
+
+
+        # Flatten and log meta-labeling report metrics
+        flat_meta_labeling_report = {}
+        for class_label, metrics_dict in meta_labeling_report.items():
+            clean_class_label = class_label.replace(" ", "_")
+            if isinstance(metrics_dict, dict):
+                for metric_name, value in metrics_dict.items():
+                    clean_metric_name = metric_name.replace("-", "_")
+                    flat_meta_labeling_report[f"metalabeling_{clean_class_label}_{clean_metric_name}"] = value
+            else:
+                flat_meta_labeling_report[f"metalabeling_{clean_class_label}"] = metrics_dict
+        mlflow_logger.log_metrics(flat_meta_labeling_report)
+
+        mlflow_logger.log_artifact_dict(baseline_report, "baseline_classification_report.json")
+        mlflow_logger.log_artifact_dict(meta_labeling_report, "meta_labeling_classification_report.json")
 
         # Log AutoGluon Meta-Model Leaderboard
         if (
@@ -137,12 +160,12 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
             if leaderboard is not None and not leaderboard.empty:
                 best_meta_model_score = leaderboard.iloc[0]["score_test"]
                 best_meta_model_name = leaderboard.iloc[0]["model"]
-                logger.log_metrics({"test_f1_best_meta_model": best_meta_model_score})
-                logger.log_params({"best_meta_model_name": best_meta_model_name})
+                mlflow_logger.log_metrics({"test_f1_best_meta_model": best_meta_model_score})
+                mlflow_logger.log_params({"best_meta_model_name": best_meta_model_name})
 
                 lb_path = "autogluon_meta_leaderboard.csv"
                 leaderboard.to_csv(lb_path)
-                logger.log_artifact(lb_path)
+                mlflow_logger.log_artifact(lb_path)
                 if os.path.exists(lb_path):
                     os.remove(lb_path)
 
@@ -150,7 +173,7 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
         """
         Trains the primary and meta-models and stores them on the instance.
         """
-        logger.info(f"Starting fit method with raw_data of shape: {raw_data.shape}")
+        logger.debug(f"Starting fit method with raw_data of shape: {raw_data.shape}")
         primary_model_params = model_params.get("primary_model_params", {})
         meta_model_config = model_params.get("meta_model_config", {})
 
@@ -187,6 +210,8 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
         logger.debug(
             f"After alignment - X shape: {X.shape}, y shape: {y.shape}, sw shape: {sw.shape}, t1 shape: {t1.shape}"
         )
+        if X.empty or y.empty:
+            raise ValueError("Aligned features or labels are empty. Cannot fit model.")
 
         # Time-series split (for OOF and final training)
         split_idx = int(len(X) * 0.8)
@@ -205,6 +230,8 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
         logger.debug(
             f"Before OOF generation - X_train shape: {X_train.shape}, y_train shape: {y_train.shape}, sw_train shape: {sw_train.shape}, t1_train shape: {t1_train.shape}"
         )
+        if X_train.empty or y_train.empty:
+            raise ValueError("X_train or y_train is empty after internal split. Cannot generate OOF predictions.")
 
         # Generate OOF predictions
         oof_df = self.generate_oof_predictions(
@@ -280,15 +307,15 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
         raw_data: pd.DataFrame,
         model_cls,
         model_params,
-        experiment_name="Chronos_Pipeline_Run_tmp",
+        experiment_name="Chronos_Pipeline_Run",
     ):
         """
         Runs the full meta-labeling experiment, maintaining backward compatibility.
         Uses the new fit and predict methods internally.
         """
-        logger = MLflowLogger(experiment_name=experiment_name)
-        with logger.start_run(run_name=f"Chronos_MetaLabeling_Run", nested=True):
-            logger.log_params(
+        mlflow_logger = MLflowLogger(experiment_name=experiment_name)
+        with mlflow_logger.start_run(run_name=f"Chronos_MetaLabeling_Run", nested=True):
+            mlflow_logger.log_params(
                 {"pipeline_config": self.config, "model_params": model_params}
             )
 
@@ -332,7 +359,7 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
             }
 
             self.log_results(
-                logger,
+                mlflow_logger,
                 self.primary_model_,
                 self.meta_model_,
                 metrics,
@@ -362,12 +389,6 @@ def main():
         timeframe="1m",
         data_path=data_path,
     )
-    raw_data.rename(columns={VOLUME_COL: "volume", CLOSE_COL: "close"}, inplace=True)
-
-    # Use a smaller subset of data for quick testing
-    raw_data = raw_data.iloc[
-        -1000000:
-    ]  # Using last 1000000 bars for a much larger training set
 
     # Configuration for the pipeline (mostly for feature engineering)
     pipeline_config = {
@@ -410,7 +431,7 @@ def main():
         model_cls=AutoGluonAdapter,  # This is the class for both models
         raw_data=raw_data,
         model_params=model_params,
-        experiment_name="tmp_Chronos_MetaLabeling_Pipeline",  # tmp prefix
+        experiment_name="Chronos_MetaLabeling_Pipeline",  # tmp prefix
         data_path=data_path,
     )
 
