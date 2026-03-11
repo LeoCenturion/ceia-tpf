@@ -3,6 +3,7 @@ import os
 
 import numpy as np
 import pandas as pd
+from sklearn.metrics import classification_report
 
 # Transformers and AutoGluon for Chronos integration
 import torch
@@ -14,6 +15,8 @@ from src.data_analysis.data_analysis import fetch_historical_data, timer
 from src.modeling.autogluon_adapter import AutoGluonAdapter
 from src.modeling.pipeline_runner import run_pipeline
 from src.modeling.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
+
+logger = logging.getLogger(__name__)
 
 
 class ChronosFeaturePipeline(PalazzoXGBoostPipeline):
@@ -29,16 +32,19 @@ class ChronosFeaturePipeline(PalazzoXGBoostPipeline):
 
     @timer
     def step_2_feature_engineering(self, bars):
-        logging.debug("Step 2: Generating Chronos features and combining with tabular...")
+        logger.debug("Step 2: Generating Chronos features and combining with tabular...")
+        logger.debug(f"Shape of bars entering feature engineering: {bars.shape}")
 
         # 1. Generate standard tabular features using parent logic
         tabular_features = super().step_2_feature_engineering(
             bars
         )  # This already calls dropna()
+        logger.debug(f"Shape of tabular_features after parent engineering: {tabular_features.shape}")
 
         # Ensure we have a clean index after dropping NaNs from parent feature engineering
         common_index = tabular_features.index.intersection(bars.index)
         bars_aligned = bars.loc[common_index]
+        logger.debug(f"Shape of bars_aligned after common index intersection: {bars_aligned.shape}")
 
         # 2. Load Chronos components (if not already loaded)
         if self.chronos_model is None:
@@ -100,6 +106,7 @@ class ChronosFeaturePipeline(PalazzoXGBoostPipeline):
             )
         else:
             chronos_features_df = pd.DataFrame(index=pd.Index([]))
+        logger.debug(f"Shape of chronos_features_df after embedding: {chronos_features_df.shape}")
 
         # Align chronos_features_df to tabular_features index before concatenation
         final_common_index = tabular_features.index.intersection(
@@ -107,26 +114,51 @@ class ChronosFeaturePipeline(PalazzoXGBoostPipeline):
         )
         aligned_tabular_features = tabular_features.loc[final_common_index]
         aligned_chronos_features = chronos_features_df.loc[final_common_index]
+        logger.debug(f"Shape of aligned_tabular_features: {aligned_tabular_features.shape}")
+        logger.debug(f"Shape of aligned_chronos_features: {aligned_chronos_features.shape}")
 
         # 4. Combine Chronos embeddings with tabular features
         combined_features = pd.concat(
             [aligned_tabular_features, aligned_chronos_features], axis=1
         )
+        logger.debug(f"Shape of combined_features before final dropna: {combined_features.shape}")
 
-        return combined_features.dropna()  # Ensure final features are clean
+        final_features = combined_features.dropna()
+        logger.debug(f"Final shape of features after dropna: {final_features.shape}")
+        return final_features
 
     def log_results(self, logger, model, X_test=None, y_test=None):
         """
         Log AutoGluon specific artifacts (Leaderboard).
         """
         if hasattr(model, "leaderboard") and X_test is not None and y_test is not None:
-            logging.debug("\n--- AutoGluon Leaderboard ---")
+            logger.debug("\n--- AutoGluon Leaderboard ---")
             leaderboard_data = X_test.copy()
             leaderboard_data[model.label] = (
                 y_test  # Use model.label for AutoGluon's target column
             )
             leaderboard = model.leaderboard(leaderboard_data, silent=True)
-            logging.debug(leaderboard)
+            logger.debug(leaderboard)
+
+            # Log classification report
+            y_pred = model.predict(X_test)
+            report = classification_report(
+                y_test, y_pred, output_dict=True, zero_division=0
+            )
+
+            flat_report = {}
+            for class_label, metrics in report.items():
+                clean_class_label = str(class_label).replace(" ", "_")
+                if isinstance(metrics, dict):
+                    for metric_name, value in metrics.items():
+                        clean_metric_name = metric_name.replace("-", "_")
+                        flat_report[
+                            f"report_{clean_class_label}_{clean_metric_name}"
+                        ] = value
+                else:
+                    flat_report[f"report_{clean_class_label}"] = metrics
+
+            logger.log_metrics(flat_report)
 
             # Log Best Model Score
             if leaderboard is not None and not leaderboard.empty:
@@ -151,7 +183,8 @@ def main():
         timeframe="1m",
         data_path=data_path,
     )
-    raw_data.rename(columns={VOLUME_COL: "volume", CLOSE_COL: "close"}, inplace=True)
+    logger.debug(f"Initial raw_data size: {len(raw_data)}")
+    # raw_data.rename(columns={VOLUME_COL: "volume", CLOSE_COL: "close"}, inplace=True)
 
     # Configuration for the ChronosFeaturePipeline
     pipeline_config = {
@@ -172,7 +205,7 @@ def main():
         # "presets": "medium_quality", # Commented out for 'best_quality' preset
         "presets": "best_quality", # Using 'best_quality' as the highest known preset, 'extreme' is not a recognized preset.
         "time_limit": 600,
-        "verbosity": 2,
+        "verbosity": 1,
         "path": "AutogluonModels/chronos_feature_pipeline_run",
     }
 

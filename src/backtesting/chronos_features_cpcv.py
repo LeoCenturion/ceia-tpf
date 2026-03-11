@@ -33,7 +33,7 @@ class ChronosFeaturePipelineCPCV(ChronosFeaturePipeline):
         mlflow_logger = MLflowLogger(experiment_name=experiment_name)
         run_name = f"CPCV_{self.__class__.__name__}"
         mlflow_logger.start_run(run_name=run_name)
-        logging.info("Starting CPCV process for Chronos pipeline...")
+        logger.info("Starting CPCV process for Chronos pipeline...")
 
         try:
             # Steps 1-3: Data processing from pipeline
@@ -50,7 +50,7 @@ class ChronosFeaturePipelineCPCV(ChronosFeaturePipeline):
                 sample_weights.loc[common_index],
                 t1_from_labeling.loc[common_index],
             )
-            logging.info(f"Data aligned. X shape: {X.shape}, y shape: {y.shape}")
+            logger.info(f"Data aligned. X shape: {X.shape}, y shape: {y.shape}")
 
             # CPCV parameters from pipeline config
             n_groups = self.config.get("n_groups", 10)
@@ -74,12 +74,12 @@ class ChronosFeaturePipelineCPCV(ChronosFeaturePipeline):
 
             # Step 2: Combinatorial Splitting
             splits = generate_combinatorial_splits(n_groups, k_test_groups)
-            logging.info(f"Total combinations to test: {len(splits)}")
+            logger.info(f"Total combinations to test: {len(splits)}")
 
             # Step 3 & 4: Purging, Embargoing, Training, and Forecasting
             split_predictions = []
             for fold, (train_group_idxs, test_group_idxs) in enumerate(splits):
-                logging.info(
+                logger.info(
                     f"--- Fold {fold + 1}/{len(splits)} --- Test groups: {test_group_idxs}"
                 )
 
@@ -88,7 +88,7 @@ class ChronosFeaturePipelineCPCV(ChronosFeaturePipeline):
                 )
 
                 if test_indices.size == 0 or train_indices.size == 0:
-                    logging.warning(
+                    logger.warning(
                         f"Skipping fold {fold + 1} due to empty train or test set after purging."
                     )
                     continue
@@ -111,7 +111,7 @@ class ChronosFeaturePipelineCPCV(ChronosFeaturePipeline):
                 )
 
             # Step 5: Backtest Path Construction
-            logging.info("--- Constructing and Evaluating Backtest Paths ---")
+            logger.info("--- Constructing and Evaluating Backtest Paths ---")
 
             path_results = construct_backtest_paths(
                 split_predictions, n_groups, k_test_groups
@@ -126,7 +126,7 @@ class ChronosFeaturePipelineCPCV(ChronosFeaturePipeline):
 
                     score = f1_score(y_true, y_pred, average="weighted", zero_division=0)
                     path_scores.append(score)
-                    logging.info(
+                    logger.info(
                         f"Path {i+1}/{len(path_results)} F1 Score (weighted): {score:.4f}"
                     )
 
@@ -149,23 +149,23 @@ class ChronosFeaturePipelineCPCV(ChronosFeaturePipeline):
                     mlflow.log_metrics(flat_report)
                     mlflow.log_metric("f1_weighted", score)
 
-            logging.info("--- CPCV Path Results ---")
+            logger.info("--- CPCV Path Results ---")
             if path_scores:
                 mean_f1 = np.mean(path_scores)
                 std_f1 = np.std(path_scores)
-                logging.info(
+                logger.info(
                     f"Individual Path F1 Scores: {[f'{s:.4f}' for s in path_scores]}"
                 )
-                logging.info(f"Mean Path F1 Score: {mean_f1:.4f}")
-                logging.info(f"Std Dev of Path F1 Scores: {std_f1:.4f}")
+                logger.info(f"Mean Path F1 Score: {mean_f1:.4f}")
+                logger.info(f"Std Dev of Path F1 Scores: {std_f1:.4f}")
                 mlflow_logger.log_metrics({"f1_mean": mean_f1, "f1_std": std_f1})
             else:
-                logging.warning("No complete backtest paths were evaluated.")
+                logger.warning("No complete backtest paths were evaluated.")
 
         finally:
             mlflow_logger.end_run()
 
-        logging.info("CPCV process finished.")
+        logger.info("CPCV process finished.")
         return path_scores
 
 
@@ -178,12 +178,11 @@ def main():
     raw_data = fetch_historical_data(
         symbol="BTC/USDT",
         timeframe="1m",
-        data_path=data_path,
-        start_date="2022-01-01T00:00:00Z",  # Use a smaller subset for quicker testing
+        data_path=data_path
     )
     # raw_data.rename(columns={VOLUME_COL: "volume", CLOSE_COL: "close"}, inplace=True)
 
-    logging.info(
+    logger.info(
         f"Running CPCV for Chronos strategy with {len(raw_data)} datapoints"
     )
 
@@ -196,7 +195,7 @@ def main():
         "pct_embargo": 0.01,
         "chronos_model_name": "amazon/chronos-t5-tiny",
         "chronos_window_size": 128,
-        "chronos_stride": 64,  # Increased stride for faster CPCV run
+        "chronos_stride": 1,  # Increased stride for faster CPCV run
     }
 
     # AutoGluon model parameters
@@ -206,7 +205,7 @@ def main():
         "problem_type": "binary",
         "presets": "medium_quality",
         "time_limit": 300,  # Reduced time limit for faster CPCV fold
-        "verbosity": 2,
+        "verbosity": 1,
         "path": "AutogluonModels/chronos_cpcv_run",
     }
 
@@ -215,7 +214,7 @@ def main():
         raw_data=raw_data,
         model_cls=AutoGluonAdapter,
         model_params=model_params,
-        experiment_name="Chronos_CPCV_Backtest_in_Pipeline",
+        experiment_name="Chronos_Features_CPCV",
     )
 
 

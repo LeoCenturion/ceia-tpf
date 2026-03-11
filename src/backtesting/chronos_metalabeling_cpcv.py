@@ -284,6 +284,7 @@ def main():
         "presets": "medium_quality",
         "time_limit": 60,
         "path": "AutogluonModels/tmp_cpcv_chronos_primary",
+        "verbosity": 0, # Suppress AutoGluon output
     }
 
     # Meta Model (AutoGluon) parameters
@@ -293,6 +294,7 @@ def main():
         "presets": "best_quality",
         "time_limit": 30,
         "path": "AutogluonModels/tmp_cpcv_chronos_meta",
+        "verbosity": 0, # Suppress AutoGluon output
     }
 
     model_params = {
