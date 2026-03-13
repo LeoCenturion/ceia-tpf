@@ -1,8 +1,8 @@
+import argparse
 import logging
 import mlflow
 import numpy as np
 import xgboost as xgb
-import cupy as cp
 from sklearn.metrics import f1_score, classification_report
 
 from src.backtesting.cpcv import (
@@ -12,26 +12,26 @@ from src.backtesting.cpcv import (
     time_based_partition,
 )
 from src.data_analysis.data_analysis import fetch_historical_data
+from src.modeling.autogluon_adapter import AutoGluonAdapter
 from src.modeling.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
 from src.modeling.mlflow_utils import MLflowLogger
 from src.utils.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
 
+
 def run_cpcv_for_pipeline(
     pipeline, raw_data, model_cls, model_params, experiment_name
 ):
     """
     Runs Combinatorially Purged Cross-Validation for a given ML pipeline.
-    """    
+    """
     # pylint: disable=too-many-locals
     mlflow_logger = MLflowLogger(experiment_name=experiment_name)
     run_name = f"CPCV_{pipeline.__class__.__name__}"
     mlflow_logger.start_run(run_name=run_name)
     logger.info("Starting CPCV process...")
     try:
-        logger.info("Starting CPCV process...")
-
         # Steps 1-3: Data processing from pipeline
         bars = pipeline.step_1_data_structuring(raw_data)
         features = pipeline.step_2_feature_engineering(bars)
@@ -69,7 +69,7 @@ def run_cpcv_for_pipeline(
         path_indices = time_based_partition(X.index, n_groups)
 
         # Step 2: Combinatorial Splitting
-        splits = generate_combinatorial_splits(n_groups, k_test_groups)  # 
+        splits = generate_combinatorial_splits(n_groups, k_test_groups)
         logger.info(f"Total combinations to test: {len(splits)}")
 
         # Step 3 & 4: Purging, Embargoing, Training, and Forecasting
@@ -95,15 +95,11 @@ def run_cpcv_for_pipeline(
 
             model = model_cls(**model_params)
 
-            # Convert data to cupy arrays for GPU training/prediction
-            X_train_gpu = cp.asarray(X_train.values)
-            y_train_gpu = cp.asarray(y_train.values)
-            sw_train_gpu = cp.asarray(sw_train.values)
-            X_test_gpu = cp.asarray(X_test.values)
-
-            model.fit(X_train_gpu, y_train_gpu, sample_weight=sw_train_gpu)
-            preds_gpu = model.predict(X_test_gpu)
-            preds = cp.asnumpy(preds_gpu)
+            # The model is expected to handle dataframe inputs directly.
+            # For XGBoost, this is enabled by `device='cuda'`.
+            # For AutoGluon, the adapter handles it.
+            model.fit(X_train, y_train, sample_weight=sw_train)
+            preds = model.predict(X_test)
 
             split_predictions.append(
                 {
@@ -127,11 +123,11 @@ def run_cpcv_for_pipeline(
                 y_true = result["y_true"]
                 y_pred = result["y_pred"]
 
-                # Calculate F1 for class 1 for logging and aggregation
-                score = f1_score(y_true, y_pred, zero_division=0)
+                # Calculate F1 score for logging and aggregation
+                score = f1_score(y_true, y_pred, average="weighted", zero_division=0)
                 path_scores.append(score)
                 logger.info(
-                    f"Path {i+1}/{len(path_results)} F1 Score (class 1): {score:.4f}"
+                    f"Path {i+1}/{len(path_results)} F1 Score (weighted): {score:.4f}"
                 )
 
                 # Generate detailed classification report
@@ -153,6 +149,7 @@ def run_cpcv_for_pipeline(
                         flat_report[clean_class_label] = metrics
 
                 mlflow.log_metrics(flat_report)
+                mlflow.log_metric("f1_weighted", score)
 
         logger.info("--- CPCV Path Results ---")
         if path_scores:
@@ -177,8 +174,20 @@ def run_cpcv_for_pipeline(
 @setup_logging
 def main():
     """
-    Main function to run the CPCV backtest for the PalazzoXGBoostPipeline.
+    Main function to run the CPCV backtest for the Palazzo pipeline with XGBoost or AutoGluon.
     """
+    parser = argparse.ArgumentParser(
+        description="Run CPCV backtest for the Palazzo pipeline."
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        required=True,
+        choices=["xgboost", "autogluon"],
+        help="The model to run the backtest with.",
+    )
+    args = parser.parse_args()
+
     data_path = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv"
     data = fetch_historical_data(
         symbol="BTC/USDT",
@@ -188,7 +197,7 @@ def main():
     )
 
     logger.info(
-        f"Running CPCV for Palazzo XGBoost strategy with {len(data)} datapoints"
+        f"Running CPCV for Palazzo strategy with {len(data)} datapoints using {args.model}"
     )
 
     # Configuration for the pipeline
@@ -200,28 +209,51 @@ def main():
         "pct_embargo": 0.01,
     }
 
-    # XGBoost model parameters
-    model_params = {
-        "objective": "binary:logistic",
-        "eval_metric": "logloss",
-        "tree_method": "hist",
-        "device": "cuda",
-        "n_estimators": 150,
-        "learning_rate": 0.05,
-        "max_depth": 5,
-        "subsample": 0.8,
-        "colsample_bytree": 0.8,
-        "gamma": 0.1,
-        "min_child_weight": 5,
-    }
+    if args.model == "xgboost":
+        model_cls = xgb.XGBClassifier
+        model_params = {
+            "objective": "binary:logistic",
+            "eval_metric": "logloss",
+            "tree_method": "hist",
+            "device": "cuda",
+            "n_estimators": 150,
+            "learning_rate": 0.05,
+            "max_depth": 5,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "gamma": 0.1,
+            "min_child_weight": 5,
+        }
+        experiment_name = "Palazzo_CPCV_Backtest"
+    elif args.model == "autogluon":
+        model_cls = AutoGluonAdapter
+        hyperparameters = {
+            "FT_TRANSFORMER": {},
+            "GBM": {},
+            "NN_TORCH": {},
+            "FASTAI": {},
+        }
+        model_params = {
+            "label": "label",
+            "eval_metric": "f1_weighted",
+            "presets": "medium_quality",
+            "hyperparameters": hyperparameters,
+            "time_limit": 300,  # Shorter time for CPCV folds
+            "verbosity": 1,  # Less verbose for multiple folds
+            "path": "AutogluonModels/palazzo_cpcv_autogluon_run",
+        }
+        experiment_name = "Palazzo_CPCV_AutoGluon_Backtest"
+    else:
+        # This case is handled by argparse choices, but as a safeguard:
+        raise ValueError(f"Unknown model to run: {args.model}")
 
     pipeline = PalazzoXGBoostPipeline(pipeline_config)
     path_scores = run_cpcv_for_pipeline(
         pipeline=pipeline,
         raw_data=data,
-        model_cls=xgb.XGBClassifier,
+        model_cls=model_cls,
         model_params=model_params,
-        experiment_name="Palazzo_CPCV_Backtest",
+        experiment_name=experiment_name,
     )
 
     if not path_scores:
