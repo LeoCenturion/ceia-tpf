@@ -3,6 +3,8 @@ import logging
 import mlflow
 import numpy as np
 import xgboost as xgb
+import optuna
+import copy
 from sklearn.metrics import f1_score, classification_report
 
 from src.backtesting.cpcv import (
@@ -29,9 +31,7 @@ def run_cpcv_for_pipeline(
     # pylint: disable=too-many-locals
     mlflow_logger = MLflowLogger(experiment_name=experiment_name)
     run_name = f"CPCV_{pipeline.__class__.__name__}"
-    mlflow_logger.start_run(run_name=run_name)
-    logger.info("Starting CPCV process...")
-    try:
+    with mlflow_logger.start_run(run_name=run_name):
         # Steps 1-3: Data processing from pipeline
         bars = pipeline.step_1_data_structuring(raw_data)
         features = pipeline.step_2_feature_engineering(bars)
@@ -152,9 +152,9 @@ def run_cpcv_for_pipeline(
                 mlflow.log_metric("f1_weighted", score)
 
         logger.info("--- CPCV Path Results ---")
+        mean_f1 = np.mean(path_scores) if path_scores else 0
+        std_f1 = np.std(path_scores) if path_scores else 0
         if path_scores:
-            mean_f1 = np.mean(path_scores)
-            std_f1 = np.std(path_scores)
             logger.info(
                 f"Individual Path F1 Scores: {[f'{s:.4f}' for s in path_scores]}"
             )
@@ -164,11 +164,8 @@ def run_cpcv_for_pipeline(
         else:
             logger.warning("No complete backtest paths were evaluated.")
 
-    finally:
-        mlflow_logger.end_run()
-
     logger.info("CPCV process finished.")
-    return path_scores
+    return mean_f1
 
 
 @setup_logging
@@ -185,6 +182,11 @@ def main():
         required=True,
         choices=["xgboost", "autogluon"],
         help="The model to run the backtest with.",
+    )
+    parser.add_argument(
+        "--optimize",
+        action="store_true",
+        help="Enable Optuna hyperparameter optimization for AutoGluon.",
     )
     args = parser.parse_args()
 
@@ -208,6 +210,7 @@ def main():
         "k_test_groups": 2,
         "pct_embargo": 0.01,
     }
+    pipeline = PalazzoXGBoostPipeline(pipeline_config)
 
     if args.model == "xgboost":
         model_cls = xgb.XGBClassifier
@@ -225,41 +228,86 @@ def main():
             "min_child_weight": 5,
         }
         experiment_name = "Palazzo_CPCV_Backtest"
-    elif args.model == "autogluon":
-        model_cls = AutoGluonAdapter
-        hyperparameters = {
-            "FT_TRANSFORMER": {},
-            "GBM": {},
-            "NN_TORCH": {},
-            "FASTAI": {},
-        }
-        model_params = {
-            "label": "label",
-            "eval_metric": "f1_weighted",
-            "presets": "medium_quality",
-            "hyperparameters": hyperparameters,
-            "time_limit": 300,  # Shorter time for CPCV folds
-            "verbosity": 1,  # Less verbose for multiple folds
-            "path": "AutogluonModels/palazzo_cpcv_autogluon_run",
-        }
-        experiment_name = "Palazzo_CPCV_AutoGluon_Backtest"
-    else:
-        # This case is handled by argparse choices, but as a safeguard:
-        raise ValueError(f"Unknown model to run: {args.model}")
-
-    pipeline = PalazzoXGBoostPipeline(pipeline_config)
-    path_scores = run_cpcv_for_pipeline(
-        pipeline=pipeline,
-        raw_data=data,
-        model_cls=model_cls,
-        model_params=model_params,
-        experiment_name=experiment_name,
-    )
-
-    if not path_scores:
-        logger.error(
-            "CPCV execution resulted in no valid paths. Please check data and configuration."
+        run_cpcv_for_pipeline(
+            pipeline=pipeline,
+            raw_data=data,
+            model_cls=model_cls,
+            model_params=model_params,
+            experiment_name=experiment_name,
         )
+
+        if not path_scores:
+            logger.error(
+                "CPCV execution resulted in no valid paths. Please check data and configuration."
+            )
+
+    elif args.model == "autogluon":
+        if args.optimize:
+            def autogluon_objective(trial):
+                try:
+                    base_model_params = {
+                        "label": "label",
+                        "eval_metric": "f1_weighted",
+                        "hyperparameters": {
+                            "FT_TRANSFORMER": {},
+                            "GBM": {},
+                            "NN_TORCH": {},
+                            "FASTAI": {},
+                        },
+                        "time_limit": 600,
+                        "verbosity": 1,
+                    }
+                    
+                    presets = trial.suggest_categorical(
+                        "presets", ["medium_quality", "high_quality", "best_quality"]
+                    )
+                    
+                    model_params = copy.deepcopy(base_model_params)
+                    model_params["presets"] = presets
+                    model_params["path"] = f"AutogluonModels/palazzo_cpcv_autogluon_trial_{trial.number}"
+
+                    return run_cpcv_for_pipeline(
+                        pipeline=pipeline,
+                        raw_data=data,
+                        model_cls=AutoGluonAdapter,
+                        model_params=model_params,
+                        experiment_name="Palazzo_CPCV_AutoGluon_Optuna",
+                    )
+                except Exception as e:
+                    logger.warning(f"Trial {trial.number} failed with error: {e}")
+                    return 0.0
+
+            study = optuna.create_study(
+                direction="maximize",
+                study_name="palazzo_autogluon_cpcv_optimization",
+                storage="sqlite:///optuna-study.db",
+                load_if_exists=True,
+            )
+            study.optimize(autogluon_objective, n_trials=10)
+            logger.info(f"Best trial: {study.best_trial.value}")
+            logger.info(f"Best params: {study.best_trial.params}")
+        else:
+            logger.info("Running single AutoGluon CPCV without Optuna optimization.")
+            model_cls = AutoGluonAdapter
+            model_params = {
+                "label": "label",
+                "eval_metric": "f1_weighted",
+                "problem_type": "binary",
+                "presets": "medium_quality",
+                "time_limit": 600,  # Longer time for a single run
+                "verbosity": 1,
+                "path": "AutogluonModels/palazzo_cpcv_autogluon_run_single",  # Unique path for single run
+            }
+            experiment_name = "Palazzo_CPCV_AutoGluon_Single_Run"
+            path_scores = run_cpcv_for_pipeline(
+                pipeline=pipeline,
+                raw_data=data,
+                model_cls=model_cls,
+                model_params=model_params,
+                experiment_name=experiment_name,
+            )
+
+
 
 
 if __name__ == "__main__":

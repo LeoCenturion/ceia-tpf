@@ -1,7 +1,11 @@
 import logging
 import os
-
+import optuna
 import numpy as np
+import argparse
+from functools import partial
+import mlflow
+
 import pandas as pd
 from sklearn.metrics import classification_report
 
@@ -127,12 +131,12 @@ class ChronosFeaturePipeline(PalazzoXGBoostPipeline):
         logger.debug(f"Final shape of features after dropna: {final_features.shape}")
         return final_features
 
-    def log_results(self, logger, model, X_test=None, y_test=None):
+    def log_results(self, mlflow_logger, model, X_test=None, y_test=None):
         """
         Log AutoGluon specific artifacts (Leaderboard).
         """
         if hasattr(model, "leaderboard") and X_test is not None and y_test is not None:
-            logger.debug("\n--- AutoGluon Leaderboard ---")
+            logger.debug("--- AutoGluon Leaderboard ---")
             leaderboard_data = X_test.copy()
             leaderboard_data[model.label] = (
                 y_test  # Use model.label for AutoGluon's target column
@@ -158,25 +162,106 @@ class ChronosFeaturePipeline(PalazzoXGBoostPipeline):
                 else:
                     flat_report[f"report_{clean_class_label}"] = metrics
 
-            logger.log_metrics(flat_report)
+            mlflow_logger.log_metrics(flat_report)
 
             # Log Best Model Score
             if leaderboard is not None and not leaderboard.empty:
                 best_model_score = leaderboard.iloc[0]["score_test"]
                 best_model_name = leaderboard.iloc[0]["model"]
-                logger.log_metrics({"test_f1_best_model": best_model_score})
-                logger.log_params({"best_model_name": best_model_name})
+                mlflow_logger.log_metrics({"test_f1_best_model": best_model_score})
+                mlflow_logger.log_params({"best_model_name": best_model_name})
 
                 # Optionally save leaderboard as CSV artifact
                 lb_path = "autogluon_leaderboard.csv"
                 leaderboard.to_csv(lb_path)
-                logger.log_artifact(lb_path)
+                mlflow_logger.log_artifact(lb_path)
                 # Cleanup local file
                 if os.path.exists(lb_path):
                     os.remove(lb_path)
 
 
-def main():
+def objective(trial, raw_data):
+    """Optuna objective function for Chronos Feature pipeline."""
+    # Pipeline hyperparameters
+    chronos_window_size = trial.suggest_int("chronos_window_size", 64, 256, step=32)
+    chronos_model_name = trial.suggest_categorical("chronos_model_name", ["amazon/chronos-t5-tiny", "amazon/chronos-t5-small"])
+    
+    pipeline_config = {
+        "volume_threshold": 50000,
+        "tau": 0.7,
+        "n_splits": 3,
+        "pct_embargo": 0.01,
+        "use_pca": False,
+        "chronos_model_name": chronos_model_name,
+        "chronos_window_size": chronos_window_size,
+        "chronos_stride": 1,
+    }
+
+    # Model hyperparameters
+    presets = trial.suggest_categorical("presets", ["medium_quality", "high_quality"])
+    time_limit = trial.suggest_int("time_limit", 300, 600, step=300)
+    
+    model_params = {
+        "label": "label",
+        "eval_metric": "f1_weighted",
+        "presets": presets,
+        "time_limit": time_limit,
+        "verbosity": 0,
+        "path": f"AutogluonModels/chronos_optuna/trial_{trial.number}",
+    }
+
+    pipeline = ChronosFeaturePipeline(pipeline_config)
+    
+    try:
+        model = AutoGluonAdapter(**model_params)
+        _, scores, _, _, _, _, _ = pipeline.run_cv(raw_data, model)
+        avg_f1 = np.mean(scores)
+        return avg_f1
+    except Exception as e:
+        logger.error(f"Trial {trial.number} failed: {e}")
+        return 0.0
+
+def run_optuna_study(raw_data, data_path, n_trials=10):
+    """
+    Sets up and runs an Optuna study for the pipeline.
+    """
+    study_name = "chronos_feature_pipeline_optimization"
+    storage_name = "sqlite:///optuna-study.db"
+    
+    # MLflow setup
+    mlflow.set_tracking_uri("sqlite:///mlflow.db")  # Ensure MLflow logs to the local DB
+    mlflow.set_experiment(study_name)
+
+    study = optuna.create_study(
+        direction="maximize",
+        study_name=study_name,
+        storage=storage_name,
+        load_if_exists=True,
+    )
+    
+    objective_with_data = partial(
+        objective, 
+        raw_data=raw_data
+    )
+    
+    def mlflow_callback(study, trial):
+        with mlflow.start_run(run_name=f"chronos_trial_{trial.number}"):
+            mlflow.log_params(trial.params)
+            mlflow.log_metric("avg_f1_score", trial.value)
+
+    study.optimize(objective_with_data, n_trials=n_trials, callbacks=[mlflow_callback])
+
+    print("--- Optuna Study Best Results ---")
+    try:
+        best_trial = study.best_trial
+        print(f"Best trial value (F1 Score): {best_trial.value:.4f}")
+        print("Best parameters found:")
+        for key, value in best_trial.params.items():
+            print(f"  {key}: {value}")
+    except ValueError:
+        print("No successful trials were completed.")
+
+def run_single_pipeline():
     data_path = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv"
     raw_data = fetch_historical_data(
         symbol="BTC/USDT",
@@ -194,7 +279,7 @@ def main():
         "pct_embargo": 0.01,
         "use_pca": False,  # PCA might be redundant with Chronos embeddings, can be experimented with
         "chronos_model_name": "amazon/chronos-t5-tiny",
-        "chronos_window_size": 128,
+        "chronos_window_size": 32,
         "chronos_stride": 1,
     }
 
@@ -220,6 +305,24 @@ def main():
         data_path=data_path,
     )
 
+def main():
+    parser = argparse.ArgumentParser(description="Run Chronos Feature Pipeline or Optuna study.")
+    parser.add_argument('--optimize', action='store_true', help='Run Optuna hyperparameter optimization study.')
+    args = parser.parse_args()
+
+    data_path = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv"
+    raw_data = fetch_historical_data(
+        symbol="BTC/USDT",
+        timeframe="1m",
+        data_path=data_path,
+    )
+
+    if args.optimize:
+        run_optuna_study(raw_data, data_path, n_trials=10)
+    else:
+        run_single_pipeline()
+
 
 if __name__ == "__main__":
     main()
+
