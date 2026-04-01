@@ -23,3 +23,9 @@ class BinanceClient:
 
     def get_latest_price(self, symbol):
         return self.client.get_symbol_ticker(symbol=symbol)['price']
+
+    def create_order(self, symbol, side, type, quantity):
+        return self.client.create_order(symbol=symbol, side=side, type=type, quantity=quantity)
+
+    def cancel_order(self, symbol, orderId):
+        return self.client.cancel_order(symbol=symbol, orderId=orderId)

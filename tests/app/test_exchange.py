@@ -34,5 +34,19 @@ class TestBinanceClient(unittest.TestCase):
         price = client.get_latest_price('BTCUSDT')
         self.assertEqual(price, '50000.00')
 
+    @patch('src.app.exchange.Client')
+    def test_create_order(self, mock_client):
+        mock_client.return_value.create_order.return_value = {'orderId': '12345'}
+        client = BinanceClient(api_key='test_key', api_secret='test_secret', testnet=True)
+        order = client.create_order(symbol='BTCUSDT', side='BUY', type='MARKET', quantity=1)
+        self.assertEqual(order['orderId'], '12345')
+
+    @patch('src.app.exchange.Client')
+    def test_cancel_order(self, mock_client):
+        mock_client.return_value.cancel_order.return_value = {'orderId': '12345'}
+        client = BinanceClient(api_key='test_key', api_secret='test_secret', testnet=True)
+        order = client.cancel_order(symbol='BTCUSDT', orderId='12345')
+        self.assertEqual(order['orderId'], '12345')
+
 if __name__ == '__main__':
     unittest.main()
