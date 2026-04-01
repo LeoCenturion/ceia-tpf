@@ -17,7 +17,7 @@
     - [x] Verify Coverage: Ensure high test coverage for the configuration module.
 - [ ] Task: Conductor - User Manual Verification 'Project Setup and CLI' (Protocol in workflow.md)
 
-## Phase 2: Binance API Integration
+## Phase 2: Binance API Integration [checkpoint: 113c338]
 
 - [x] Task: Implement Binance API client.
     - [x] Write Failing Tests: For connecting to the Binance Spot Testnet.
