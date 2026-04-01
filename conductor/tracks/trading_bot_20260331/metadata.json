@@ -1,15 +1,11 @@
-# Project Tracks
+{
+  "track_id": "trading_bot_20260331",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-03-31T00:00:00Z",
+  "updated_at": "2026-03-31T00:00:00Z",
+  "description": "Your task is to create a trading bot in the src/app directory (create it). It should trade on the spot market using the binance api (configure it for using the test api). It shoul be able to use several trading strategies. Propose a strategy interface. Start by implementing a very basic MACD strategy.
 
-This file tracks all major tracks for the project. Each track has its own detailed plan in its respective folder.
-
----
-
-- [ ] **Track: Implement initial data acquisition and preprocessing for Bitcoin time series analysis.**
-  *Link: [./tracks/data_acquisition_preprocessing_20260217/](./tracks/data_acquisition_preprocessing_20260217/)*
-
----
-
-- [ ] **Track: Your task is to create a trading bot in the src/app directory (create it). It should trade on the spot market using the binance api (configure it for using the test api). It shoul be able to use several trading strategies. Propose a strategy interface. Start by implementing a very basic MACD strategy.
 The requirements are
 ### **1. Functional Requirements**
 * **1.1. Autonomous Execution:** The core trading loop must execute asynchronously and autonomously, requiring no human intervention once the initialization phase is complete.
@@ -30,5 +26,5 @@ The requirements are
 
 ### **4. Interface Requirements**
 * **4.1. CLI Implementation:** Develop a Command Line Interface (CLI) application exposing robust commands (e.g., `start`, `stop`, `status`) to manage the system's operational lifecycle.
-* **4.2. Pre-flight Validation & Error Handling:** The CLI must perform pre-flight checks upon initialization. If required configurations, credentials, or parameters are missing or malformed, the system must abort startup and return clear, actionable, and strictly typed error messages to `stderr`.**
-  *Link: [./tracks/trading_bot_20260331/](./tracks/trading_bot_20260331/)*
+* **4.2. Pre-flight Validation & Error Handling:** The CLI must perform pre-flight checks upon initialization. If required configurations, credentials, or parameters are missing or malformed, the system must abort startup and return clear, actionable, and strictly typed error messages to `stderr`."
+}
