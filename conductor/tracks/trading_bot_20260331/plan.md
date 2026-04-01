@@ -38,11 +38,11 @@
 
 ## Phase 3: Strategy Interface and MACD Implementation
 
-- [ ] Task: Define and implement the strategy interface.
-    - [ ] Write Failing Tests: For the `get_signal()` and `get_order_size()` methods.
-    - [ ] Implement to Pass Tests: Create the abstract base class for the strategy interface.
-    - [ ] Refactor: Add documentation to the interface.
-    - [ ] Verify Coverage: Ensure high test coverage for the interface.
+- [x] Task: Define and implement the strategy interface.
+    - [x] Write Failing Tests: For the `get_signal()` and `get_order_size()` methods.
+    - [x] Implement to Pass Tests: Create the abstract base class for the strategy interface.
+    - [x] Refactor: Add documentation to the interface.
+    - [x] Verify Coverage: Ensure high test coverage for the interface.
 - [ ] Task: Implement the MACD strategy.
     - [ ] Write Failing Tests: For calculating the MACD indicator and generating signals.
     - [ ] Implement to Pass Tests: Create the `MACDStrategy` class that implements the strategy interface.
