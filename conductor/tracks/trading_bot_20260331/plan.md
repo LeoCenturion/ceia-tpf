@@ -1,6 +1,6 @@
 # Implementation Plan: Trading Bot
 
-## Phase 1: Project Setup and CLI
+## Phase 1: Project Setup and CLI [checkpoint: 9888ce8]
 
 - [x] Task: Initialize the project structure in `src/app`.
     - [x] Create the main directory `src/app`.
