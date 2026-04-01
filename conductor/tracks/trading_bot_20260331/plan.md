@@ -10,11 +10,11 @@
     - [x] Implement to Pass Tests: Create the CLI using a library like `click` or `argparse`.
     - [x] Refactor: Improve CLI code and add help messages.
     - [x] Verify Coverage: Ensure high test coverage for the CLI module.
-- [ ] Task: Implement configuration management.
-    - [ ] Write Failing Tests: For loading and validating the YAML configuration.
-    - [ ] Implement to Pass Tests: Create a configuration loader that reads `config.yaml`.
-    - [ ] Refactor: Improve error handling for missing or invalid configurations.
-    - [ ] Verify Coverage: Ensure high test coverage for the configuration module.
+- [x] Task: Implement configuration management.
+    - [x] Write Failing Tests: For loading and validating the YAML configuration.
+    - [x] Implement to Pass Tests: Create a configuration loader that reads `config.yaml`.
+    - [x] Refactor: Improve error handling for missing or invalid configurations.
+    - [x] Verify Coverage: Ensure high test coverage for the configuration module.
 - [ ] Task: Conductor - User Manual Verification 'Project Setup and CLI' (Protocol in workflow.md)
 
 ## Phase 2: Binance API Integration
