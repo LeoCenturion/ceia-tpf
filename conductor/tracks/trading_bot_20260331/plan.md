@@ -5,11 +5,11 @@
 - [x] Task: Initialize the project structure in `src/app`.
     - [x] Create the main directory `src/app`.
     - [x] Set up the basic file structure (e.g., `main.py`, `bot.py`, `config.py`).
-- [ ] Task: Implement the CLI application.
-    - [ ] Write Failing Tests: For `start`, `stop`, and `status` commands.
-    - [ ] Implement to Pass Tests: Create the CLI using a library like `click` or `argparse`.
-    - [ ] Refactor: Improve CLI code and add help messages.
-    - [ ] Verify Coverage: Ensure high test coverage for the CLI module.
+- [x] Task: Implement the CLI application.
+    - [x] Write Failing Tests: For `start`, `stop`, and `status` commands.
+    - [x] Implement to Pass Tests: Create the CLI using a library like `click` or `argparse`.
+    - [x] Refactor: Improve CLI code and add help messages.
+    - [x] Verify Coverage: Ensure high test coverage for the CLI module.
 - [ ] Task: Implement configuration management.
     - [ ] Write Failing Tests: For loading and validating the YAML configuration.
     - [ ] Implement to Pass Tests: Create a configuration loader that reads `config.yaml`.
