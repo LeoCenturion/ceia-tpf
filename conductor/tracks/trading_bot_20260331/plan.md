@@ -2,9 +2,9 @@
 
 ## Phase 1: Project Setup and CLI
 
-- [ ] Task: Initialize the project structure in `src/app`.
-    - [ ] Create the main directory `src/app`.
-    - [ ] Set up the basic file structure (e.g., `main.py`, `bot.py`, `config.py`).
+- [x] Task: Initialize the project structure in `src/app`.
+    - [x] Create the main directory `src/app`.
+    - [x] Set up the basic file structure (e.g., `main.py`, `bot.py`, `config.py`).
 - [ ] Task: Implement the CLI application.
     - [ ] Write Failing Tests: For `start`, `stop`, and `status` commands.
     - [ ] Implement to Pass Tests: Create the CLI using a library like `click` or `argparse`.

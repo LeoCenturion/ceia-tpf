@@ -1,0 +1,19 @@
+# Allow poetry to manage dependencies (add/remove/install)
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^poetry (add|remove|install|update|lock) .*"
+decision = "allow"
+priority = 110
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^poetry run python .*"
+decision = "allow"
+priority = 110
+
+
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "poetry env remove"
+decision = "ask_user"
+priority = 120 # Higher priority than the 'allow' rules

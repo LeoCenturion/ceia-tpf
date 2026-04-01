@@ -1,0 +1,57 @@
+{
+    "info": {
+        "artifact_uri": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/mlruns/16/5d46552a8d964c81b2d38f9c72e3e91a/artifacts",
+        "end_time": 1772158370756,
+        "experiment_id": "16",
+        "lifecycle_stage": "active",
+        "run_id": "5d46552a8d964c81b2d38f9c72e3e91a",
+        "run_name": "run_20260226_231030",
+        "start_time": 1772158231172,
+        "status": "FINISHED",
+        "user_id": "leocenturion"
+    },
+    "data": {
+        "metrics": {
+            "avg_cv_f1": 0.6044036590095049,
+            "test_accuracy": 0.6071055381400209,
+            "test_macro_f1": 0.5733999772373762,
+            "test_weighted_f1": 0.6013417619261858
+        },
+        "params": {
+            "data_filename": "BTCUSDT_consolidated_klines.csv",
+            "data_start_date": "2020-01-01T00:00:00",
+            "data_end_date": "2025-10-08T23:59:00",
+            "data_rows": "3033173",
+            "data_cols": "12",
+            "pipeline_config.volume_threshold": "50000",
+            "pipeline_config.tau": "0.7",
+            "pipeline_config.n_splits": "3",
+            "pipeline_config.pct_embargo": "0.01",
+            "pipeline_config.use_pca": "True",
+            "pipeline_config.pca_components": "0.95",
+            "pipeline_class": "PalazzoXGBoostPipeline",
+            "model_params.objective": "binary:logistic",
+            "model_params.eval_metric": "auc",
+            "model_params.tree_method": "hist",
+            "model_params.device": "cuda",
+            "model_params.n_estimators": "100",
+            "model_params.learning_rate": "0.1",
+            "model_params.max_depth": "6",
+            "model_class": "XGBClassifier"
+        },
+        "tags": {
+            "mlflow.user": "leocenturion",
+            "mlflow.source.name": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/src/modeling/xgboost_pipeline_palazzo.py",
+            "mlflow.source.type": "LOCAL",
+            "mlflow.source.git.commit": "b3bd1699dab8d7234142b2772bebcc1187b5961c",
+            "mlflow.runName": "run_20260226_231030"
+        }
+    },
+    "inputs": {
+        "model_inputs": [],
+        "dataset_inputs": []
+    },
+    "outputs": {
+        "model_outputs": []
+    }
+}

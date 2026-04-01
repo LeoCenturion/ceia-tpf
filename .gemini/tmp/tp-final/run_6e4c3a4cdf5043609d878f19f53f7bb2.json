@@ -1,0 +1,58 @@
+{
+    "info": {
+        "artifact_uri": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/mlruns/15/6e4c3a4cdf5043609d878f19f53f7bb2/artifacts",
+        "end_time": 1771352440396,
+        "experiment_id": "15",
+        "lifecycle_stage": "active",
+        "run_id": "6e4c3a4cdf5043609d878f19f53f7bb2",
+        "run_name": "run_20260217_151645",
+        "start_time": 1771352205323,
+        "status": "FINISHED",
+        "user_id": "leocenturion"
+    },
+    "data": {
+        "metrics": {
+            "avg_cv_f1": 0.6167037114043658,
+            "test_accuracy": 0.6394984326018809,
+            "test_macro_f1": 0.5984434690280985,
+            "test_weighted_f1": 0.6283626091488616,
+            "test_f1_best_model": 0.6283626091488616
+        },
+        "params": {
+            "data_filename": "BTCUSDT_consolidated_klines.csv",
+            "data_start_date": "2020-01-01T00:00:00",
+            "data_end_date": "2025-10-08T23:59:00",
+            "data_rows": "3033173",
+            "data_cols": "12",
+            "pipeline_config.volume_threshold": "50000",
+            "pipeline_config.tau": "0.7",
+            "pipeline_config.n_splits": "3",
+            "pipeline_config.pct_embargo": "0.01",
+            "pipeline_config.use_pca": "True",
+            "pipeline_config.pca_components": "0.95",
+            "pipeline_class": "PalazzoAutoGluonPipeline",
+            "model_params.label": "label",
+            "model_params.eval_metric": "f1_weighted",
+            "model_params.presets": "medium_quality",
+            "model_params.time_limit": "600",
+            "model_params.verbosity": "2",
+            "model_params.path": "AutogluonModels/pipeline_run",
+            "model_class": "AutoGluonAdapter",
+            "best_model_name": "WeightedEnsemble_L2"
+        },
+        "tags": {
+            "mlflow.user": "leocenturion",
+            "mlflow.source.name": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/src/modeling/autogluon_pipeline_palazzo.py",
+            "mlflow.source.type": "LOCAL",
+            "mlflow.source.git.commit": "401c83835ecc2607cfd936ff811c5ceea3239e37",
+            "mlflow.runName": "run_20260217_151645"
+        }
+    },
+    "inputs": {
+        "model_inputs": [],
+        "dataset_inputs": []
+    },
+    "outputs": {
+        "model_outputs": []
+    }
+}

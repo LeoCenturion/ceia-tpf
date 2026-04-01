@@ -1,0 +1,55 @@
+{
+    "info": {
+        "artifact_uri": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/mlruns/28/ead332c1101142c29b80922424cf2675/artifacts",
+        "end_time": 1772761108689,
+        "experiment_id": "28",
+        "lifecycle_stage": "active",
+        "run_id": "ead332c1101142c29b80922424cf2675",
+        "run_name": "CPCV_PalazzoXGBoostPipeline",
+        "start_time": 1772760957319,
+        "status": "FINISHED",
+        "user_id": "leocenturion"
+    },
+    "data": {
+        "metrics": {
+            "f1_mean": 0.5714962911769988,
+            "f1_std": 0.005291610830002887
+        },
+        "params": {
+            "pipeline": "PalazzoXGBoostPipeline",
+            "n_groups": "10",
+            "k_test_groups": "2",
+            "pct_embargo": "0.01",
+            "pipeline_config.volume_threshold": "50000",
+            "pipeline_config.tau": "0.7",
+            "pipeline_config.n_groups": "10",
+            "pipeline_config.k_test_groups": "2",
+            "pipeline_config.pct_embargo": "0.01",
+            "model_params.objective": "binary:logistic",
+            "model_params.eval_metric": "logloss",
+            "model_params.tree_method": "hist",
+            "model_params.device": "cuda",
+            "model_params.n_estimators": "150",
+            "model_params.learning_rate": "0.05",
+            "model_params.max_depth": "5",
+            "model_params.subsample": "0.8",
+            "model_params.colsample_bytree": "0.8",
+            "model_params.gamma": "0.1",
+            "model_params.min_child_weight": "5"
+        },
+        "tags": {
+            "mlflow.user": "leocenturion",
+            "mlflow.source.name": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/src/backtesting/run_palazzo_cpcv.py",
+            "mlflow.source.type": "LOCAL",
+            "mlflow.source.git.commit": "39d16f1cde7c7a29497db607032a2ba13404aa74",
+            "mlflow.runName": "CPCV_PalazzoXGBoostPipeline"
+        }
+    },
+    "inputs": {
+        "model_inputs": [],
+        "dataset_inputs": []
+    },
+    "outputs": {
+        "model_outputs": []
+    }
+}

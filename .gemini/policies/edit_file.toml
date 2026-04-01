@@ -1,0 +1,13 @@
+# Allow the AI to edit files in your project automatically
+[[rule]]
+mcpName = "builtin/file"
+toolName = "edit_file"
+decision = "allow"
+priority = 150
+
+# Also allow creating/writing new files
+[[rule]]
+mcpName = "builtin/file"
+toolName = "write_file"
+decision = "allow"
+priority = 150

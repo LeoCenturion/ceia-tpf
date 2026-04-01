@@ -1,0 +1,55 @@
+{
+    "info": {
+        "artifact_uri": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/mlruns/15/165cce09ba914dc8922d4d81262d3fed/artifacts",
+        "end_time": 1771177641754,
+        "experiment_id": "15",
+        "lifecycle_stage": "active",
+        "run_id": "165cce09ba914dc8922d4d81262d3fed",
+        "run_name": "run_20260215_144353",
+        "start_time": 1771177434064,
+        "status": "FINISHED",
+        "user_id": "leocenturion"
+    },
+    "data": {
+        "metrics": {
+            "avg_cv_f1": 0.6151629881251536,
+            "fold_1_f1": 0.6168035554929616,
+            "fold_2_f1": 0.6141100601361603,
+            "fold_3_f1": 0.6145753487463386,
+            "test_f1_best_model": 0.6171438445625644,
+            "test_accuracy": 0.6154649947753396,
+            "test_macro_f1": 0.5587872713605613,
+            "test_weighted_f1": 0.595636053638974
+        },
+        "params": {
+            "data_filename": "BTCUSDT_consolidated_klines.csv",
+            "data_start_date": "2020-01-01T00:00:00",
+            "data_end_date": "2025-10-08T23:59:00",
+            "data_rows": "3033173",
+            "data_cols": "12",
+            "pipeline_config.volume_threshold": "50000",
+            "pipeline_config.tau": "0.7",
+            "pipeline_config.n_splits": "3",
+            "pipeline_config.pct_embargo": "0.01",
+            "pipeline_config.use_pca": "True",
+            "pipeline_config.pca_components": "0.95",
+            "hyperparameters": "{'FT_TRANSFORMER': {}, 'GBM': {}, 'NN_TORCH': {}, 'FASTAI': {}}",
+            "presets": "medium_quality",
+            "best_model_name": "FTTransformer"
+        },
+        "tags": {
+            "mlflow.user": "leocenturion",
+            "mlflow.source.name": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/src/modeling/autogluon_pipeline_palazzo.py",
+            "mlflow.source.type": "LOCAL",
+            "mlflow.source.git.commit": "d0187ca149bd42e447a0c9a7401af658e753abb3",
+            "mlflow.runName": "run_20260215_144353"
+        }
+    },
+    "inputs": {
+        "model_inputs": [],
+        "dataset_inputs": []
+    },
+    "outputs": {
+        "model_outputs": []
+    }
+}

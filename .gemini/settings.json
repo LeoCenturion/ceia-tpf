@@ -1,0 +1,22 @@
+{
+  "skills": {
+    "disabled": [
+        "hugging-face-model-trainer",
+        "company-research",
+        "get-code-context-exa",
+        "hugging-face-cli",
+        "hugging-face-datasets",
+        "hugging-face-evaluation",
+        "hugging-face-jobs",
+        "hugging-face-model-trainer",
+        "hugging-face-paper-publisher",
+        "hugging-face-tool-builder",
+        "hugging-face-trackio",
+        "people-research",
+        "web-search-advanced-financial-report",
+        "web-search-advanced-personal-site",
+        "web-search-advanced-research-paper",
+        "web-search-advanced-tweet"
+    ]
+  }
+}

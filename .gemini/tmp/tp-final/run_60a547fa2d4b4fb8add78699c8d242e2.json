@@ -1,0 +1,48 @@
+{
+    "info": {
+        "artifact_uri": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/mlruns/17/60a547fa2d4b4fb8add78699c8d242e2/artifacts",
+        "end_time": 1771269570229,
+        "experiment_id": "17",
+        "lifecycle_stage": "active",
+        "run_id": "60a547fa2d4b4fb8add78699c8d242e2",
+        "run_name": "run_20260216_161459",
+        "start_time": 1771269300162,
+        "status": "FINISHED",
+        "user_id": "leocenturion"
+    },
+    "data": {
+        "metrics": {
+            "avg_cv_f1": 0.49377142433461413,
+            "test_mase_best_model": -6421.361562500002,
+            "test_accuracy": 0.49388523047977423,
+            "test_macro_f1": 0.49315554382634114,
+            "test_weighted_f1": 0.4937887429884112
+        },
+        "params": {
+            "data_filename": "BTCUSDT_consolidated_klines.csv",
+            "data_start_date": "2020-01-01T00:00:00",
+            "data_end_date": "2025-10-08T23:59:00",
+            "data_rows": "3033173",
+            "data_cols": "12",
+            "pipeline_config.volume_threshold": "50000",
+            "pipeline_config.prediction_length": "2",
+            "pipeline_config.chronos_model": "amazon/chronos-t5-small",
+            "pipeline_class": "PalazzoChronosClassificationPipeline",
+            "best_ts_model": "Chronos[amazon__chronos-t5-small]"
+        },
+        "tags": {
+            "mlflow.user": "leocenturion",
+            "mlflow.source.name": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/src/modeling/chronos_pipeline_palazzo.py",
+            "mlflow.source.type": "LOCAL",
+            "mlflow.source.git.commit": "bb68685acea970f7ba2e43e42dcce7bf6151c3f2",
+            "mlflow.runName": "run_20260216_161459"
+        }
+    },
+    "inputs": {
+        "model_inputs": [],
+        "dataset_inputs": []
+    },
+    "outputs": {
+        "model_outputs": []
+    }
+}

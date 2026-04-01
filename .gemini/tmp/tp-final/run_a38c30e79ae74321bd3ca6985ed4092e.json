@@ -1,0 +1,56 @@
+{
+    "info": {
+        "artifact_uri": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/mlruns/22/a38c30e79ae74321bd3ca6985ed4092e/artifacts",
+        "end_time": 1772993634707,
+        "experiment_id": "22",
+        "lifecycle_stage": "active",
+        "run_id": "a38c30e79ae74321bd3ca6985ed4092e",
+        "run_name": "run_20260308_150743",
+        "start_time": 1772993263797,
+        "status": "FINISHED",
+        "user_id": "leocenturion"
+    },
+    "data": {
+        "metrics": {},
+        "params": {
+            "data_filename": "BTCUSDT_consolidated_klines.csv",
+            "data_start_date": "2020-01-01T00:00:00",
+            "data_end_date": "2025-10-08T23:59:00",
+            "data_rows": "3033173",
+            "data_cols": "12",
+            "pipeline_config.volume_threshold": "50000",
+            "pipeline_config.tau": "0.7",
+            "pipeline_config.n_splits": "3",
+            "pipeline_config.pct_embargo": "0.01",
+            "pipeline_config.use_pca": "False",
+            "pipeline_config.chronos_model_name": "amazon/chronos-t5-tiny",
+            "pipeline_config.chronos_window_size": "128",
+            "pipeline_class": "ChronosMetaLabelingPipeline",
+            "model_params.primary_model_params.label": "label",
+            "model_params.primary_model_params.eval_metric": "f1_weighted",
+            "model_params.primary_model_params.presets": "medium_quality",
+            "model_params.primary_model_params.time_limit": "60",
+            "model_params.primary_model_params.path": "AutogluonModels/tmp_chronos_primary",
+            "model_params.meta_model_config.label": "label",
+            "model_params.meta_model_config.eval_metric": "f1",
+            "model_params.meta_model_config.presets": "best_quality",
+            "model_params.meta_model_config.time_limit": "30",
+            "model_params.meta_model_config.path": "AutogluonModels/tmp_chronos_meta",
+            "model_class": "AutoGluonAdapter"
+        },
+        "tags": {
+            "mlflow.user": "leocenturion",
+            "mlflow.source.name": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/src/modeling/chronos_metalabeling_pipeline.py",
+            "mlflow.source.type": "LOCAL",
+            "mlflow.source.git.commit": "0f3c09047210554bb1c2f4ed94eff15c48d00f10",
+            "mlflow.runName": "run_20260308_150743"
+        }
+    },
+    "inputs": {
+        "model_inputs": [],
+        "dataset_inputs": []
+    },
+    "outputs": {
+        "model_outputs": []
+    }
+}

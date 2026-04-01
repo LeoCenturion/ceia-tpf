@@ -1,0 +1,50 @@
+{
+    "info": {
+        "artifact_uri": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/mlruns/28/85e7e9ac45e74e128da44923b9f8d0eb/artifacts",
+        "end_time": 1772761108616,
+        "experiment_id": "28",
+        "lifecycle_stage": "active",
+        "run_id": "85e7e9ac45e74e128da44923b9f8d0eb",
+        "run_name": "path_8",
+        "start_time": 1772761108581,
+        "status": "FINISHED",
+        "user_id": "leocenturion"
+    },
+    "data": {
+        "metrics": {
+            "0_precision": 0.7386503067484662,
+            "0_recall": 0.6086956521739131,
+            "0_f1_score": 0.6674057649667405,
+            "0_support": 1978.0,
+            "1_precision": 0.503209242618742,
+            "1_recall": 0.6479338842975206,
+            "1_f1_score": 0.5664739884393064,
+            "1_support": 1210.0,
+            "accuracy": 0.6235884567126725,
+            "macro_avg_precision": 0.6209297746836041,
+            "macro_avg_recall": 0.6283147682357169,
+            "macro_avg_f1_score": 0.6169398767030234,
+            "macro_avg_support": 3188.0,
+            "weighted_avg_precision": 0.6492890496603337,
+            "weighted_avg_recall": 0.6235884567126725,
+            "weighted_avg_f1_score": 0.6290972801492389,
+            "weighted_avg_support": 3188.0
+        },
+        "params": {},
+        "tags": {
+            "mlflow.user": "leocenturion",
+            "mlflow.source.name": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/src/backtesting/run_palazzo_cpcv.py",
+            "mlflow.source.type": "LOCAL",
+            "mlflow.source.git.commit": "39d16f1cde7c7a29497db607032a2ba13404aa74",
+            "mlflow.parentRunId": "ead332c1101142c29b80922424cf2675",
+            "mlflow.runName": "path_8"
+        }
+    },
+    "inputs": {
+        "model_inputs": [],
+        "dataset_inputs": []
+    },
+    "outputs": {
+        "model_outputs": []
+    }
+}

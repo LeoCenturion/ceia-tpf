@@ -1,0 +1,69 @@
+{
+    "info": {
+        "artifact_uri": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/mlruns/19/18bcb5b8902c497983054e99339c537d/artifacts",
+        "end_time": 1771637622382,
+        "experiment_id": "19",
+        "lifecycle_stage": "active",
+        "run_id": "18bcb5b8902c497983054e99339c537d",
+        "run_name": "run_20260220_223025",
+        "start_time": 1771637425917,
+        "status": "FINISHED",
+        "user_id": "leocenturion"
+    },
+    "data": {
+        "metrics": {
+            "baseline_precision": 0.5045045045045045,
+            "metalabeling_precision": 0.5091743119266054,
+            "baseline_f1_weighted": 0.6082486178533696,
+            "metalabeling_f1_weighted": 0.6105993340129321,
+            "test_f1_best_meta_model": 0.76171875
+        },
+        "params": {
+            "data_filename": "BTCUSDT_consolidated_klines.csv",
+            "data_start_date": "2020-01-01T00:00:00",
+            "data_end_date": "2025-10-08T23:59:00",
+            "data_rows": "3033173",
+            "data_cols": "12",
+            "pipeline_config.volume_threshold": "50000",
+            "pipeline_config.tau": "0.7",
+            "pipeline_config.n_splits": "3",
+            "pipeline_config.pct_embargo": "0.01",
+            "pipeline_config.use_pca": "True",
+            "pipeline_config.pca_components": "0.95",
+            "pipeline_class": "PalazzoMetaLabelingPipeline",
+            "model_params.primary_model_params.objective": "binary:logistic",
+            "model_params.primary_model_params.eval_metric": "auc",
+            "model_params.primary_model_params.tree_method": "hist",
+            "model_params.primary_model_params.device": "cuda",
+            "model_params.primary_model_params.n_estimators": "100",
+            "model_params.primary_model_params.learning_rate": "0.1",
+            "model_params.primary_model_params.max_depth": "6",
+            "model_params.meta_model_config.label": "label",
+            "model_params.meta_model_config.eval_metric": "f1",
+            "model_params.meta_model_config.time_limit": "600",
+            "model_params.meta_model_config.path": "AutogluonModels/metalabeling",
+            "model_params.meta_model_config.verbosity": "2",
+            "model_params.meta_model_config.hyperparameters.FT_TRANSFORMER.optim.loss_func": "focal_loss",
+            "model_params.meta_model_config.hyperparameters.FT_TRANSFORMER.optim.focal_loss.alpha": "[0.75, 0.25]",
+            "model_params.meta_model_config.hyperparameters.FT_TRANSFORMER.optim.focal_loss.gamma": "2.0",
+            "model_params.meta_model_config.hyperparameters.FT_TRANSFORMER.data.mixup.turn_on": "True",
+            "model_params.meta_model_config.hyperparameters.FT_TRANSFORMER.data.mixup.cutmix_alpha": "0.8",
+            "model_class": "AutoGluonAdapter",
+            "best_meta_model_name": "FTTransformer"
+        },
+        "tags": {
+            "mlflow.user": "leocenturion",
+            "mlflow.source.name": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/src/modeling/autogluon_metalabeling_palazzo.py",
+            "mlflow.source.type": "LOCAL",
+            "mlflow.source.git.commit": "d87bd0f5ec62646bb93df18577e8ed6cecb920db",
+            "mlflow.runName": "run_20260220_223025"
+        }
+    },
+    "inputs": {
+        "model_inputs": [],
+        "dataset_inputs": []
+    },
+    "outputs": {
+        "model_outputs": []
+    }
+}

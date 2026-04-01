@@ -1,0 +1,55 @@
+{
+    "info": {
+        "artifact_uri": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/mlruns/15/4ea1beab508d483884e43f7a5edb542d/artifacts",
+        "end_time": 1771203168740,
+        "experiment_id": "15",
+        "lifecycle_stage": "active",
+        "run_id": "4ea1beab508d483884e43f7a5edb542d",
+        "run_name": "run_20260215_214918",
+        "start_time": 1771202958631,
+        "status": "FINISHED",
+        "user_id": "leocenturion"
+    },
+    "data": {
+        "metrics": {
+            "avg_cv_f1": 0.6153389966862188,
+            "fold_1_f1": 0.6174488161834933,
+            "fold_2_f1": 0.6126438520324413,
+            "fold_3_f1": 0.615924321842722,
+            "test_f1_best_model": 0.6179131836606832,
+            "test_accuracy": 0.6144200626959248,
+            "test_macro_f1": 0.6006028286575469,
+            "test_weighted_f1": 0.6179131836606832
+        },
+        "params": {
+            "data_filename": "BTCUSDT_consolidated_klines.csv",
+            "data_start_date": "2020-01-01T00:00:00",
+            "data_end_date": "2025-10-08T23:59:00",
+            "data_rows": "3033173",
+            "data_cols": "12",
+            "pipeline_config.volume_threshold": "50000",
+            "pipeline_config.tau": "0.7",
+            "pipeline_config.n_splits": "3",
+            "pipeline_config.pct_embargo": "0.01",
+            "pipeline_config.use_pca": "True",
+            "pipeline_config.pca_components": "0.95",
+            "hyperparameters": "{'FT_TRANSFORMER': {}}",
+            "presets": "medium_quality",
+            "best_model_name": "FTTransformer"
+        },
+        "tags": {
+            "mlflow.user": "leocenturion",
+            "mlflow.source.name": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/src/modeling/autogluon_pipeline_palazzo.py",
+            "mlflow.source.type": "LOCAL",
+            "mlflow.source.git.commit": "d0187ca149bd42e447a0c9a7401af658e753abb3",
+            "mlflow.runName": "run_20260215_214918"
+        }
+    },
+    "inputs": {
+        "model_inputs": [],
+        "dataset_inputs": []
+    },
+    "outputs": {
+        "model_outputs": []
+    }
+}

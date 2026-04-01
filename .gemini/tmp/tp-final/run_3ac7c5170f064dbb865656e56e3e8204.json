@@ -1,0 +1,65 @@
+{
+    "info": {
+        "artifact_uri": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/mlruns/19/3ac7c5170f064dbb865656e56e3e8204/artifacts",
+        "end_time": 1771370741733,
+        "experiment_id": "19",
+        "lifecycle_stage": "active",
+        "run_id": "3ac7c5170f064dbb865656e56e3e8204",
+        "run_name": "run_20260217_202257",
+        "start_time": 1771370577986,
+        "status": "FINISHED",
+        "user_id": "leocenturion"
+    },
+    "data": {
+        "metrics": {
+            "baseline_precision": 0.5045045045045045,
+            "metalabeling_precision": 0.5046296296296297,
+            "baseline_f1_weighted": 0.6082486178533696,
+            "metalabeling_f1_weighted": 0.6069917888812427,
+            "test_f1_best_meta_model": 0.7588235294117647
+        },
+        "params": {
+            "data_filename": "BTCUSDT_consolidated_klines.csv",
+            "data_start_date": "2020-01-01T00:00:00",
+            "data_end_date": "2025-10-08T23:59:00",
+            "data_rows": "3033173",
+            "data_cols": "12",
+            "pipeline_config.volume_threshold": "50000",
+            "pipeline_config.tau": "0.7",
+            "pipeline_config.n_splits": "3",
+            "pipeline_config.pct_embargo": "0.01",
+            "pipeline_config.use_pca": "True",
+            "pipeline_config.pca_components": "0.95",
+            "pipeline_class": "PalazzoMetaLabelingPipeline",
+            "model_params.primary_model_params.objective": "binary:logistic",
+            "model_params.primary_model_params.eval_metric": "auc",
+            "model_params.primary_model_params.tree_method": "hist",
+            "model_params.primary_model_params.device": "cuda",
+            "model_params.primary_model_params.n_estimators": "100",
+            "model_params.primary_model_params.learning_rate": "0.1",
+            "model_params.primary_model_params.max_depth": "6",
+            "model_params.meta_model_config.label": "label",
+            "model_params.meta_model_config.eval_metric": "f1",
+            "model_params.meta_model_config.presets": "medium_quality",
+            "model_params.meta_model_config.time_limit": "120",
+            "model_params.meta_model_config.path": "AutogluonModels/metalabeling",
+            "model_params.meta_model_config.verbosity": "2",
+            "model_class": "AutoGluonAdapter",
+            "best_meta_model_name": "FTTransformer"
+        },
+        "tags": {
+            "mlflow.user": "leocenturion",
+            "mlflow.source.name": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/src/modeling/autogluon_metalabeling_palazzo.py",
+            "mlflow.source.type": "LOCAL",
+            "mlflow.source.git.commit": "e92253ee2c46fc544fa41b3630b25f2e61c5c358",
+            "mlflow.runName": "run_20260217_202257"
+        }
+    },
+    "inputs": {
+        "model_inputs": [],
+        "dataset_inputs": []
+    },
+    "outputs": {
+        "model_outputs": []
+    }
+}

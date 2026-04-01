@@ -79,7 +79,7 @@ ignore = [
 init-hook='import sys; sys.path.append(".")'
 
 [tool.pyright]
-include = ["src", "data_analysis"]
+include = ["src", "data_analysis", "tests"]
 exclude = [
     "**/node_modules",
     "**/__pycache__",
@@ -92,3 +92,13 @@ exclude = [
 # If you are using a virtual environment in the root
 venvPath = "."
 venv = ".venv"
+
+[tool.pytest.ini_options]
+pythonpath = [
+  "."
+]
+
+[dependency-groups]
+dev = [
+    "pytest (>=9.0.2,<10.0.0)"
+]

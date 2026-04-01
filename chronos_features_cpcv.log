@@ -1,0 +1,81 @@
+2026-03-09 09:07:42,044 - __main__ - INFO - Running CPCV for Chronos strategy with 3033173 datapoints
+2026-03-09 09:07:42,961 - __main__ - INFO - Starting CPCV process for Chronos pipeline...
+2026-03-09 09:10:01,298 - __main__ - INFO - Data aligned. X shape: (48, 327), y shape: (48,)
+2026-03-09 09:10:01,435 - __main__ - INFO - Total combinations to test: 15
+2026-03-09 09:10:01,435 - __main__ - INFO - --- Fold 1/15 --- Test groups: (0, 1)
+2026-03-09 09:10:01,436 - src.backtesting.cpcv - DEBUG - Train before purge: 34
+2026-03-09 09:10:05,170 - autogluon.tabular.models.catboost.catboost_model - WARNING - 	Warning: CatBoost on GPU is experimental. If you encounter issues, use CPU for training CatBoost instead.
+2026-03-09 09:10:10,597 - autogluon.tabular.predictor.predictor - WARNING - Disabling decision threshold calibration for metric `f1_weighted` due to having fewer than 50 rows of validation data for calibration to avoid overfitting (7 rows). Force calibration via specifying `calibrate_decision_threshold=True`.
+2026-03-09 09:10:10,827 - __main__ - INFO - --- Fold 2/15 --- Test groups: (0, 2)
+2026-03-09 09:10:10,828 - src.backtesting.cpcv - DEBUG - Train before purge: 30
+2026-03-09 09:10:14,194 - autogluon.tabular.models.catboost.catboost_model - WARNING - 	Warning: CatBoost on GPU is experimental. If you encounter issues, use CPU for training CatBoost instead.
+2026-03-09 09:10:18,768 - autogluon.tabular.predictor.predictor - WARNING - Disabling decision threshold calibration for metric `f1_weighted` due to having fewer than 50 rows of validation data for calibration to avoid overfitting (6 rows). Force calibration via specifying `calibrate_decision_threshold=True`.
+2026-03-09 09:10:19,019 - __main__ - INFO - --- Fold 3/15 --- Test groups: (0, 3)
+2026-03-09 09:10:19,020 - src.backtesting.cpcv - DEBUG - Train before purge: 25
+2026-03-09 09:10:19,246 - autogluon.tabular.learner.default_learner - WARNING - Warning: Updated label_count_threshold from 10 to 6 to avoid cutting too many classes.
+2026-03-09 09:10:22,445 - autogluon.tabular.models.catboost.catboost_model - WARNING - 	Warning: CatBoost on GPU is experimental. If you encounter issues, use CPU for training CatBoost instead.
+2026-03-09 09:10:28,224 - autogluon.tabular.predictor.predictor - WARNING - Disabling decision threshold calibration for metric `f1_weighted` due to having fewer than 50 rows of validation data for calibration to avoid overfitting (5 rows). Force calibration via specifying `calibrate_decision_threshold=True`.
+2026-03-09 09:10:28,448 - __main__ - INFO - --- Fold 4/15 --- Test groups: (0, 4)
+2026-03-09 09:10:28,449 - src.backtesting.cpcv - DEBUG - Train before purge: 37
+2026-03-09 09:10:31,841 - autogluon.tabular.models.catboost.catboost_model - WARNING - 	Warning: CatBoost on GPU is experimental. If you encounter issues, use CPU for training CatBoost instead.
+2026-03-09 09:10:36,596 - autogluon.tabular.predictor.predictor - WARNING - Disabling decision threshold calibration for metric `f1_weighted` due to having fewer than 50 rows of validation data for calibration to avoid overfitting (8 rows). Force calibration via specifying `calibrate_decision_threshold=True`.
+2026-03-09 09:10:36,863 - __main__ - INFO - --- Fold 5/15 --- Test groups: (0, 5)
+2026-03-09 09:10:36,864 - src.backtesting.cpcv - DEBUG - Train before purge: 38
+2026-03-09 09:10:40,301 - autogluon.tabular.models.catboost.catboost_model - WARNING - 	Warning: CatBoost on GPU is experimental. If you encounter issues, use CPU for training CatBoost instead.
+2026-03-09 09:10:45,382 - autogluon.tabular.predictor.predictor - WARNING - Disabling decision threshold calibration for metric `f1_weighted` due to having fewer than 50 rows of validation data for calibration to avoid overfitting (8 rows). Force calibration via specifying `calibrate_decision_threshold=True`.
+2026-03-09 09:10:45,614 - __main__ - INFO - --- Fold 6/15 --- Test groups: (1, 2)
+2026-03-09 09:10:45,614 - src.backtesting.cpcv - DEBUG - Train before purge: 30
+2026-03-09 09:10:49,014 - autogluon.tabular.models.catboost.catboost_model - WARNING - 	Warning: CatBoost on GPU is experimental. If you encounter issues, use CPU for training CatBoost instead.
+2026-03-09 09:10:53,511 - autogluon.tabular.predictor.predictor - WARNING - Disabling decision threshold calibration for metric `f1_weighted` due to having fewer than 50 rows of validation data for calibration to avoid overfitting (6 rows). Force calibration via specifying `calibrate_decision_threshold=True`.
+2026-03-09 09:10:53,773 - __main__ - INFO - --- Fold 7/15 --- Test groups: (1, 3)
+2026-03-09 09:10:53,774 - src.backtesting.cpcv - DEBUG - Train before purge: 25
+2026-03-09 09:10:54,001 - autogluon.tabular.learner.default_learner - WARNING - Warning: Updated label_count_threshold from 10 to 6 to avoid cutting too many classes.
+2026-03-09 09:10:57,232 - autogluon.tabular.models.catboost.catboost_model - WARNING - 	Warning: CatBoost on GPU is experimental. If you encounter issues, use CPU for training CatBoost instead.
+2026-03-09 09:11:02,106 - autogluon.tabular.predictor.predictor - WARNING - Disabling decision threshold calibration for metric `f1_weighted` due to having fewer than 50 rows of validation data for calibration to avoid overfitting (5 rows). Force calibration via specifying `calibrate_decision_threshold=True`.
+2026-03-09 09:11:02,334 - __main__ - INFO - --- Fold 8/15 --- Test groups: (1, 4)
+2026-03-09 09:11:02,334 - src.backtesting.cpcv - DEBUG - Train before purge: 37
+2026-03-09 09:11:05,771 - autogluon.tabular.models.catboost.catboost_model - WARNING - 	Warning: CatBoost on GPU is experimental. If you encounter issues, use CPU for training CatBoost instead.
+2026-03-09 09:11:11,889 - autogluon.tabular.predictor.predictor - WARNING - Disabling decision threshold calibration for metric `f1_weighted` due to having fewer than 50 rows of validation data for calibration to avoid overfitting (8 rows). Force calibration via specifying `calibrate_decision_threshold=True`.
+2026-03-09 09:11:12,117 - __main__ - INFO - --- Fold 9/15 --- Test groups: (1, 5)
+2026-03-09 09:11:12,117 - src.backtesting.cpcv - DEBUG - Train before purge: 38
+2026-03-09 09:11:15,591 - autogluon.tabular.models.catboost.catboost_model - WARNING - 	Warning: CatBoost on GPU is experimental. If you encounter issues, use CPU for training CatBoost instead.
+2026-03-09 09:11:20,164 - autogluon.tabular.predictor.predictor - WARNING - Disabling decision threshold calibration for metric `f1_weighted` due to having fewer than 50 rows of validation data for calibration to avoid overfitting (8 rows). Force calibration via specifying `calibrate_decision_threshold=True`.
+2026-03-09 09:11:20,401 - __main__ - INFO - --- Fold 10/15 --- Test groups: (2, 3)
+2026-03-09 09:11:20,402 - src.backtesting.cpcv - DEBUG - Train before purge: 21
+2026-03-09 09:11:20,642 - autogluon.tabular.learner.default_learner - WARNING - Warning: Updated label_count_threshold from 10 to 5 to avoid cutting too many classes.
+2026-03-09 09:11:23,805 - autogluon.tabular.models.catboost.catboost_model - WARNING - 	Warning: CatBoost on GPU is experimental. If you encounter issues, use CPU for training CatBoost instead.
+2026-03-09 09:11:29,091 - autogluon.tabular.predictor.predictor - WARNING - Disabling decision threshold calibration for metric `f1_weighted` due to having fewer than 50 rows of validation data for calibration to avoid overfitting (5 rows). Force calibration via specifying `calibrate_decision_threshold=True`.
+2026-03-09 09:11:29,343 - __main__ - INFO - --- Fold 11/15 --- Test groups: (2, 4)
+2026-03-09 09:11:29,343 - src.backtesting.cpcv - DEBUG - Train before purge: 33
+2026-03-09 09:11:32,737 - autogluon.tabular.models.catboost.catboost_model - WARNING - 	Warning: CatBoost on GPU is experimental. If you encounter issues, use CPU for training CatBoost instead.
+2026-03-09 09:11:38,785 - autogluon.tabular.predictor.predictor - WARNING - Disabling decision threshold calibration for metric `f1_weighted` due to having fewer than 50 rows of validation data for calibration to avoid overfitting (7 rows). Force calibration via specifying `calibrate_decision_threshold=True`.
+2026-03-09 09:11:39,016 - __main__ - INFO - --- Fold 12/15 --- Test groups: (2, 5)
+2026-03-09 09:11:39,016 - src.backtesting.cpcv - DEBUG - Train before purge: 34
+2026-03-09 09:11:42,472 - autogluon.tabular.models.catboost.catboost_model - WARNING - 	Warning: CatBoost on GPU is experimental. If you encounter issues, use CPU for training CatBoost instead.
+2026-03-09 09:11:47,085 - autogluon.tabular.predictor.predictor - WARNING - Disabling decision threshold calibration for metric `f1_weighted` due to having fewer than 50 rows of validation data for calibration to avoid overfitting (7 rows). Force calibration via specifying `calibrate_decision_threshold=True`.
+2026-03-09 09:11:47,315 - __main__ - INFO - --- Fold 13/15 --- Test groups: (3, 4)
+2026-03-09 09:11:47,315 - src.backtesting.cpcv - DEBUG - Train before purge: 28
+2026-03-09 09:11:47,544 - autogluon.tabular.learner.default_learner - WARNING - Warning: Updated label_count_threshold from 10 to 6 to avoid cutting too many classes.
+2026-03-09 09:11:50,719 - autogluon.tabular.models.catboost.catboost_model - WARNING - 	Warning: CatBoost on GPU is experimental. If you encounter issues, use CPU for training CatBoost instead.
+2026-03-09 09:12:00,299 - autogluon.tabular.predictor.predictor - WARNING - Disabling decision threshold calibration for metric `f1_weighted` due to having fewer than 50 rows of validation data for calibration to avoid overfitting (6 rows). Force calibration via specifying `calibrate_decision_threshold=True`.
+2026-03-09 09:12:00,533 - __main__ - INFO - --- Fold 14/15 --- Test groups: (3, 5)
+2026-03-09 09:12:00,533 - src.backtesting.cpcv - DEBUG - Train before purge: 29
+2026-03-09 09:12:00,761 - autogluon.tabular.learner.default_learner - WARNING - Warning: Updated label_count_threshold from 10 to 5 to avoid cutting too many classes.
+2026-03-09 09:12:03,970 - autogluon.tabular.models.catboost.catboost_model - WARNING - 	Warning: CatBoost on GPU is experimental. If you encounter issues, use CPU for training CatBoost instead.
+2026-03-09 09:12:08,596 - autogluon.tabular.predictor.predictor - WARNING - Disabling decision threshold calibration for metric `f1_weighted` due to having fewer than 50 rows of validation data for calibration to avoid overfitting (6 rows). Force calibration via specifying `calibrate_decision_threshold=True`.
+2026-03-09 09:12:08,835 - __main__ - INFO - --- Fold 15/15 --- Test groups: (4, 5)
+2026-03-09 09:12:08,836 - src.backtesting.cpcv - DEBUG - Train before purge: 41
+2026-03-09 09:12:12,261 - autogluon.tabular.models.catboost.catboost_model - WARNING - 	Warning: CatBoost on GPU is experimental. If you encounter issues, use CPU for training CatBoost instead.
+2026-03-09 09:12:17,719 - autogluon.tabular.predictor.predictor - WARNING - Disabling decision threshold calibration for metric `f1_weighted` due to having fewer than 50 rows of validation data for calibration to avoid overfitting (9 rows). Force calibration via specifying `calibrate_decision_threshold=True`.
+2026-03-09 09:12:18,000 - __main__ - INFO - --- Constructing and Evaluating Backtest Paths ---
+2026-03-09 09:12:18,001 - src.backtesting.cpcv - INFO - Constructed 5 unique, disjoint backtest paths.
+2026-03-09 09:12:18,047 - __main__ - INFO - Path 1/5 F1 Score (weighted): 0.5035
+2026-03-09 09:12:18,114 - __main__ - INFO - Path 2/5 F1 Score (weighted): 0.5431
+2026-03-09 09:12:18,171 - __main__ - INFO - Path 3/5 F1 Score (weighted): 0.5078
+2026-03-09 09:12:18,229 - __main__ - INFO - Path 4/5 F1 Score (weighted): 0.4709
+2026-03-09 09:12:18,293 - __main__ - INFO - Path 5/5 F1 Score (weighted): 0.5559
+2026-03-09 09:12:18,339 - __main__ - INFO - --- CPCV Path Results ---
+2026-03-09 09:12:18,340 - __main__ - INFO - Individual Path F1 Scores: ['0.5035', '0.5431', '0.5078', '0.4709', '0.5559']
+2026-03-09 09:12:18,340 - __main__ - INFO - Mean Path F1 Score: 0.5162
+2026-03-09 09:12:18,340 - __main__ - INFO - Std Dev of Path F1 Scores: 0.0303
+2026-03-09 09:12:18,373 - __main__ - INFO - CPCV process finished.

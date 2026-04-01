@@ -1,0 +1,63 @@
+{
+    "info": {
+        "artifact_uri": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/mlruns/22/aa4f91bd48944347889c79afe11a3f19/artifacts",
+        "end_time": 1771982050650,
+        "experiment_id": "22",
+        "lifecycle_stage": "active",
+        "run_id": "aa4f91bd48944347889c79afe11a3f19",
+        "run_name": "run_20260224_220741",
+        "start_time": 1771981661563,
+        "status": "FINISHED",
+        "user_id": "leocenturion"
+    },
+    "data": {
+        "metrics": {
+            "baseline_precision": 0.5392491467576792,
+            "metalabeling_precision": 0.5301724137931034,
+            "baseline_f1_weighted": 0.6552960276917775,
+            "metalabeling_f1_weighted": 0.635477586213765,
+            "test_f1_best_meta_model": 0.7885375494071146
+        },
+        "params": {
+            "data_filename": "BTCUSDT_consolidated_klines.csv",
+            "data_start_date": "2020-01-01T00:00:00",
+            "data_end_date": "2025-10-08T23:59:00",
+            "data_rows": "3033173",
+            "data_cols": "12",
+            "pipeline_config.volume_threshold": "50000",
+            "pipeline_config.tau": "0.7",
+            "pipeline_config.n_splits": "3",
+            "pipeline_config.pct_embargo": "0.01",
+            "pipeline_config.use_pca": "False",
+            "pipeline_config.chronos_model_name": "amazon/chronos-t5-tiny",
+            "pipeline_config.chronos_window_size": "128",
+            "pipeline_class": "ChronosMetaLabelingPipeline",
+            "model_params.primary_model_params.label": "label",
+            "model_params.primary_model_params.eval_metric": "f1_weighted",
+            "model_params.primary_model_params.presets": "medium_quality",
+            "model_params.primary_model_params.time_limit": "600",
+            "model_params.primary_model_params.path": "AutogluonModels/chronos_primary",
+            "model_params.meta_model_config.label": "label",
+            "model_params.meta_model_config.eval_metric": "f1",
+            "model_params.meta_model_config.presets": "medium_quality",
+            "model_params.meta_model_config.time_limit": "300",
+            "model_params.meta_model_config.path": "AutogluonModels/chronos_meta",
+            "model_class": "AutoGluonAdapter",
+            "best_meta_model_name": "LightGBMLarge"
+        },
+        "tags": {
+            "mlflow.user": "leocenturion",
+            "mlflow.source.name": "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/src/modeling/chronos_metalabeling_pipeline.py",
+            "mlflow.source.type": "LOCAL",
+            "mlflow.source.git.commit": "9c852dcec28a558dca3d8cc4cef43e0d4ecf8090",
+            "mlflow.runName": "run_20260224_220741"
+        }
+    },
+    "inputs": {
+        "model_inputs": [],
+        "dataset_inputs": []
+    },
+    "outputs": {
+        "model_outputs": []
+    }
+}
