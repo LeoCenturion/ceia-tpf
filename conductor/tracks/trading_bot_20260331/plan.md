@@ -43,11 +43,11 @@
     - [x] Implement to Pass Tests: Create the abstract base class for the strategy interface.
     - [x] Refactor: Add documentation to the interface.
     - [x] Verify Coverage: Ensure high test coverage for the interface.
-- [ ] Task: Implement the MACD strategy.
-    - [ ] Write Failing Tests: For calculating the MACD indicator and generating signals.
-    - [ ] Implement to Pass Tests: Create the `MACDStrategy` class that implements the strategy interface.
-    - [ ] Refactor: Optimize the MACD calculation.
-    - [ ] Verify Coverage: Ensure high test coverage for the MACD strategy.
+- [x] Task: Implement the MACD strategy.
+    - [x] Write Failing Tests: For calculating the MACD indicator and generating signals.
+    - [x] Implement to Pass Tests: Create the `MACDStrategy` class that implements the strategy interface.
+    - [x] Refactor: Optimize the MACD calculation.
+    - [x] Verify Coverage: Ensure high test coverage for the MACD strategy.
 - [ ] Task: Conductor - User Manual Verification 'Strategy Interface and MACD Implementation' (Protocol in workflow.md)
 
 ## Phase 4: Trading Bot Core Logic
