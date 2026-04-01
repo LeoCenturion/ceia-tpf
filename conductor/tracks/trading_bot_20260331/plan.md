@@ -24,11 +24,11 @@
     - [x] Implement to Pass Tests: Create a client to handle API authentication and requests.
     - [x] Refactor: Abstract API interaction into a dedicated service.
     - [x] Verify Coverage: Ensure high test coverage for the API client.
-- [ ] Task: Implement data fetching from Binance.
-    - [ ] Write Failing Tests: For fetching historical and real-time market data.
-    - [ ] Implement to Pass Tests: Add methods to the API client to fetch candlestick and ticker data.
-    - [ ] Refactor: Optimize data fetching and add error handling.
-    - [ ] Verify Coverage: Ensure high test coverage for data fetching.
+- [x] Task: Implement data fetching from Binance.
+    - [x] Write Failing Tests: For fetching historical and real-time market data.
+    - [x] Implement to Pass Tests: Add methods to the API client to fetch candlestick and ticker data.
+    - [x] Refactor: Optimize data fetching and add error handling.
+    - [x] Verify Coverage: Ensure high test coverage for data fetching.
 - [ ] Task: Implement order execution.
     - [ ] Write Failing Tests: For placing and canceling orders on the testnet.
     - [ ] Implement to Pass Tests: Add methods to the API client to execute trades.

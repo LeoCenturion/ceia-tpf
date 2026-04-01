@@ -17,3 +17,9 @@ class BinanceClient:
         except Exception as e:
             print(f"Connection failed: {e}")
             return False
+
+    def get_historical_klines(self, symbol, interval, start_str):
+        return self.client.get_historical_klines(symbol, interval, start_str)
+
+    def get_latest_price(self, symbol):
+        return self.client.get_symbol_ticker(symbol=symbol)['price']

@@ -20,5 +20,19 @@ class TestBinanceClient(unittest.TestCase):
         client = BinanceClient(api_key='invalid_key', api_secret='invalid_secret', testnet=True)
         self.assertFalse(client.test_connection())
 
+    @patch('src.app.exchange.Client')
+    def test_get_historical_klines(self, mock_client):
+        mock_client.return_value.get_historical_klines.return_value = [[1, 2, 3], [4, 5, 6]]
+        client = BinanceClient(api_key='test_key', api_secret='test_secret', testnet=True)
+        klines = client.get_historical_klines('BTCUSDT', '1m', '1 day ago UTC')
+        self.assertEqual(len(klines), 2)
+
+    @patch('src.app.exchange.Client')
+    def test_get_latest_price(self, mock_client):
+        mock_client.return_value.get_symbol_ticker.return_value = {'price': '50000.00'}
+        client = BinanceClient(api_key='test_key', api_secret='test_secret', testnet=True)
+        price = client.get_latest_price('BTCUSDT')
+        self.assertEqual(price, '50000.00')
+
 if __name__ == '__main__':
     unittest.main()
