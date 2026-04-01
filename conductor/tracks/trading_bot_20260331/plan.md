@@ -19,11 +19,11 @@
 
 ## Phase 2: Binance API Integration
 
-- [ ] Task: Implement Binance API client.
-    - [ ] Write Failing Tests: For connecting to the Binance Spot Testnet.
-    - [ ] Implement to Pass Tests: Create a client to handle API authentication and requests.
-    - [ ] Refactor: Abstract API interaction into a dedicated service.
-    - [ ] Verify Coverage: Ensure high test coverage for the API client.
+- [x] Task: Implement Binance API client.
+    - [x] Write Failing Tests: For connecting to the Binance Spot Testnet.
+    - [x] Implement to Pass Tests: Create a client to handle API authentication and requests.
+    - [x] Refactor: Abstract API interaction into a dedicated service.
+    - [x] Verify Coverage: Ensure high test coverage for the API client.
 - [ ] Task: Implement data fetching from Binance.
     - [ ] Write Failing Tests: For fetching historical and real-time market data.
     - [ ] Implement to Pass Tests: Add methods to the API client to fetch candlestick and ticker data.
