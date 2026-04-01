@@ -46,20 +46,12 @@ def objective(trial, pipeline_config, raw_data):
     """Optuna objective function for AutoGluon pipeline."""
     # Hyperparameters to tune
     presets = trial.suggest_categorical("presets", ["medium_quality", "high_quality", "best_quality"])
-    time_limit = trial.suggest_int("time_limit", 300, 600, step=300)
-    
-    hyperparameters = {
-        'FT_TRANSFORMER': {},
-        'GBM': {},
-        'NN_TORCH': {},
-        'FASTAI': {}
-    }
-        
+    time_limit = 600
+
     model_params = {
         'label': 'label',
         'eval_metric': 'f1_weighted',
         'presets': presets,
-        'hyperparameters': hyperparameters,
         'time_limit': time_limit,
         'verbosity': 0,
         'path': f'AutogluonModels/palazzo_optuna/trial_{trial.number}'
@@ -122,7 +114,6 @@ def run_single_pipeline():
         symbol="BTC/USDT", timeframe="1m",
         data_path=data_path
     )
-    raw_data.rename(columns={VOLUME_COL: "volume", CLOSE_COL: "close"}, inplace=True)
     
     config = {
         "volume_threshold": 50000, 
@@ -173,7 +164,6 @@ def main():
         symbol="BTC/USDT", timeframe="1m",
         data_path=data_path
     )
-    raw_data.rename(columns={VOLUME_COL: "volume", CLOSE_COL: "close"}, inplace=True)
     
     config = {
         "volume_threshold": 50000, 

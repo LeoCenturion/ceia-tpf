@@ -183,7 +183,7 @@ class ChronosFeaturePipeline(PalazzoXGBoostPipeline):
 def objective(trial, raw_data):
     """Optuna objective function for Chronos Feature pipeline."""
     # Pipeline hyperparameters
-    chronos_window_size = trial.suggest_int("chronos_window_size", 64, 256, step=32)
+    chronos_window_size = trial.suggest_int("chronos_window_size", 32, 256, step=64)
     chronos_model_name = trial.suggest_categorical("chronos_model_name", ["amazon/chronos-t5-tiny", "amazon/chronos-t5-small"])
     
     pipeline_config = {
@@ -227,7 +227,6 @@ def run_optuna_study(raw_data, data_path, n_trials=10):
     """
     study_name = "chronos_feature_pipeline_optimization"
     storage_name = "sqlite:///optuna-study.db"
-    
     # MLflow setup
     mlflow.set_tracking_uri("sqlite:///mlflow.db")  # Ensure MLflow logs to the local DB
     mlflow.set_experiment(study_name)
@@ -238,7 +237,7 @@ def run_optuna_study(raw_data, data_path, n_trials=10):
         storage=storage_name,
         load_if_exists=True,
     )
-    
+
     objective_with_data = partial(
         objective, 
         raw_data=raw_data
