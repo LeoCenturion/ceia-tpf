@@ -83,7 +83,7 @@
     - [x] Verify Coverage: Ensure high test coverage for performance metrics.
 - [ ] Task: Conductor - User Manual Verification 'Backtesting and Evaluation' (Protocol in workflow.md)
 
-## Phase 6: Logging and Monitoring
+## Phase 6: Logging and Monitoring [checkpoint: e604269]
 
 - [x] Task: Implement the logging framework.
     - [x] Write Failing Tests: For logging messages at different levels.
