@@ -40,13 +40,15 @@ class Bot:
             # Execute order
             if signal == "BUY" and not self.position:
                 quantity = self.strategy.get_order_size()
-                self.exchange_client.create_order(
-                    symbol=self.config['bot']['symbol'],
-                    side='BUY',
-                    type='MARKET',
-                    quantity=quantity
-                )
-                self.position = {'price': latest_price, 'quantity': quantity}
+                cost = quantity * latest_price
+                if cost <= self.config['capital_allocation']['max_capital']:
+                    self.exchange_client.create_order(
+                        symbol=self.config['bot']['symbol'],
+                        side='BUY',
+                        type='MARKET',
+                        quantity=quantity
+                    )
+                    self.position = {'price': latest_price, 'quantity': quantity}
             elif signal == "SELL" and self.position:
                 self.exchange_client.create_order(
                     symbol=self.config['bot']['symbol'],

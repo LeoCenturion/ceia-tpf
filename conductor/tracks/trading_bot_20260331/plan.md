@@ -62,11 +62,11 @@
     - [x] Implement to Pass Tests: Integrate risk management checks into the trading loop.
     - [x] Refactor: Make risk management rules configurable.
     - [x] Verify Coverage: Ensure high test coverage for risk management.
-- [ ] Task: Implement capital allocation.
-    - [ ] Write Failing Tests: For enforcing the maximum capital allocation limit.
-    - [ ] Implement to Pass Tests: Add capital allocation checks before placing orders.
-    - [ ] Refactor: Improve capital management logic.
-    - [ ] Verify Coverage: Ensure high test coverage for capital allocation.
+- [x] Task: Implement capital allocation.
+    - [x] Write Failing Tests: For enforcing the maximum capital allocation limit.
+    - [x] Implement to Pass Tests: Add capital allocation checks before placing orders.
+    - [x] Refactor: Improve capital management logic.
+    - [x] Verify Coverage: Ensure high test coverage for capital allocation.
 - [ ] Task: Conductor - User Manual Verification 'Trading Bot Core Logic' (Protocol in workflow.md)
 
 ## Phase 5: Backtesting and Evaluation
