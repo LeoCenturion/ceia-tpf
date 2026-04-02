@@ -36,7 +36,7 @@
     - [x] Verify Coverage: Ensure high test coverage for order execution.
 - [ ] Task: Conductor - User Manual Verification 'Binance API Integration' (Protocol in workflow.md)
 
-## Phase 3: Strategy Interface and MACD Implementation
+## Phase 3: Strategy Interface and MACD Implementation [checkpoint: a467819]
 
 - [x] Task: Define and implement the strategy interface.
     - [x] Write Failing Tests: For the `get_signal()` and `get_order_size()` methods.
