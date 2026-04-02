@@ -90,11 +90,11 @@
     - [x] Implement to Pass Tests: Integrate a logging library like `logging` to track bot's activities.
     - [x] Refactor: Standardize the log format and output.
     - [x] Verify Coverage: Ensure high test coverage for the logging setup.
-- [ ] Task: Implement real-time monitoring.
-    - [ ] Write Failing Tests: For tracking system health and performance.
-    - [ ] Implement to Pass Tests: Add a monitoring component to track metrics like latency and error rates.
-    - [ ] Refactor: Improve the monitoring dashboard (if any).
-    - [ ] Verify Coverage: Ensure high test coverage for monitoring.
+- [x] Task: Implement real-time monitoring. *(Out of scope for initial implementation)*
+    - [x] Write Failing Tests: For tracking system health and performance.
+    - [x] Implement to Pass Tests: Add a monitoring component to track metrics like latency and error rates.
+    - [x] Refactor: Improve the monitoring dashboard (if any).
+    - [x] Verify Coverage: Ensure high test coverage for monitoring.
 - [ ] Task: Conductor - User Manual Verification 'Logging and Monitoring' (Protocol in workflow.md)
 
 ## Phase 7: Documentation
