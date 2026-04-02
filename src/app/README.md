@@ -1,6 +1,6 @@
 # Trading Bot
 
-This is a simple trading bot that uses a MACD strategy to trade on the Binance Spot Testnet.
+This is a flexible trading bot that allows the use of multiple trading strategies on the Binance Spot Testnet.
 
 ## Prerequisites
 
@@ -34,12 +34,24 @@ This is a simple trading bot that uses a MACD strategy to trade on the Binance S
      start_str: '1 day ago UTC'
    exchange:
      name: 'binance_testnet'
+   strategy:
+     name: 'macd' # Name of the strategy to use
+     params:
+       fast_period: 12
+       slow_period: 26
+       signal_period: 9
    risk_management:
      stop_loss: 0.1
      max_drawdown: 0.2
    capital_allocation:
      max_capital: 1000
    ```
+2. Set up your Binance Testnet API keys as environment variables:
+   ```bash
+   export BINANCE_TESTNET_API_KEY="your_api_key"
+   export BINANCE_TESTNET_API_SECRET="your_api_secret"
+   ```
+
 ## Configuration Schema
 
 - `bot`:
@@ -48,17 +60,14 @@ This is a simple trading bot that uses a MACD strategy to trade on the Binance S
   - `start_str` (string): The start time for historical data (e.g., '1 day ago UTC').
 - `exchange`:
   - `name` (string): The name of the exchange (e.g., 'binance_testnet').
+- `strategy`:
+  - `name` (string): The name of the strategy to use (e.g., 'macd').
+  - `params` (dict): A dictionary of parameters for the chosen strategy.
 - `risk_management`:
   - `stop_loss` (float): The stop-loss percentage (e.g., 0.1 for 10%).
   - `max_drawdown` (float): The maximum drawdown percentage (e.g., 0.2 for 20%).
 - `capital_allocation`:
   - `max_capital` (float): The maximum capital to allocate for a single trade.
-
-2. Set up your Binance Testnet API keys as environment variables:
-   ```bash
-   export BINANCE_TESTNET_API_KEY="your_api_key"
-   export BINANCE_TESTNET_API_SECRET="your_api_secret"
-   ```
 
 ### Commands
 

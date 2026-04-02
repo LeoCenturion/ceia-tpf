@@ -11,10 +11,10 @@ class Strategy(ABC):
         pass
 
 class MACDStrategy(Strategy):
-    def __init__(self, fast_period=12, slow_period=26, signal_period=9):
-        self.fast_period = fast_period
-        self.slow_period = slow_period
-        self.signal_period = signal_period
+    def __init__(self, **params):
+        self.fast_period = params.get('fast_period', 12)
+        self.slow_period = params.get('slow_period', 26)
+        self.signal_period = params.get('signal_period', 9)
 
     def get_signal(self, data):
         # Calculate Fast and Slow EMAs
@@ -42,3 +42,11 @@ class MACDStrategy(Strategy):
         # For simplicity, we'll return a fixed size.
         # In a real bot, this would be based on risk management.
         return 0.01
+
+class StrategyFactory:
+    @staticmethod
+    def create_strategy(name, **params):
+        if name == 'macd':
+            return MACDStrategy(**params)
+        else:
+            raise ValueError(f"Strategy '{name}' not found.")

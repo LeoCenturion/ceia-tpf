@@ -289,7 +289,8 @@ def main(strategy_func, trade_amount, max_capital):
         while True:
             try:
                 # We need enough data for MACD calculation, e.g., long_window + signal_window
-                df = get_historical_data(symbol, timeframe, "100 minutes ago UTC")
+                df = get_histori
+                cal_data(symbol, timeframe, "100 minutes ago UTC")
                 if len(df) < 26 + 9:  # not enough data for MACD
                     logging.debug("Not enough historical data yet. Waiting...")
                     time.sleep(60)

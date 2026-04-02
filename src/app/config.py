@@ -6,7 +6,7 @@ def load_config(config_path):
         config = yaml.safe_load(f)
     
     # Simple validation
-    if 'bot' not in config or 'exchange' not in config:
+    if 'bot' not in config or 'exchange' not in config or 'strategy' not in config:
         raise KeyError("Invalid config file")
         
     return config
