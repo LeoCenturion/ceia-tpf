@@ -69,7 +69,7 @@
     - [x] Verify Coverage: Ensure high test coverage for capital allocation.
 - [ ] Task: Conductor - User Manual Verification 'Trading Bot Core Logic' (Protocol in workflow.md)
 
-## Phase 5: Backtesting and Evaluation
+## Phase 5: Backtesting and Evaluation [checkpoint: 1a2d936]
 
 - [x] Task: Implement the backtesting pipeline.
     - [x] Write Failing Tests: For running a strategy against historical data.
