@@ -103,7 +103,7 @@
     - [x] Write the initial draft of the `README.md`.
     - [x] Add sections for prerequisites, installation, and usage.
     - [x] Document the CLI commands and operational flows.
-- [ ] Task: Create the configuration schema documentation.
-    - [ ] Document all configurable parameters in the `config.yaml`.
-    - [ ] Provide details on data types, default values, and their effects.
+- [x] Task: Create the configuration schema documentation.
+    - [x] Document all configurable parameters in the `config.yaml`.
+    - [x] Provide details on data types, default values, and their effects.
 - [ ] Task: Conductor - User Manual Verification 'Documentation' (Protocol in workflow.md)

@@ -40,6 +40,20 @@ This is a simple trading bot that uses a MACD strategy to trade on the Binance S
    capital_allocation:
      max_capital: 1000
    ```
+## Configuration Schema
+
+- `bot`:
+  - `symbol` (string): The trading symbol (e.g., 'BTCUSDT').
+  - `interval` (string): The candlestick interval (e.g., '1m', '5m', '1h').
+  - `start_str` (string): The start time for historical data (e.g., '1 day ago UTC').
+- `exchange`:
+  - `name` (string): The name of the exchange (e.g., 'binance_testnet').
+- `risk_management`:
+  - `stop_loss` (float): The stop-loss percentage (e.g., 0.1 for 10%).
+  - `max_drawdown` (float): The maximum drawdown percentage (e.g., 0.2 for 20%).
+- `capital_allocation`:
+  - `max_capital` (float): The maximum capital to allocate for a single trade.
+
 2. Set up your Binance Testnet API keys as environment variables:
    ```bash
    export BINANCE_TESTNET_API_KEY="your_api_key"
