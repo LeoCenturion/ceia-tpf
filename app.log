@@ -46572,3 +46572,25 @@ Disk Space Avail:   551.02 GB / 1149.14 GB (48.0%)
 2026-03-13 18:47:55,707 - __main__ - INFO - --- Fold 20/45 --- Test groups: (2, 5)
 2026-03-13 18:47:55,708 - src.backtesting.cpcv - DEBUG - Train before purge: 2126
 2026-04-01 22:04:12,436 - root - INFO - This is a test log message.
+2026-04-02 14:13:55,595 - root - INFO - Bot thread started.
+2026-04-02 14:13:55,601 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-04-02 14:13:55,601 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2026-04-02 14:14:36,280 - src.app.main - ERROR - Exception on /shutdown [POST]
+Traceback (most recent call last):
+  File "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/.venv/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/.venv/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/.venv/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/.venv/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/src/app/main.py", line 62, in shutdown
+    raise RuntimeError('Not running with the Werkzeug Server')
+RuntimeError: Not running with the Werkzeug Server
+2026-04-02 14:14:36,282 - werkzeug - INFO - 127.0.0.1 - - [02/Apr/2026 14:14:36] "[35m[1mPOST /shutdown HTTP/1.1[0m" 500 -
