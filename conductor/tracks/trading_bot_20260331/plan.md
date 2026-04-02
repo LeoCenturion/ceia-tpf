@@ -99,10 +99,10 @@
 
 ## Phase 7: Documentation
 
-- [ ] Task: Create the `README.md` file.
-    - [ ] Write the initial draft of the `README.md`.
-    - [ ] Add sections for prerequisites, installation, and usage.
-    - [ ] Document the CLI commands and operational flows.
+- [x] Task: Create the `README.md` file.
+    - [x] Write the initial draft of the `README.md`.
+    - [x] Add sections for prerequisites, installation, and usage.
+    - [x] Document the CLI commands and operational flows.
 - [ ] Task: Create the configuration schema documentation.
     - [ ] Document all configurable parameters in the `config.yaml`.
     - [ ] Provide details on data types, default values, and their effects.

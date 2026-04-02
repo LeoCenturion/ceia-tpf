@@ -46571,3 +46571,4 @@ Disk Space Avail:   551.02 GB / 1149.14 GB (48.0%)
 2026-03-13 18:47:55,688 - autogluon.tabular.predictor.predictor - INFO - TabularPredictor saved. To load, use: predictor = TabularPredictor.load("/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/AutogluonModels/palazzo_cpcv_autogluon_trial_4/170ddc59")
 2026-03-13 18:47:55,707 - __main__ - INFO - --- Fold 20/45 --- Test groups: (2, 5)
 2026-03-13 18:47:55,708 - src.backtesting.cpcv - DEBUG - Train before purge: 2126
+2026-04-01 22:04:12,436 - root - INFO - This is a test log message.

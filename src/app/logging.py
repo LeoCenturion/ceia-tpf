@@ -21,3 +21,7 @@ def setup_logging(log_file='app.log', level=logging.INFO):
     sh = logging.StreamHandler(sys.stdout)
     sh.setFormatter(formatter)
     logger.addHandler(sh)
+
+if __name__ == '__main__':
+    setup_logging()
+    logging.info("This is a test log message.")
