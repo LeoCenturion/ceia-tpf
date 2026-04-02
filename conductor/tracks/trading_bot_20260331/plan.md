@@ -76,11 +76,11 @@
     - [x] Implement to Pass Tests: Create a backtesting engine that simulates trading.
     - [x] Refactor: Improve the backtesting performance and output.
     - [x] Verify Coverage: Ensure high test coverage for the backtesting pipeline.
-- [ ] Task: Implement performance metrics calculation.
-    - [ ] Write Failing Tests: For calculating metrics like Sharpe ratio, profit/loss, and drawdown.
-    - [ ] Implement to Pass Tests: Add a module to calculate and report performance metrics.
-    - [ ] Refactor: Improve the accuracy and presentation of the metrics.
-    - [ ] Verify Coverage: Ensure high test coverage for performance metrics.
+- [x] Task: Implement performance metrics calculation.
+    - [x] Write Failing Tests: For calculating metrics like Sharpe ratio, profit/loss, and drawdown.
+    - [x] Implement to Pass Tests: Add a module to calculate and report performance metrics.
+    - [x] Refactor: Improve the accuracy and presentation of the metrics.
+    - [x] Verify Coverage: Ensure high test coverage for performance metrics.
 - [ ] Task: Conductor - User Manual Verification 'Backtesting and Evaluation' (Protocol in workflow.md)
 
 ## Phase 6: Logging and Monitoring

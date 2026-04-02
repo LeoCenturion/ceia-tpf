@@ -27,6 +27,9 @@ class TestBacktesting(unittest.TestCase):
         
         stats = run_backtest(df, SmaCross)
         self.assertIn('Return [%]', stats)
+        self.assertIn('Sharpe Ratio', stats)
+        self.assertIn('Max. Drawdown [%]', stats)
+        self.assertIn('Profit Factor', stats)
 
 if __name__ == '__main__':
     unittest.main()
