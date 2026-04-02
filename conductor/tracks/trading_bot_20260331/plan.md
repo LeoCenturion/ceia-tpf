@@ -52,11 +52,11 @@
 
 ## Phase 4: Trading Bot Core Logic
 
-- [ ] Task: Implement the main trading loop.
-    - [ ] Write Failing Tests: For the autonomous execution of the trading loop.
-    - [ ] Implement to Pass Tests: Create the core loop that fetches data, applies the strategy, and executes trades.
-    - [ ] Refactor: Improve the loop's structure and add graceful shutdown handling.
-    - [ ] Verify Coverage: Ensure high test coverage for the trading loop.
+- [x] Task: Implement the main trading loop.
+    - [x] Write Failing Tests: For the autonomous execution of the trading loop.
+    - [x] Implement to Pass Tests: Create the core loop that fetches data, applies the strategy, and executes trades.
+    - [x] Refactor: Improve the loop's structure and add graceful shutdown handling.
+    - [x] Verify Coverage: Ensure high test coverage for the trading loop.
 - [ ] Task: Implement risk management.
     - [ ] Write Failing Tests: For enforcing stop-loss and maximum drawdown limits.
     - [ ] Implement to Pass Tests: Integrate risk management checks into the trading loop.
