@@ -7,6 +7,8 @@ class Bot:
         self.exchange_client = exchange_client
         self.strategy = strategy
         self.running = True
+        self.account_balance = 10000 # Example balance
+        self.position = None
 
     def run(self):
         while self.running:
@@ -18,12 +20,25 @@ class Bot:
             )
             df = pd.DataFrame(klines, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_asset_volume', 'number_of_trades', 'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'])
             df['close'] = pd.to_numeric(df['close'])
+            latest_price = float(df['close'].iloc[-1])
+
+            # Check for stop-loss
+            if self.position:
+                pnl = (latest_price - self.position['price']) * self.position['quantity']
+                if pnl / (self.position['price'] * self.position['quantity']) < -self.config['risk_management']['stop_loss']:
+                    self.exchange_client.create_order(
+                        symbol=self.config['bot']['symbol'],
+                        side='SELL',
+                        type='MARKET',
+                        quantity=self.position['quantity']
+                    )
+                    self.position = None
 
             # Get signal
             signal = self.strategy.get_signal(df)
 
             # Execute order
-            if signal == "BUY":
+            if signal == "BUY" and not self.position:
                 quantity = self.strategy.get_order_size()
                 self.exchange_client.create_order(
                     symbol=self.config['bot']['symbol'],
@@ -31,20 +46,20 @@ class Bot:
                     type='MARKET',
                     quantity=quantity
                 )
-            elif signal == "SELL":
-                quantity = self.strategy.get_order_size()
+                self.position = {'price': latest_price, 'quantity': quantity}
+            elif signal == "SELL" and self.position:
                 self.exchange_client.create_order(
                     symbol=self.config['bot']['symbol'],
                     side='SELL',
                     type='MARKET',
-                    quantity=quantity
+                    quantity=self.position['quantity']
                 )
-            
-            # For testing purposes, we'll break the loop
+                self.position = None
+
             if "MagicMock" in str(type(self.exchange_client)):
                 break
             
-            time.sleep(60) # Wait for the next interval
+            time.sleep(60)
 
     def stop(self):
         self.running = False

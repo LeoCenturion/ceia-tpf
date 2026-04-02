@@ -57,11 +57,11 @@
     - [x] Implement to Pass Tests: Create the core loop that fetches data, applies the strategy, and executes trades.
     - [x] Refactor: Improve the loop's structure and add graceful shutdown handling.
     - [x] Verify Coverage: Ensure high test coverage for the trading loop.
-- [ ] Task: Implement risk management.
-    - [ ] Write Failing Tests: For enforcing stop-loss and maximum drawdown limits.
-    - [ ] Implement to Pass Tests: Integrate risk management checks into the trading loop.
-    - [ ] Refactor: Make risk management rules configurable.
-    - [ ] Verify Coverage: Ensure high test coverage for risk management.
+- [x] Task: Implement risk management.
+    - [x] Write Failing Tests: For enforcing stop-loss and maximum drawdown limits.
+    - [x] Implement to Pass Tests: Integrate risk management checks into the trading loop.
+    - [x] Refactor: Make risk management rules configurable.
+    - [x] Verify Coverage: Ensure high test coverage for risk management.
 - [ ] Task: Implement capital allocation.
     - [ ] Write Failing Tests: For enforcing the maximum capital allocation limit.
     - [ ] Implement to Pass Tests: Add capital allocation checks before placing orders.

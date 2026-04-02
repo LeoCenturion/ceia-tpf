@@ -13,7 +13,8 @@ class TestBot(unittest.TestCase):
     def test_trading_loop(self):
         # Mock dependencies
         mock_config = {
-            'bot': {'symbol': 'BTCUSDT', 'interval': '1m', 'start_str': '1 day ago UTC'}
+            'bot': {'symbol': 'BTCUSDT', 'interval': '1m', 'start_str': '1 day ago UTC'},
+            'risk_management': {'stop_loss': 0.1, 'max_drawdown': 0.2}
         }
         mock_exchange_client = MagicMock()
         mock_strategy = MagicMock()
@@ -32,6 +33,31 @@ class TestBot(unittest.TestCase):
         mock_strategy.get_signal.assert_called_once()
         mock_exchange_client.create_order.assert_called_once_with(
             symbol='BTCUSDT', side='BUY', type='MARKET', quantity=0.01
+        )
+    
+    def test_risk_management_stop_loss(self):
+        # Mock dependencies
+        mock_config = {
+            'bot': {'symbol': 'BTCUSDT', 'interval': '1m', 'start_str': '1 day ago UTC'},
+            'risk_management': {'stop_loss': 0.1, 'max_drawdown': 0.2}
+        }
+        mock_exchange_client = MagicMock()
+        mock_strategy = MagicMock()
+
+        # Set up mock returns
+        mock_exchange_client.get_historical_klines.return_value = [[1, 2, 3, 4, 100, 6, 7, 8, 9, 10, 11, 12]]
+        mock_strategy.get_signal.return_value = "SELL" # Should trigger stop-loss
+        mock_strategy.get_order_size.return_value = 0.01
+
+        # Instantiate bot and run loop once
+        bot = Bot(config=mock_config, exchange_client=mock_exchange_client, strategy=mock_strategy)
+        bot.account_balance = 1000
+        bot.position = {'price': 110, 'quantity': 1} # Losing position
+        bot.run()
+        
+        # Assert that a SELL order was created to close the position
+        mock_exchange_client.create_order.assert_called_once_with(
+            symbol='BTCUSDT', side='SELL', type='MARKET', quantity=1
         )
 
 if __name__ == '__main__':
