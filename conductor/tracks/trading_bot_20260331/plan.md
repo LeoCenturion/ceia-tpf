@@ -71,11 +71,11 @@
 
 ## Phase 5: Backtesting and Evaluation
 
-- [ ] Task: Implement the backtesting pipeline.
-    - [ ] Write Failing Tests: For running a strategy against historical data.
-    - [ ] Implement to Pass Tests: Create a backtesting engine that simulates trading.
-    - [ ] Refactor: Improve the backtesting performance and output.
-    - [ ] Verify Coverage: Ensure high test coverage for the backtesting pipeline.
+- [x] Task: Implement the backtesting pipeline.
+    - [x] Write Failing Tests: For running a strategy against historical data.
+    - [x] Implement to Pass Tests: Create a backtesting engine that simulates trading.
+    - [x] Refactor: Improve the backtesting performance and output.
+    - [x] Verify Coverage: Ensure high test coverage for the backtesting pipeline.
 - [ ] Task: Implement performance metrics calculation.
     - [ ] Write Failing Tests: For calculating metrics like Sharpe ratio, profit/loss, and drawdown.
     - [ ] Implement to Pass Tests: Add a module to calculate and report performance metrics.

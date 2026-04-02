@@ -9,6 +9,7 @@ class Bot:
         self.running = True
         self.account_balance = 10000 # Example balance
         self.position = None
+        self.run_once = False # New attribute for manual testing
 
     def run(self):
         while self.running:
@@ -26,6 +27,7 @@ class Bot:
             if self.position:
                 pnl = (latest_price - self.position['price']) * self.position['quantity']
                 if pnl / (self.position['price'] * self.position['quantity']) < -self.config['risk_management']['stop_loss']:
+                    print("Stop-loss triggered!")
                     self.exchange_client.create_order(
                         symbol=self.config['bot']['symbol'],
                         side='SELL',
@@ -36,12 +38,14 @@ class Bot:
 
             # Get signal
             signal = self.strategy.get_signal(df)
+            print(f"Generated signal: {signal}")
 
             # Execute order
             if signal == "BUY" and not self.position:
                 quantity = self.strategy.get_order_size()
                 cost = quantity * latest_price
                 if cost <= self.config['capital_allocation']['max_capital']:
+                    print(f"Executing BUY order for {quantity} of {self.config['bot']['symbol']}")
                     self.exchange_client.create_order(
                         symbol=self.config['bot']['symbol'],
                         side='BUY',
@@ -49,7 +53,11 @@ class Bot:
                         quantity=quantity
                     )
                     self.position = {'price': latest_price, 'quantity': quantity}
+                else:
+                    print(f"Skipping BUY order due to capital allocation limit.")
+
             elif signal == "SELL" and self.position:
+                print(f"Executing SELL order for {self.position['quantity']} of {self.config['bot']['symbol']}")
                 self.exchange_client.create_order(
                     symbol=self.config['bot']['symbol'],
                     side='SELL',
@@ -58,10 +66,11 @@ class Bot:
                 )
                 self.position = None
 
-            if "MagicMock" in str(type(self.exchange_client)):
+            if self.run_once or "MagicMock" in str(type(self.exchange_client)):
                 break
             
             time.sleep(60)
+
 
     def stop(self):
         self.running = False
