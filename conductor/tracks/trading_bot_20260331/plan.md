@@ -50,7 +50,7 @@
     - [x] Verify Coverage: Ensure high test coverage for the MACD strategy.
 - [ ] Task: Conductor - User Manual Verification 'Strategy Interface and MACD Implementation' (Protocol in workflow.md)
 
-## Phase 4: Trading Bot Core Logic
+## Phase 4: Trading Bot Core Logic [checkpoint: 6cfaa41]
 
 - [x] Task: Implement the main trading loop.
     - [x] Write Failing Tests: For the autonomous execution of the trading loop.
