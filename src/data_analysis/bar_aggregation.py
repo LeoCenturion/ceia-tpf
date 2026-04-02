@@ -225,7 +225,7 @@ def create_tick_imbalance_bars(
     Creates tick imbalance bars (TIBs) with a configurable threshold strategy.
 
     Args:
-        df (pd.DataFrame): DataFrame with tick data. Must include 'Close' price.
+ o       df (pd.DataFrame): DataFrame with tick data. Must include 'Close' price.
         threshold_type (str): The threshold strategy to use. One of:
             - 'static': Use a fixed `static_threshold`.
             - 'dynamic_imbalance': E[T] * E[b_t] (EWMA of bar sizes and tick imbalances).

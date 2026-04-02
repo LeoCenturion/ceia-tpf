@@ -9,7 +9,7 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [x] **Track: Your task is to create a trading bot in the src/app directory (create it). It should trade on the spot market using the binance api (configure it for using the test api). It shoul be able to use several trading strategies. Propose a strategy interface. Start by implementing a very basic MACD strategy.
+- [~] **Track: Your task is to create a trading bot in the src/app directory (create it). It should trade on the spot market using the binance api (configure it for using the test api). It shoul be able to use several trading strategies. Propose a strategy interface. Start by implementing a very basic MACD strategy.
 The requirements are
 ### **1. Functional Requirements**
 * **1.1. Autonomous Execution:** The core trading loop must execute asynchronously and autonomously, requiring no human intervention once the initialization phase is complete.

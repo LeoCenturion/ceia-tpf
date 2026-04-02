@@ -7,7 +7,8 @@ class TestConfig(unittest.TestCase):
     def setUp(self):
         self.valid_config_data = {
             'bot': {'name': 'Test Bot'},
-            'exchange': {'name': 'binance_testnet'}
+            'exchange': {'name': 'binance_testnet'},
+            'strategy': {'name': 'macd', 'params': {}}
         }
         self.invalid_config_data = {
             'bot': {'name': 'Test Bot'}
