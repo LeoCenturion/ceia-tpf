@@ -97,7 +97,7 @@
     - [x] Verify Coverage: Ensure high test coverage for monitoring.
 - [ ] Task: Conductor - User Manual Verification 'Logging and Monitoring' (Protocol in workflow.md)
 
-## Phase 7: Documentation
+## Phase 7: Documentation [checkpoint: e95d71e]
 
 - [x] Task: Create the `README.md` file.
     - [x] Write the initial draft of the `README.md`.
