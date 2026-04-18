@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Tuple
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
@@ -53,6 +54,13 @@ class AbstractMLPipeline(ABC):
         """
         pass
 
+
+    def cross_validation_feature_engineering(self, train, test) -> tuple[pd.DataFrame, pd.DataFrame] :
+        """
+        Applies feature engineering for the train and test folds
+        """
+        return (train,test)
+
     @timer
     def run_cv(self, raw_tick_data, model):
         """
@@ -91,8 +99,8 @@ class AbstractMLPipeline(ABC):
         print(f"Starting Purged Cross-Validation ({self.config['n_splits']} folds)...")
         for i, (train_idx, test_idx) in enumerate(cv.split(X_raw, y)):
             # 1. Split
-            X_train_raw, X_test_raw = X_raw.iloc[train_idx], X_raw.iloc[test_idx]
             y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+            X_train_raw, X_test_raw = self.cross_validation_feature_engineering(X_raw.iloc[train_idx], X_raw.iloc[test_idx], y_train)
             sw_train = sw.iloc[train_idx]
 
             # 2. Fit Scaler on TRAIN only
