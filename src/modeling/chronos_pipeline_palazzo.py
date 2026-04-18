@@ -173,7 +173,7 @@ class PalazzoChronosPipeline(PalazzoXGBoostPipeline):
 
             predictor.fit(
                 ts_train,
-                hyperparameters={"Chronos": {"model_path": model_path}},
+                hyperparameters={"Chronos": {"model_path": model_path, "fine_tune": True, "fine_tune_batch_size": 16}},
                 time_limit=300,
             )
 
@@ -257,7 +257,7 @@ class PalazzoChronosPipeline(PalazzoXGBoostPipeline):
             # We create a TimeSeriesDataFrame where each 'item_id' is a specific test instance
             # Instance k: data up to index (train_len + k - 1). We want to predict index (train_len + k).
 
-            batch_size = 64
+            batch_size = 16
             for start_k in tqdm(range(0, test_len, batch_size), desc="Predicting"):
                 end_k = min(start_k + batch_size, test_len)
                 batch_items = []
@@ -533,7 +533,7 @@ class PalazzoChronosBinaryClassificationPipeline(PalazzoChronosPipeline):
             )
             predictor.fit(
                 ts_train,
-                hyperparameters={"Chronos": {"model_path": model_path}},
+                hyperparameters={"Chronos": {"model_path": model_path, "fine_tune": True, "fine_tune_batch_size": 16}},
                 time_limit=300,
             )
 
@@ -560,7 +560,7 @@ class PalazzoChronosBinaryClassificationPipeline(PalazzoChronosPipeline):
             print(f"Generating rolling predictions for {test_len} steps...")
             fold_y_pred_continuous = []
             context_length = 512
-            batch_size = 64
+            batch_size = 16
 
             for start_k in tqdm(range(0, test_len, batch_size), desc="Predicting"):
                 # (Batching logic is identical to parent, so it's condensed for brevity)
@@ -643,7 +643,6 @@ def main():
     raw_data = fetch_historical_data(
         symbol="BTC/USDT", timeframe="1m", data_path=data_path
     )
-    raw_data.rename(columns={VOLUME_COL: "volume", CLOSE_COL: "close"}, inplace=True)
 
     config = {
         "volume_threshold": 50000,
@@ -662,8 +661,8 @@ def main():
     # experiment = "Chronos_Palazzo_ForecastToClass"
 
     # 3. Fine-tuning for Binary Classification (New method)
-    # pipeline = PalazzoChronosBinaryClassificationPipeline(config)
-    # experiment = "Chronos_Palazzo_FinetuneToClass"
+    pipeline = PalazzoChronosBinaryClassificationPipeline(config)
+    experiment = "Chronos_Palazzo_FinetuneToClass"
 
 
     run_pipeline(
