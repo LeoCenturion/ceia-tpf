@@ -55,11 +55,11 @@ class AbstractMLPipeline(ABC):
         pass
 
 
-    def cross_validation_feature_engineering(self, train, test) -> tuple[pd.DataFrame, pd.DataFrame] :
+    def cross_validation_feature_engineering(self, train, test, y_train, y_test) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame] :
         """
         Applies feature engineering for the train and test folds
         """
-        return (train,test)
+        return (train,test, y_train, y_test)
 
     @timer
     def run_cv(self, raw_tick_data, model):
@@ -99,9 +99,11 @@ class AbstractMLPipeline(ABC):
         print(f"Starting Purged Cross-Validation ({self.config['n_splits']} folds)...")
         for i, (train_idx, test_idx) in enumerate(cv.split(X_raw, y)):
             # 1. Split
-            y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
-            X_train_raw, X_test_raw = self.cross_validation_feature_engineering(X_raw.iloc[train_idx], X_raw.iloc[test_idx], y_train)
-            sw_train = sw.iloc[train_idx]
+            X_train_raw, X_test_raw, y_train, y_test = self.cross_validation_feature_engineering(X_raw.iloc[train_idx], X_raw.iloc[test_idx], y.iloc[train_idx], y.iloc[test_idx])
+            sw_train = sw.loc[X_train_raw.index]
+            if X_train_raw.empty or X_test_raw.empty:
+                print(f"Skipping fold {i+1} due to empty features after engineering/alignment.")
+                continue
 
             # 2. Fit Scaler on TRAIN only
             scaler = StandardScaler()
