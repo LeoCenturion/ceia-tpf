@@ -25,7 +25,7 @@
 
 ## Phase 2: Integration and Configuration
 
-- [ ] Task: Write a failing test to ensure the `StrategyFactory` can create the `ChronosPalazzoStrategy`.
+- [x] Task: Write a failing test to ensure the `StrategyFactory` can create the `ChronosPalazzoStrategy`. d9bcbba
 - [ ] Task: Integrate the new strategy into the bot's `StrategyFactory`.
     - [ ] Modify `src/app/strategy.py` to import `ChronosPalazzoStrategy`.
     - [ ] Add a new case in the `create_strategy` method to handle `name='ChronosPalazzo'`.
