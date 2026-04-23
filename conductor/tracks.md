@@ -4,7 +4,7 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: Implement initial data acquisition and preprocessing for Bitcoin time series analysis.**
+- [x] **Track: Implement initial data acquisition and preprocessing for Bitcoin time series analysis.**
   *Link: [./tracks/data_acquisition_preprocessing_20260217/](./tracks/data_acquisition_preprocessing_20260217/)*
 
 ---
@@ -30,5 +30,10 @@ The requirements are
 
 ### **4. Interface Requirements**
 * **4.1. CLI Implementation:** Develop a Command Line Interface (CLI) application exposing robust commands (e.g., `start`, `stop`, `status`) to manage the system's operational lifecycle.
-* **4.2. Pre-flight Validation & Error Handling:** The CLI must perform pre-flight checks upon initialization. If required configurations, credentials, or parameters are missing or malformed, the system must abort startup and return clear, actionable, and strictly typed error messages to `stderr`.**
+* **4.2. Pre-flight Validation & Error Handling:** The CLI must perform pre-flight checks upon initialization. If required configurations, credentials, or parameters are missing or malformed, the system must abort startup and return clear, actionable, and strictly typed error messages to `stderr`.
   *Link: [./tracks/trading_bot_20260331/](./tracks/trading_bot_20260331/)*
+
+---
+
+- [ ] **Track: implement PalazzoChronosBinaryClassificationPipeline for the trading bot**
+*Link: [./tracks/chronos_strategy_20260421/](./tracks/chronos_strategy_20260421/)*

@@ -46594,3 +46594,5 @@ Traceback (most recent call last):
     raise RuntimeError('Not running with the Werkzeug Server')
 RuntimeError: Not running with the Werkzeug Server
 2026-04-02 14:14:36,282 - werkzeug - INFO - 127.0.0.1 - - [02/Apr/2026 14:14:36] "[35m[1mPOST /shutdown HTTP/1.1[0m" 500 -
+2026-04-02 18:01:13,423 - werkzeug - INFO - 127.0.0.1 - - [02/Apr/2026 18:01:13] "[33mGET / HTTP/1.1[0m" 404 -
+2026-04-02 18:01:13,586 - werkzeug - INFO - 127.0.0.1 - - [02/Apr/2026 18:01:13] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -

@@ -105,5 +105,6 @@ pythonpath = [
 [dependency-groups]
 dev = [
     "pytest (>=9.0.2,<10.0.0)",
-    "requests-mock (>=1.12.1,<2.0.0)"
+    "requests-mock (>=1.12.1,<2.0.0)",
+    "pytest-cov (>=7.1.0,<8.0.0)"
 ]
