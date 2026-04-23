@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 import pandas as pd
 
+from src.app.chronos_strategy import ChronosPalazzoStrategy
+
 class Strategy(ABC):
     @abstractmethod
     def get_signal(self, data):
@@ -48,5 +50,7 @@ class StrategyFactory:
     def create_strategy(name, **params):
         if name == 'macd':
             return MACDStrategy(**params)
+        elif name == 'ChronosPalazzo':
+            return ChronosPalazzoStrategy(params)
         else:
             raise ValueError(f"Strategy '{name}' not found.")

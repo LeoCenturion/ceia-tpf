@@ -1,6 +1,7 @@
 import unittest
 import pandas as pd
-from src.app.strategy import Strategy, MACDStrategy, StrategyFactory
+from src.app.strategy import Strategy, MACDStrategy, StrategyFactory, ChronosPalazzoStrategy
+from unittest.mock import patch
 
 class TestStrategy(unittest.TestCase):
     def test_strategy_interface(self):
@@ -14,9 +15,15 @@ class TestStrategy(unittest.TestCase):
         self.assertEqual(strategy.get_order_size(), 0)
 
 class TestStrategyFactory(unittest.TestCase):
-    def test_create_chronos_strategy_fails(self):
+    def test_create_unknown_strategy_fails(self):
         with self.assertRaises(ValueError):
-            StrategyFactory.create_strategy(name='ChronosPalazzo', config={})
+            StrategyFactory.create_strategy(name='UnknownStrategy', config={})
+
+    @patch('autogluon.timeseries.TimeSeriesPredictor.load')
+    def test_create_chronos_strategy_success(self, mock_load):
+        mock_load.return_value = 'mock_model'
+        strategy = StrategyFactory.create_strategy(name='ChronosPalazzo', model_path='/fake/path')
+        self.assertIsInstance(strategy, ChronosPalazzoStrategy)
 
 class TestMACDStrategy(unittest.TestCase):
     def setUp(self):
