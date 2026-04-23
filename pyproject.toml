@@ -4,7 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["leo centurion <centurionm.leo@gmail.com>"]
 readme = "README.md"
-package-mode = false
+packages = [{include = "src"}]
 
 [tool.poetry.dependencies]
 python = ">=3.12,<3.14"
@@ -97,10 +97,7 @@ exclude = [
 venvPath = "."
 venv = ".venv"
 
-[tool.pytest.ini_options]
-pythonpath = [
-  "."
-]
+
 
 [dependency-groups]
 dev = [
