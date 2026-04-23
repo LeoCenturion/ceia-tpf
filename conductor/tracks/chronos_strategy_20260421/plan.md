@@ -9,18 +9,18 @@
     - [x] Write a test that simulates receiving market data and asserts that the strategy returns a "BUY" signal when the mocked model's prediction is positive.
     - [x] Write a test that asserts the strategy returns a "SELL" signal when the mocked model's prediction is zero or negative.
     - [x] Write a test to verify that an error is logged and no signal is returned if the model prediction fails.
-- [ ] Task: Implement the `ChronosPalazzoStrategy` class in `src/app/chronos_strategy.py` to pass the tests.
-    - [ ] Implement the `__init__` method to load the `TimeSeriesPredictor` from a path provided in the config.
-    - [ ] Implement the `get_signal` method.
-        - [ ] Add logic to rename incoming DataFrame columns to match the training pipeline's expectations (`close` -> `close_price`, etc.).
-        - [ ] Instantiate `PalazzoChronosBinaryClassificationPipeline` to get access to its `step_2_feature_engineering` method.
-        - [ ] Call the feature engineering method to transform the raw data.
-        - [ ] Convert the resulting feature DataFrame into the `TimeSeriesDataFrame` format required by the predictor.
-        - [ ] Create the `known_covariates` DataFrame for future timestamps (e.g., by forward-filling the last known values).
-        - [ ] Wrap the `model.predict()` call in a try/except block.
-        - [ ] Implement the logic to convert the numerical prediction to a "BUY" (> 0) or "SELL" (<= 0) signal.
-        - [ ] In the case of an exception, log the error and return `None`.
-    - [ ] Implement a `get_order_size` method (e.g., returning a fixed default value).
+- [x] Task: Implement the `ChronosPalazzoStrategy` class in `src/app/chronos_strategy.py` to pass the tests. 7030847
+    - [x] Implement the `__init__` method to load the `TimeSeriesPredictor` from a path provided in the config.
+    - [x] Implement the `get_signal` method.
+        - [x] Add logic to rename incoming DataFrame columns to match the training pipeline's expectations (`close` -> `close_price`, etc.).
+        - [x] Instantiate `PalazzoChronosBinaryClassificationPipeline` to get access to its `step_2_feature_engineering` method.
+        - [x] Call the feature engineering method to transform the raw data.
+        - [x] Convert the resulting feature DataFrame into the `TimeSeriesDataFrame` format required by the predictor.
+        - [x] Create the `known_covariates` DataFrame for future timestamps (e.g., by forward-filling the last known values).
+        - [x] Wrap the `model.predict()` call in a try/except block.
+        - [x] Implement the logic to convert the numerical prediction to a "BUY" (> 0) or "SELL" (<= 0) signal.
+        - [x] In the case of an exception, log the error and return `None`.
+    - [x] Implement a `get_order_size` method (e.g., returning a fixed default value).
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Strategy Implementation' (Protocol in workflow.md)
 
 ## Phase 2: Integration and Configuration
