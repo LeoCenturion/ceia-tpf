@@ -4,15 +4,14 @@ import numpy as np
 import pandas as pd
 from scipy.signal import find_peaks
 
-from src.data_analysis.data_analysis import ewm, sma, std
 from src.constants import (
-    OPEN_COL,
+    CLOSE_COL,
     HIGH_COL,
     LOW_COL,
-    CLOSE_COL,
+    OPEN_COL,
     VOLUME_COL,
-    TIMESTAMP_COL,
 )
+from src.data_analysis.data_analysis import ewm, sma, std
 
 
 def awesome_oscillator(
@@ -60,7 +59,7 @@ def mfi(
 
     with np.errstate(divide="ignore", invalid="ignore"):
         money_ratio = positive_mf / negative_mf
-        mfi_series = 100 - (100 / (1 + money_ratio))
+        mfi_series = pd.Series(100 - (100 / (1 + money_ratio)), index=close.index)
     mfi_series.replace([np.inf, -np.inf], 100, inplace=True)
     return mfi_series
 
@@ -113,7 +112,7 @@ def ultimate_oscillator(  # pylint: disable=too-many-arguments, too-many-locals
     fast: int = 7,
     medium: int = 14,
     slow: int = 28,
-):
+) -> pd.DataFrame:
     """Calculate the Ultimate Oscillator."""
     close_prev = close.shift(1).bfill()
     bp = close - pd.concat([low, close_prev], axis=1).min(axis=1)
@@ -138,7 +137,7 @@ def ultimate_oscillator(  # pylint: disable=too-many-arguments, too-many-locals
 
 def true_strength_index(
     close: pd.Series, fast: int = 13, slow: int = 25, signal: int = 13
-):
+) -> pd.DataFrame:
     """Calculate the True Strength Index."""
     pc = close.diff(1)
     pc_ema_fast = ewm(pc, span=fast)
@@ -153,7 +152,7 @@ def true_strength_index(
     return pd.DataFrame({f"TSI_{slow}_{fast}": tsi, f"TSIs_{slow}_{fast}": signal_line})
 
 
-def adx(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14):  # pylint: disable=too-many-locals
+def adx(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14) -> pd.DataFrame:  # pylint: disable=too-many-locals
     """Calculate the Average Directional Movement Index."""
     up = high.diff()
     down = -low.diff()
@@ -192,7 +191,7 @@ def cci(
     return cci_series
 
 
-def rsi_indicator(series, n=14):
+def rsi_indicator(series, n=14) -> pd.Series:
     delta = pd.Series(series).diff()
     gain = delta.where(delta > 0, 0)
     loss = -delta.where(delta < 0, 0)
@@ -204,7 +203,7 @@ def rsi_indicator(series, n=14):
     return 100 - (100 / (1 + rs))
 
 
-def momentum_indicator(series, window=10):
+def momentum_indicator(series, window=10) -> pd.Series:
     return pd.Series(series).diff(window)
 
 
@@ -237,7 +236,7 @@ def stc(
     )
 
 
-def vortex(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14):
+def vortex(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14) -> pd.DataFrame:
     """Calculate the Vortex Indicator."""
     tr = true_range(high, low, close)
 
@@ -254,7 +253,7 @@ def vortex(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14):
     return pd.DataFrame({f"VTXP_{n}": vip, f"VTXM_{n}": vim})
 
 
-def bollinger_bands(close: pd.Series, n: int = 20, std_dev: float = 2.0):
+def bollinger_bands(close: pd.Series, n: int = 20, std_dev: float = 2.0) -> pd.DataFrame:
     """Calculate Bollinger Bands."""
     sma_val = sma(close, n)
     std_val = std(close, n)
@@ -277,7 +276,7 @@ def keltner_channels(  # pylint: disable=too-many-arguments
     n_ema: int = 20,
     n_atr: int = 20,
     multiplier: float = 2.0,
-):
+) -> pd.DataFrame:
     """Calculate Keltner Channels."""
     ema_val = ewm(close, span=n_ema)
     atr_val = atr(high, low, close, n=n_atr)
@@ -288,21 +287,21 @@ def keltner_channels(  # pylint: disable=too-many-arguments
     )
 
 
-def donchian_channels(high: pd.Series, low: pd.Series, n: int = 20):
+def donchian_channels(high: pd.Series, low: pd.Series, n: int = 20) -> pd.DataFrame:
     """Calculate Donchian Channels."""
     upper = high.rolling(n).max()
     lower = low.rolling(n).min()
     return pd.DataFrame({f"DCU_{n}_{n}": upper, f"DCL_{n}_{n}": lower})
 
 
-def volume_oscillator(volume: pd.Series, short_period: int = 14, long_period: int = 28):
+def volume_oscillator(volume: pd.Series, short_period: int = 14, long_period: int = 28) -> pd.Series:
     """Calculates the Volume Oscillator."""
     short_ma = sma(volume, short_period)
     long_ma = sma(volume, long_period)
     return 100 * (short_ma - long_ma) / long_ma.replace(0, 1e-9)
 
 
-def kama(close: pd.Series, n: int = 10, pow1: int = 2, pow2: int = 30):
+def kama(close: pd.Series, n: int = 10, pow1: int = 2, pow2: int = 30) -> pd.Series:
     """Calculates Kaufman's Adaptive Moving Average (KAMA)."""
     # Efficiency Ratio
     change = abs(close - close.shift(n))
@@ -332,7 +331,7 @@ def kama(close: pd.Series, n: int = 10, pow1: int = 2, pow2: int = 30):
     return pd.Series(kama_arr, index=close.index)
 
 
-def volume_price_trend(close: pd.Series, volume: pd.Series):
+def volume_price_trend(close: pd.Series, volume: pd.Series) -> pd.Series:
     """Calculates the Volume Price Trend (VPT)."""
     vpt = volume * close.pct_change()
     return vpt.cumsum()
@@ -340,7 +339,7 @@ def volume_price_trend(close: pd.Series, volume: pd.Series):
 
 def chaikin_money_flow(
     high: pd.Series, low: pd.Series, close: pd.Series, volume: pd.Series, n: int = 20
-):
+) -> pd.Series:
     """Calculates Chaikin Money Flow (CMF)."""
     # Money Flow Multiplier
     mf_multiplier = ((close - low) - (high - close)) / (high - low).replace(0, 1e-9)
@@ -350,7 +349,7 @@ def chaikin_money_flow(
     return mf_volume.rolling(n).sum() / volume.rolling(n).sum().replace(0, 1e-9)
 
 
-def rolling_z_score(series: pd.Series, window: int = 20):
+def rolling_z_score(series: pd.Series, window: int = 20) -> pd.Series:
     """Calculates the rolling Z-Score."""
     mean = series.rolling(window).mean()
     std_dev = series.rolling(window).std(ddof=0)

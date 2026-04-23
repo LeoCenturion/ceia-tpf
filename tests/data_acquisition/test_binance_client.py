@@ -1,9 +1,12 @@
 # tests/data_acquisition/test_binance_client.py
 
 import unittest
-from unittest.mock import patch, MagicMock
-from src.data_acquisition.binance_client import BinanceClient
+from unittest.mock import MagicMock, patch
+
 from binance.exceptions import BinanceAPIException
+
+from src.data_acquisition.binance_client import BinanceClient
+
 
 class TestBinanceClient(unittest.TestCase):
     """

@@ -1,7 +1,8 @@
 import unittest
-import os
 from unittest.mock import patch
+
 from src.app.exchange import BinanceClient
+
 
 class TestBinanceClient(unittest.TestCase):
     @patch('src.app.exchange.Client')

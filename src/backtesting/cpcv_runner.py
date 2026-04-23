@@ -1,19 +1,21 @@
 import logging
-import mlflow
-import pandas as pd
-import numpy as np
+from typing import Type
 
-from src.backtesting.cpcv import (
-    partition_data,
-    generate_combinatorial_splits,
-    get_purged_train_test_split,
-    construct_backtest_paths,
-)
+import mlflow
+import numpy as np
+import pandas as pd
+
 from src.backtesting.backtesting import TrialStrategy
+from src.backtesting.cpcv import (
+    construct_backtest_paths,
+    generate_combinatorial_splits,
+    purge_and_embargo_split,
+    time_based_partition,
+)
 from src.backtesting.strategies.statistical_strategies import SmaCross
-from src.data_analysis.data_analysis import fetch_historical_data, adjust_data_to_ubtc
-from src.modeling.mlflow_utils import MLflowLogger
+from src.data_analysis.data_analysis import adjust_data_to_ubtc, fetch_historical_data
 from src.modeling.chronos_metalabeling_pipeline import ChronosMetaLabelingPipeline
+from src.modeling.mlflow_utils import MLflowLogger
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +23,7 @@ logger = logging.getLogger(__name__)
 def run_cpcv_for_strategy(
     data: pd.DataFrame,
     t1: pd.Series,
-    strategy_class: TrialStrategy,
+    strategy_class: Type[TrialStrategy],
     strategy_params: dict,
     n_groups: int,
     k_test_groups: int,
@@ -47,21 +49,30 @@ def run_cpcv_for_strategy(
         mlflow_logger.log_params(strategy_params)
 
         # --- Step 4: Generate OOS predictions for all splits ---
-        groups = partition_data(data, n_groups)
+        path_indices = time_based_partition(pd.to_datetime(data.index), n_groups)
         logger.info(f"Data partitioned into {n_groups} groups.")
 
         splits = generate_combinatorial_splits(n_groups, k_test_groups)
         logger.info(f"Generated {len(splits)} combinatorial splits.")
 
-        all_predictions = {i: [] for i in range(n_groups)}
+        split_predictions = []
 
         for i, (train_split, test_split) in enumerate(splits):
-            logger.info(f"Processing split {i+1}/{len(splits)}: Train={train_split}, Test={test_split}")
-            train_indices = pd.concat([groups[i] for i in train_split]).index
-            test_indices = pd.concat([groups[i] for i in test_split]).index
-            _train_data, test_data = get_purged_train_test_split(
-                data, t1, train_indices, test_indices, embargo_pct
+            logger.info(
+                f"Processing split {i + 1}/{len(splits)}: Train={train_split}, Test={test_split}"
             )
+            train_indices, test_indices = purge_and_embargo_split(
+                data, t1, path_indices, train_split, test_split, embargo_pct
+            )
+
+            if test_indices.size == 0 or train_indices.size == 0:
+                logger.warning(
+                    f"Skipping split {i+1} due to empty train or test set after purging."
+                )
+                continue
+
+            _train_data, test_data = data.iloc[train_indices], data.iloc[test_indices]
+            y_test = data["Close"].iloc[test_indices]
 
             # If using ChronosMetaLabelingCPCVStrategy, train the pipeline here
             if strategy_class.__name__ == "ChronosMetaLabelingCPCVStrategy":
@@ -72,7 +83,9 @@ def run_cpcv_for_strategy(
                     )
 
                     train_df = _train_data
-                    logger.debug(f"Fitting ChronosMetaLabelingPipeline with train_df of shape: {train_df.shape}")
+                    logger.debug(
+                        f"Fitting ChronosMetaLabelingPipeline with train_df of shape: {train_df.shape}"
+                    )
 
                     # Fit the pipeline on the current training data
                     current_pipeline.fit(
@@ -91,7 +104,9 @@ def run_cpcv_for_strategy(
                         },
                     )
                 except ValueError as e:
-                    logger.debug(f"Skipping split due to error during pipeline fitting: {e}")
+                    logger.debug(
+                        f"Skipping split due to error during pipeline fitting: {e}"
+                    )
                     continue  # Skip to the next split
             else:
                 # Existing logic for other strategies
@@ -101,22 +116,24 @@ def run_cpcv_for_strategy(
 
             predictions = strategy_instance.predict(test_data)
 
-            for group_idx in test_split:
-                group_data = groups[group_idx]
-                group_predictions = predictions[
-                    predictions.index.isin(group_data.index)
-                ]
-                print(f'added {len(group_prediction)} predictions')
-                all_predictions[group_idx].append(group_predictions)
+            split_predictions.append(
+                {
+                    "test_path_idxs": test_split,
+                    "preds": predictions,
+                    "y_test": y_test,
+                }
+            )
 
         # --- Step 5: Construct backtest paths ---
-        paths = construct_backtest_paths(all_predictions, n_groups, k_test_groups)
+        paths = construct_backtest_paths(split_predictions, n_groups, k_test_groups)
 
         logging.info(f"Constructed {len(paths)} backtest paths.")
 
         # --- Step 6: Evaluate each path and log to MLflow ---
         path_sharpe_ratios = []
-        for i, path_predictions in enumerate(paths):
+        for i, path in enumerate(paths):
+            path_predictions = path["y_pred"]
+            path_y_true = path["y_true"]
             with mlflow.start_run(run_name=f"path_{i + 1}", nested=True):
                 # Here, you would calculate the performance of the path.
                 # For example, calculate returns based on the signals
@@ -124,14 +141,13 @@ def run_cpcv_for_strategy(
 
                 # Dummy calculation for now:
                 path_returns = (
-                    data["Close"].pct_change().loc[path_predictions.index]
-                    * path_predictions
+                    pd.Series(path_y_true).pct_change() * path_predictions
                 )
                 path_sharpe = (
                     path_returns.mean() / path_returns.std() * np.sqrt(365 * 24)
                 )  # Annualized Sharpe for hourly data
                 if np.isinf(path_sharpe) or np.isnan(path_sharpe):
-                    path_sharpe = 0
+                    path_sharpe = 0.0
                 path_sharpe_ratios.append(path_sharpe)
 
                 mlflow.log_metric("sharpe_ratio", path_sharpe)

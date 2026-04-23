@@ -1,28 +1,30 @@
 import logging
-logger = logging.getLogger(__name__)
-import pandas as pd
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
-from backtesting import Strategy
-from sklearn.svm import SVC
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import StandardScaler
+import pandas as pd
 import xgboost as xgb
+from numpy.typing import NDArray
+from pandas import DataFrame, Index, Series
 from scipy.signal import find_peaks
 from scipy.stats import pearsonr
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
 from sklearn.utils.class_weight import compute_class_weight
 
-
+from backtesting import Strategy
 from src.backtesting.backtesting import run_optimizations
-from src.data_analysis.data_analysis import ewm, sma, std
-from src.data_analysis.indicators import momentum_indicator, rsi_indicator
 from src.constants import (
-    OPEN_COL,
+    CLOSE_COL,
     HIGH_COL,
     LOW_COL,
-    CLOSE_COL,
-    VOLUME_COL,
-    TIMESTAMP_COL,
+    OPEN_COL,
 )
+from src.data_analysis.data_analysis import ewm, sma, std
+from src.data_analysis.indicators import momentum_indicator, rsi_indicator
+
+logger = logging.getLogger(__name__)
 
 
 def _create_features(data):
@@ -123,7 +125,7 @@ def mfi(
 
     with np.errstate(divide="ignore", invalid="ignore"):
         money_ratio = positive_mf / negative_mf
-        mfi_series = 100 - (100 / (1 + money_ratio))
+        mfi_series = pd.Series(100 - (100 / (1 + money_ratio)), index=close.index)
     mfi_series.replace([np.inf, -np.inf], 100, inplace=True)
     return mfi_series
 
@@ -162,7 +164,8 @@ def willr(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14) -> pd.
 
 
 def roc(close: pd.Series, n: int = 10) -> pd.Series:
-    return (close.diff(n) / close.shift(n)).replace([np.inf, -np.inf], 0) * 100
+    roc_series = (close.diff(n) / close.shift(n)) * 100
+    return roc_series.replace([np.inf, -np.inf], 0)
 
 
 def ultimate_oscillator(
@@ -341,7 +344,9 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
     close_pct = df[CLOSE_COL].pct_change().fillna(0)
     features["pct_change"] = close_pct
     features["RSI_pct"] = rsi_indicator(close_pct, n=14)
-    stoch_pct = stochastic_oscillator(high_pct, low_pct, close_pct)
+    stoch_pct = stochastic_oscillator(
+        pd.Series(high_pct), pd.Series(low_pct), pd.Series(close_pct)
+    )
     features["Stoch_K_pct"] = stoch_pct["%K"]
     features["Stoch_D_pct"] = stoch_pct["%D"]
     macd_pct_df = macd(close_pct)
@@ -349,14 +354,20 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
     features["MACD_Signal_pct"] = macd_pct_df["Signal"]
     features["MACD_Hist_pct"] = macd_pct_df["Hist"]
     if "Volume" in df.columns:
-        features["MFI_pct"] = mfi(high_pct, low_pct, close_pct, df["Volume"], n=14)
+        features["MFI_pct"] = mfi(
+            pd.Series(high_pct),
+            pd.Series(low_pct),
+            pd.Series(close_pct),
+            pd.Series(df["Volume"]),
+            n=14,
+        )
     sma20_pct = sma(close_pct, 20)
     std20_pct = std(close_pct, 20)
     features["BB_Upper_pct"] = sma20_pct + (std20_pct * 2)
     features["BB_Lower_pct"] = sma20_pct - (std20_pct * 2)
     features["BB_Width_pct"] = (
         features["BB_Upper_pct"] - features["BB_Lower_pct"]
-    ) / sma20_pct
+    ) / sma20_pct.replace(0, 1e-9)
 
     # Lagged pct_change features
     for lag in range(1, 6):
@@ -370,44 +381,73 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
     # Volume
     if "Volume" in df.columns:
         features["Volume"] = df["Volume"]
-        features["avg_volume_20"] = sma(df["Volume"], 20)
+        features["avg_volume_20"] = sma(pd.Series(df["Volume"]), 20)
 
     # Momentum Indicators
-    features["RSI"] = rsi_indicator(df[CLOSE_COL], n=14)
-    features["AO"] = awesome_oscillator(df["High"], df["Low"])
-    features["WR"] = willr(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])
-    features["ROC"] = roc(df[CLOSE_COL])
+    features["RSI"] = rsi_indicator(pd.Series(df[CLOSE_COL]), n=14)
+    features["AO"] = awesome_oscillator(pd.Series(df["High"]), pd.Series(df["Low"]))
+    features["WR"] = willr(
+        pd.Series(df[HIGH_COL]), pd.Series(df[LOW_COL]), pd.Series(df[CLOSE_COL])
+    )
+    features["ROC"] = roc(pd.Series(df[CLOSE_COL]))
     features = pd.concat(
-        [features, ultimate_oscillator(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])],
+        [
+            features,
+            ultimate_oscillator(
+                pd.Series(df[HIGH_COL]),
+                pd.Series(df[LOW_COL]),
+                pd.Series(df[CLOSE_COL]),
+            ),
+        ],
         axis=1,
     )
-    features = pd.concat([features, true_strength_index(df[CLOSE_COL])], axis=1)
-    stoch_price = stochastic_oscillator(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])
+    features = pd.concat(
+        [features, true_strength_index(pd.Series(df[CLOSE_COL]))], axis=1
+    )
+    stoch_price = stochastic_oscillator(
+        pd.Series(df[HIGH_COL]), pd.Series(df[LOW_COL]), pd.Series(df[CLOSE_COL])
+    )
     features["Stoch_K"] = stoch_price["%K"]
     features["Stoch_D"] = stoch_price["%D"]
 
     # Trend Indicators
-    macd_price_df = macd(df[CLOSE_COL])
+    macd_price_df = macd(pd.Series(df[CLOSE_COL]))
     features["MACD"] = macd_price_df["MACD"]
     features["MACD_Signal"] = macd_price_df["Signal"]
     features["MACD_Hist"] = macd_price_df["Hist"]
     features = pd.concat(
-        [features, adx(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])], axis=1
+        [
+            features,
+            adx(
+                pd.Series(df[HIGH_COL]),
+                pd.Series(df[LOW_COL]),
+                pd.Series(df[CLOSE_COL]),
+            ),
+        ],
+        axis=1,
     )
-    features = pd.concat([features, aroon(df[HIGH_COL], df[LOW_COL])], axis=1)
-    features["CCI"] = cci(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])
-    features = pd.concat([features, stc(df[CLOSE_COL])], axis=1)
-    vortex_df = vortex(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])
+    features = pd.concat(
+        [features, aroon(pd.Series(df[HIGH_COL]), pd.Series(df[LOW_COL]))], axis=1
+    )
+    features["CCI"] = cci(
+        pd.Series(df[HIGH_COL]), pd.Series(df[LOW_COL]), pd.Series(df[CLOSE_COL])
+    )
+    features = pd.concat([features, stc(pd.Series(df[CLOSE_COL]))], axis=1)
+    vortex_df = vortex(
+        pd.Series(df[HIGH_COL]), pd.Series(df[LOW_COL]), pd.Series(df[CLOSE_COL])
+    )
     features = pd.concat([features, vortex_df], axis=1)
     if "VTXP_14" in features.columns and "VTXM_14" in features.columns:
         features["VORTEX_diff"] = features["VTXP_14"] - features["VTXM_14"]
 
     # Fluctuation Indicators
-    bbands = bollinger_bands(df[CLOSE_COL])
+    bbands = bollinger_bands(pd.Series(df[CLOSE_COL]))
     if bbands is not None and not bbands.empty:
         features["BBP"] = bbands.get("BBP_20_2.0")
 
-    keltner = keltner_channels(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])
+    keltner = keltner_channels(
+        pd.Series(df[HIGH_COL]), pd.Series(df[LOW_COL]), pd.Series(df[CLOSE_COL])
+    )
     if keltner is not None and not keltner.empty:
         kcu = keltner.get("KCU_20_2.0")
         kcl = keltner.get("KCL_20_2.0")
@@ -415,7 +455,7 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
             kc_range = kcu - kcl
             features["KCP"] = (df[CLOSE_COL] - kcl) / kc_range.replace(0, np.nan)
 
-    donchian = donchian_channels(df[HIGH_COL], df[LOW_COL])
+    donchian = donchian_channels(pd.Series(df[HIGH_COL]), pd.Series(df[LOW_COL]))
     if donchian is not None and not donchian.empty:
         dcu = donchian.get("DCU_20_20")
         dcl = donchian.get("DCL_20_20")
@@ -427,7 +467,7 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
     emas = [10, 15, 20, 30, 40, 50, 60]
     for e in emas:
         features[f"above_ema_{e}"] = (
-            df[CLOSE_COL] > ewm(df[CLOSE_COL], span=e)
+            df[CLOSE_COL] > ewm(pd.Series(df[CLOSE_COL]), span=e)
         ).astype(int)
 
     # Consecutive run feature
@@ -473,6 +513,7 @@ def create_target_variable(
         df.loc[future_pct_change <= -(rolling_std * std_fraction), "target"] = -1
         return df
 
+    ao: Optional[pd.Series] = None
     if method == "ao_on_pct_change":
         # computing the peaks from the awesome oscillator from the pct_change of the values
         high_pct = df[HIGH_COL].pct_change().fillna(0)
@@ -544,12 +585,12 @@ class SVCStrategy(Strategy):  # pylint: disable=attribute-defined-outside-init
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.model = None
-        self.scaler = None
-        self.features = None
-        self.target = None
-        self.y_true = []
-        self.y_pred = []
+        self.model: Optional[SVC] = None
+        self.scaler: Optional[StandardScaler] = None
+        self.features: Optional[NDArray[np.float64]] = None
+        self.target: Optional[NDArray[np.int64]] = None
+        self.y_true: List[int] = []
+        self.y_pred: List[int] = []
 
     def init(self):
         self.scaler = StandardScaler()
@@ -572,14 +613,15 @@ class SVCStrategy(Strategy):  # pylint: disable=attribute-defined-outside-init
             X_train_raw = self.features[-self.lookback_length : -1]
             y_train = self.target[-self.lookback_length : -1]
 
-            X_train = self.scaler.fit_transform(X_train_raw)
-            self.model = SVC(
-                kernel=self.kernel, C=self.C, gamma=self.gamma, probability=True
-            )
-            self.model.fit(X_train, y_train)
+            if self.scaler:
+                X_train = self.scaler.fit_transform(X_train_raw)
+                self.model = SVC(
+                    kernel=self.kernel, C=self.C, gamma=self.gamma, probability=True
+                )
+                self.model.fit(X_train, y_train)
 
         # Make prediction and trade if the model is trained
-        if self.model:
+        if self.model and self.scaler:
             current_features = self.features[-1].reshape(1, -1)
             scaled_features = self.scaler.transform(current_features)
             prediction = self.model.predict(scaled_features)[0]
@@ -607,7 +649,7 @@ class RandomForestClassifierStrategy(Strategy):  # pylint: disable=attribute-def
     n_estimators = 100
     max_depth = 10
     min_samples_split = 10
-    max_features = 0.5
+    max_features: float = 0.5
 
     # Strategy Parameters
     refit_period = 24 * 7
@@ -615,12 +657,12 @@ class RandomForestClassifierStrategy(Strategy):  # pylint: disable=attribute-def
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.model = None
-        self.scaler = None
-        self.features = None
-        self.target = None
-        self.y_true = []
-        self.y_pred = []
+        self.model: Optional[RandomForestClassifier] = None
+        self.scaler: Optional[StandardScaler] = None
+        self.features: Optional[NDArray[np.float64]] = None
+        self.target: Optional[NDArray[np.int64]] = None
+        self.y_true: List[int] = []
+        self.y_pred: List[int] = []
 
     def init(self):
         self.scaler = StandardScaler()
@@ -641,19 +683,20 @@ class RandomForestClassifierStrategy(Strategy):  # pylint: disable=attribute-def
             X_train_raw = self.features[-self.lookback_length : -1]
             y_train = self.target[-self.lookback_length : -1]
 
-            X_train = self.scaler.fit_transform(X_train_raw)
+            if self.scaler:
+                X_train = self.scaler.fit_transform(X_train_raw)
 
-            self.model = RandomForestClassifier(
-                n_estimators=self.n_estimators,
-                max_depth=self.max_depth,
-                min_samples_split=self.min_samples_split,
-                max_features=self.max_features,
-                random_state=42,
-                n_jobs=-1,
-            )
-            self.model.fit(X_train, y_train)
+                self.model = RandomForestClassifier(
+                    n_estimators=self.n_estimators,
+                    max_depth=self.max_depth,
+                    min_samples_split=self.min_samples_split,
+                    max_features=self.max_features,  # type: ignore
+                    random_state=42,
+                    n_jobs=-1,
+                )
+                self.model.fit(X_train, y_train)
 
-        if self.model:
+        if self.model and self.scaler:
             current_features = self.features[-1].reshape(1, -1)
             scaled_features = self.scaler.transform(current_features)
             prediction = self.model.predict(scaled_features)[0]
@@ -697,13 +740,13 @@ class XGBoostPriceReversalStrategy(Strategy):  # pylint: disable=attribute-defin
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.model = None
-        self.scaler = None
-        self.selected_cols = None
-        self.features_df = None
-        self.target_series = None
-        self.y_true = []
-        self.y_pred = []
+        self.model: Optional[xgb.XGBClassifier] = None
+        self.scaler: Optional[StandardScaler] = None
+        self.selected_cols: Optional[List[str]] = None
+        self.features_df: Optional[pd.DataFrame] = None
+        self.target_series: Optional[pd.Series] = None
+        self.y_true: List[int] = []
+        self.y_pred: List[int] = []
 
     def init(self):
         self.scaler = StandardScaler()
@@ -718,12 +761,14 @@ class XGBoostPriceReversalStrategy(Strategy):  # pylint: disable=attribute-defin
             peak_threshold=self.peak_threshold,
         )
         y = reversal_data["target"]
-        self.target_series = y.map({-1: 0, 0: 1, 1: 2}).bfill().ffill()
+        self.target_series = y.map(lambda x: {-1: 0, 0: 1, 1: 2}.get(x, x)).bfill().ffill()
 
     def next(self):
         # Retrain the model periodically
         if (
-            len(self.data) > self.lookback_length
+            self.features_df is not None
+            and self.target_series is not None
+            and len(self.data) > self.lookback_length
             and len(self.data) % self.refit_period == 0
         ):
             end_idx = len(self.data) - 1
@@ -736,45 +781,47 @@ class XGBoostPriceReversalStrategy(Strategy):  # pylint: disable=attribute-defin
             y_train = y_train_series.values
 
             # Scale and fit
-            X_train = self.scaler.fit_transform(X_train_raw)
+            if self.scaler:
+                X_train = self.scaler.fit_transform(X_train_raw)
 
-            # Class weights
-            classes = np.unique(y_train)
-            weights = compute_class_weight(
-                class_weight="balanced", classes=classes, y=y_train
-            )
-            class_weight_dict = dict(zip(classes, weights))
-            sample_weights = y_train_series.map(class_weight_dict).to_numpy()
+                # Class weights
+                classes = np.unique(y_train)
+                weights = compute_class_weight(
+                    class_weight="balanced", classes=classes, y=y_train
+                )
+                class_weight_dict = dict(zip(classes, weights))
+                sample_weights = y_train_series.map(class_weight_dict).to_numpy()
 
-            self.model = xgb.XGBClassifier(
-                n_estimators=self.n_estimators,
-                learning_rate=self.learning_rate,
-                max_depth=self.max_depth,
-                subsample=self.subsample,
-                colsample_bytree=self.colsample_bytree,
-                gamma=self.gamma,
-                min_child_weight=self.min_child_weight,
-                objective="multi:softmax",
-                num_class=3,
-                eval_metric="mlogloss",
-                tree_method="hist",
-                # device='cuda', # Uncomment if you have a CUDA-enabled GPU and XGBoost with GPU support
-                random_state=42,
-                n_jobs=-1,
-            )
-            self.model.fit(X_train, y_train, sample_weight=sample_weights)
+                self.model = xgb.XGBClassifier(
+                    n_estimators=self.n_estimators,
+                    learning_rate=self.learning_rate,
+                    max_depth=self.max_depth,
+                    subsample=self.subsample,
+                    colsample_bytree=self.colsample_bytree,
+                    gamma=self.gamma,
+                    min_child_weight=self.min_child_weight,
+                    objective="multi:softmax",
+                    num_class=3,
+                    eval_metric="mlogloss",
+                    tree_method="hist",
+                    # device='cuda', # Uncomment if you have a CUDA-enabled GPU and XGBoost with GPU support
+                    random_state=42,
+                    n_jobs=-1,
+                )
+                self.model.fit(X_train, y_train, sample_weight=sample_weights)
 
         # Make prediction and trade if the model is trained
-        if self.model:
+        if self.model and self.scaler and self.features_df is not None:
             current_features_all = self.features_df.iloc[len(self.data) - 1]
             current_features_selected = current_features_all.values.reshape(1, -1)
 
             scaled_features = self.scaler.transform(current_features_selected)
             prediction = self.model.predict(scaled_features)[0]
 
-            true_label = self.target_series.iloc[len(self.data) - 1]
-            self.y_true.append(true_label)
-            self.y_pred.append(prediction)
+            if self.target_series is not None:
+                true_label = self.target_series.iloc[len(self.data) - 1]
+                self.y_true.append(true_label)
+                self.y_pred.append(prediction)
 
             # Trading logic: Buy on bottom, sell/close on top
             if prediction == 0 and not self.position.is_long:  # Bottom signal

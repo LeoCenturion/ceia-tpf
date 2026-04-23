@@ -1,23 +1,24 @@
-import pandas as pd
+from functools import partial
+
+import cupy as cp
 import numpy as np
+import optuna
+import pandas as pd
 import xgboost as xgb
 from scipy.stats import pearsonr
-import optuna
-from functools import partial
-from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, classification_report
+from sklearn.preprocessing import StandardScaler
 from sklearn.utils.class_weight import compute_class_weight
-import cupy as cp
-from src.data_analysis.data_analysis import fetch_historical_data, sma, ewm, std
-from src.data_analysis.indicators import rsi_indicator
+
 from src.constants import (
-    OPEN_COL,
+    CLOSE_COL,
     HIGH_COL,
     LOW_COL,
-    CLOSE_COL,
+    OPEN_COL,
     VOLUME_COL,
-    TIMESTAMP_COL,
 )
+from src.data_analysis.data_analysis import ewm, fetch_historical_data, sma, std
+from src.data_analysis.indicators import rsi_indicator
 
 # --- Part 1: Data Simulation and Volume Bar Creation ---
 # The paper uses high-frequency data to construct volume bars.
@@ -342,7 +343,7 @@ def aggregate_to_volume_bars(df, volume_threshold=50000):
 # --- Part 2: Target Labeling and Feature Engineering ---
 
 
-def create_labels(df, tau=0.35):
+def create_labels(df, tau=0.35) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Creates target labels based on the triple-barrier method variation
     described in Section 3.3.2, Equation 3.1.

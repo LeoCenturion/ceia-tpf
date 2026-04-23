@@ -1,13 +1,16 @@
 import logging
-logger = logging.getLogger(__name__)
+
+
 import os
 
 import mlflow
-import pandas as pd
 import numpy as np
-from autogluon.timeseries import TimeSeriesPredictor, TimeSeriesDataFrame
+import pandas as pd
+from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
 
 from src.backtesting.backtesting import TrialStrategy, run_optimizations
+
+logger = logging.getLogger(__name__)
 
 
 class ChronosStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
@@ -28,9 +31,9 @@ class ChronosStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outsi
         Initialize the strategy.
         """
         super().__init__(*args, **kwargs)
-        self.predictor = None
+        self.predictor: TimeSeriesPredictor | None = None
         self.periods_since_refit = np.inf  # Force refit on first valid occasion
-        self.predictions_df = pd.DataFrame()
+        self.predictions_df: pd.DataFrame = pd.DataFrame()
         self._last_prediction = None
         self.backtest_start_index = 0
 
@@ -71,10 +74,14 @@ class ChronosStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outsi
                     }
                 },
             )
-            logger.debug(f"[{initial_train_df.index[-1]}] Initial fine-tuning complete.")
+            logger.debug(
+                f"[{initial_train_df.index[-1]}] Initial fine-tuning complete."
+            )
             self.periods_since_refit = 0  # Reset counter
         except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.debug(f"[{initial_train_df.index[-1]}] Initial model fitting failed: {e}")
+            logger.debug(
+                f"[{initial_train_df.index[-1]}] Initial model fitting failed: {e}"
+            )
             self.predictor = None
             self.periods_since_refit = np.inf
 
@@ -121,9 +128,9 @@ class ChronosStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outsi
                 self.predictor = None  # Ensure predictor is None if fit fails
 
         if self._last_prediction is not None:
-            prediction_timestamp = self._last_prediction.index.get_level_values(
-                "timestamp"
-            )[0]
+            prediction_timestamp = pd.Timestamp(
+                self._last_prediction.index.get_level_values("timestamp")[0]
+            )
             if prediction_timestamp == self.data.index[-1]:
                 log_entry = self._last_prediction.iloc[0].to_dict()
                 log_entry["actual_close"] = self.data.Close[-1]
@@ -206,7 +213,7 @@ class PrecomputedChronosStrategy(TrialStrategy):
         Initialize the strategy and load pre-computed predictions.
         """
         super().__init__(*args, **kwargs)
-        self.predictions_df = pd.DataFrame()
+        self.predictions_df: pd.DataFrame = pd.DataFrame()
 
     def init(self):
         try:
@@ -215,8 +222,11 @@ class PrecomputedChronosStrategy(TrialStrategy):
                 self.predictions_file, index_col=0, parse_dates=True
             )
             # Ensure the index is timezone-naive to match backtesting.py data
-            if self.predictions_df.index.tz is not None:
-                self.predictions_df.index = self.predictions_df.index.tz_localize(None)
+            if isinstance(self.predictions_df.index, pd.DatetimeIndex):
+                if self.predictions_df.index.tz is not None:
+                    self.predictions_df.index = self.predictions_df.index.tz_localize(
+                        None
+                    )
         except FileNotFoundError:
             logger.debug(
                 f"Error: Predictions file not found at '{self.predictions_file}'. This strategy requires pre-computed predictions."

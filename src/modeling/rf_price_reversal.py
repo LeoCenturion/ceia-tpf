@@ -1,24 +1,23 @@
-import pandas as pd
-import numpy as np
-from scipy.stats import pearsonr
-from scipy.signal import find_peaks
-import optuna
 from functools import partial
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report, accuracy_score
-from sklearn.preprocessing import StandardScaler
-import mplfinance as mpf
 
-from src.data_analysis.data_analysis import fetch_historical_data, sma, ewm, std
-from src.data_analysis.indicators import rsi_indicator
+import mplfinance as mpf
+import numpy as np
+import optuna
+import pandas as pd
+from scipy.signal import find_peaks
+from scipy.stats import pearsonr
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report
+from sklearn.preprocessing import StandardScaler
+
 from src.constants import (
-    OPEN_COL,
+    CLOSE_COL,
     HIGH_COL,
     LOW_COL,
-    CLOSE_COL,
-    VOLUME_COL,
-    TIMESTAMP_COL,
+    OPEN_COL,
 )
+from src.data_analysis.data_analysis import ewm, fetch_historical_data, sma, std
+from src.data_analysis.indicators import rsi_indicator
 
 
 def awesome_oscillator(

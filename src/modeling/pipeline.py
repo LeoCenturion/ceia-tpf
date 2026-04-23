@@ -1,13 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import Tuple
+
 import pandas as pd
-import numpy as np
-from sklearn.preprocessing import StandardScaler
+from sklearn.base import clone
 from sklearn.decomposition import PCA
 from sklearn.metrics import f1_score
-from sklearn.base import clone
-from src.modeling import PurgedKFold
+from sklearn.preprocessing import StandardScaler
+
 from src.data_analysis.data_analysis import timer
+from src.modeling import PurgedKFold
+
 
 class AbstractMLPipeline(ABC):
     """
@@ -17,20 +18,22 @@ class AbstractMLPipeline(ABC):
 
     def __init__(self, config):
         self.config = config
-        self.problem_type = "classification" # Default to classification
+        self.problem_type = "classification"  # Default to classification
 
     @abstractmethod
-    def step_1_data_structuring(self, raw_tick_data):
+    def step_1_data_structuring(self, raw_tick_data) -> pd.DataFrame:
         """Generate information-driven bars (e.g., Dollar Bars, Volume Bars)."""
         pass
 
     @abstractmethod
-    def step_2_feature_engineering(self, bars):
+    def step_2_feature_engineering(self, bars) -> pd.DataFrame:
         """Create features and ensure stationarity."""
         pass
 
     @abstractmethod
-    def step_3_labeling_and_weighting(self, bars):
+    def step_3_labeling_and_weighting(
+        self, bars: pd.DataFrame
+    ) -> tuple[pd.Series, pd.Series, pd.DataFrame]:
         """
         Define target labels and sample weights.
         Should return: (labels, sample_weights, t1)
@@ -54,12 +57,13 @@ class AbstractMLPipeline(ABC):
         """
         pass
 
-
-    def cross_validation_feature_engineering(self, train, test, y_train, y_test) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame] :
+    def cross_validation_feature_engineering(
+        self, train, test, y_train, y_test
+    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
         Applies feature engineering for the train and test folds
         """
-        return (train,test, y_train, y_test)
+        return (train, test, y_train, y_test)
 
     @timer
     def run_cv(self, raw_tick_data, model):
@@ -80,7 +84,11 @@ class AbstractMLPipeline(ABC):
 
         # 2. Alignment
         # We ensure all components share the same indices
-        common_idx = features.index.intersection(labels.index).intersection(sample_weights.index).intersection(t1.index)
+        common_idx = (
+            features.index.intersection(labels.index)
+            .intersection(sample_weights.index)
+            .intersection(t1.index)
+        )
         X_raw = features.loc[common_idx]
         y = labels.loc[common_idx]
         sw = sample_weights.loc[common_idx]
@@ -91,18 +99,29 @@ class AbstractMLPipeline(ABC):
 
         # Part II: Modeling with Purged Cross-Validation
         cv = PurgedKFold(
-            n_splits=self.config["n_splits"], t1=t1_series, pct_embargo=self.config["pct_embargo"]
+            n_splits=self.config["n_splits"],
+            t1=t1_series,
+            pct_embargo=self.config["pct_embargo"],
         )
 
         scores = []
-        
+
         print(f"Starting Purged Cross-Validation ({self.config['n_splits']} folds)...")
         for i, (train_idx, test_idx) in enumerate(cv.split(X_raw, y)):
             # 1. Split
-            X_train_raw, X_test_raw, y_train, y_test = self.cross_validation_feature_engineering(X_raw.iloc[train_idx], X_raw.iloc[test_idx], y.iloc[train_idx], y.iloc[test_idx])
+            X_train_raw, X_test_raw, y_train, y_test = (
+                self.cross_validation_feature_engineering(
+                    X_raw.iloc[train_idx],
+                    X_raw.iloc[test_idx],
+                    y.iloc[train_idx],
+                    y.iloc[test_idx],
+                )
+            )
             sw_train = sw.loc[X_train_raw.index]
             if X_train_raw.empty or X_test_raw.empty:
-                print(f"Skipping fold {i+1} due to empty features after engineering/alignment.")
+                print(
+                    f"Skipping fold {i + 1} due to empty features after engineering/alignment."
+                )
                 continue
 
             # 2. Fit Scaler on TRAIN only
@@ -112,7 +131,10 @@ class AbstractMLPipeline(ABC):
 
             # 3. Fit PCA on TRAIN only (Optional)
             if self.config.get("use_pca", False):
-                pca_fold = PCA(n_components=self.config.get("pca_components", 0.95), random_state=42)
+                pca_fold = PCA(
+                    n_components=self.config.get("pca_components", 0.95),
+                    random_state=42,
+                )
                 X_train_transformed = pca_fold.fit_transform(X_train_scaled)
                 X_test_transformed = pca_fold.transform(X_test_scaled)
             else:
@@ -122,25 +144,31 @@ class AbstractMLPipeline(ABC):
             # 4. Fit Model
             fold_model = clone(model)
             fold_model.fit(X_train_transformed, y_train, sample_weight=sw_train.values)
-            
+
             # 5. Predict and Score
             y_pred = fold_model.predict(X_test_transformed)
             scores.append(f1_score(y_test, y_pred, average="weighted"))
-            print(f"Fold {i+1} F1: {scores[-1]:.4f}")
+            print(f"Fold {i + 1} F1: {scores[-1]:.4f}")
 
         # --- Final Fit on Full Dataset ---
         scaler_final = StandardScaler()
         X_scaled_final = scaler_final.fit_transform(X_raw)
-        
+
         if self.config.get("use_pca", False):
-            pca_final = PCA(n_components=self.config.get("pca_components", 0.95), random_state=42)
+            pca_final = PCA(
+                n_components=self.config.get("pca_components", 0.95), random_state=42
+            )
             X_final = pd.DataFrame(
                 pca_final.fit_transform(X_scaled_final),
                 index=X_raw.index,
-                columns=[f"PC{i+1}" for i in range(pca_final.n_components_)] if hasattr(pca_final, 'n_components_') else None
+                columns=[f"PC{i + 1}" for i in range(pca_final.n_components_)]
+                if hasattr(pca_final, "n_components_")
+                else None,
             )
         else:
-            X_final = pd.DataFrame(X_scaled_final, index=X_raw.index, columns=X_raw.columns)
+            X_final = pd.DataFrame(
+                X_scaled_final, index=X_raw.index, columns=X_raw.columns
+            )
             pca_final = None
 
         trained_model = clone(model)

@@ -1,22 +1,17 @@
 import os
-import sys
+
 import numpy as np
 import pandas as pd
+from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
+from sklearn.metrics import accuracy_score, f1_score
 from tqdm import tqdm
-from autogluon.timeseries import TimeSeriesPredictor, TimeSeriesDataFrame
-from sklearn.metrics import f1_score, accuracy_score
 
-# Make the script runnable from anywhere
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
 
+from src.constants import VOLUME_COL
 from src.data_analysis.data_analysis import fetch_historical_data, timer
-from src.modeling.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
-from src.modeling.pipeline_runner import run_pipeline
-from src.modeling.mlflow_utils import MLflowLogger
 from src.modeling import PurgedKFold
-from src.constants import VOLUME_COL, CLOSE_COL, OPEN_COL, HIGH_COL, LOW_COL
+from src.modeling.pipeline_runner import run_pipeline
+from src.modeling.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
 
 
 class PalazzoChronosPipeline(PalazzoXGBoostPipeline):
@@ -173,7 +168,13 @@ class PalazzoChronosPipeline(PalazzoXGBoostPipeline):
 
             predictor.fit(
                 ts_train,
-                hyperparameters={"Chronos": {"model_path": model_path, "fine_tune": True, "fine_tune_batch_size": 16}},
+                hyperparameters={
+                    "Chronos": {
+                        "model_path": model_path,
+                        "fine_tune": True,
+                        "fine_tune_batch_size": 16,
+                    }
+                },
                 time_limit=300,
             )
 
@@ -433,6 +434,7 @@ class PalazzoChronosClassificationPipeline(PalazzoChronosPipeline):
                 }
             )
 
+
 class PalazzoChronosBinaryClassificationPipeline(PalazzoChronosPipeline):
     """
     Fine-tunes Chronos for binary classification by recasting the problem
@@ -457,6 +459,129 @@ class PalazzoChronosBinaryClassificationPipeline(PalazzoChronosPipeline):
         # Use index as t1 for PurgedKFold
         t1 = pd.Series(bars.index, index=bars.index)
         return y, None, t1
+
+    def fit_predictor(
+        self,
+        features: pd.DataFrame,
+        y: pd.Series,
+        model_path: str = "AutogluonModels/Chronos_Binary_Live",
+    ):
+        """
+        Fits a Chronos predictor on all provided features/labels.
+        Uses the same predictor config and hyperparameters as run_cv.
+        Returns (predictor, known_covariates_names).
+        """
+        import shutil
+
+        chronos_model = self.config.get("chronos_model", "amazon/chronos-t5-small")
+        prediction_length = self.config.get("prediction_length", 2)
+
+        train_df = features.copy()
+        train_df["target"] = y
+        train_df["item_id"] = "live_train"
+        train_df["timestamp"] = pd.date_range(
+            start="2000-01-01", periods=len(train_df), freq="min"
+        )
+
+        ts_train = TimeSeriesDataFrame.from_data_frame(
+            train_df, id_column="item_id", timestamp_column="timestamp"
+        )
+
+        known_covariates_names = [
+            c for c in train_df.columns if c not in ["target", "item_id", "timestamp"]
+        ]
+
+        if os.path.exists(model_path):
+            shutil.rmtree(model_path, ignore_errors=True)
+
+        predictor = TimeSeriesPredictor(
+            prediction_length=prediction_length,
+            path=model_path,
+            target="target",
+            eval_metric="MASE",
+            known_covariates_names=known_covariates_names,
+            freq="min",
+            verbosity=0,
+        )
+        predictor.fit(
+            ts_train,
+            hyperparameters={
+                "Chronos": {
+                    "model_path": chronos_model,
+                    "fine_tune": True,
+                    "fine_tune_batch_size": 16,
+                }
+            },
+            time_limit=300,
+        )
+
+        return predictor, known_covariates_names
+
+    def predict_next(
+        self,
+        predictor,
+        features: pd.DataFrame,
+        y: pd.Series,
+        known_covariates_names: list,
+    ) -> int:
+        """
+        Predicts the direction of the next bar using the fitted predictor.
+        Mirrors the single-step prediction logic from run_cv (512-row context, forward-fill padding).
+        Returns 1 if the model expects price to go up, 0 if down/same.
+        """
+        prediction_length = self.config.get("prediction_length", 2)
+        context_length = 512
+
+        combined_df = features.copy()
+        combined_df["target"] = y
+        combined_df["item_id"] = "live_train"
+        combined_df["timestamp"] = pd.date_range(
+            start="2000-01-01", periods=len(combined_df), freq="min"
+        )
+
+        train_len = len(combined_df)
+        cutoff_idx = train_len  # k=0: predict first step beyond training window
+
+        start_ctx = max(0, cutoff_idx - context_length)
+        ctx_slice = combined_df.iloc[start_ctx:cutoff_idx].copy()
+        ctx_slice["item_id"] = "seq_0"
+
+        ts_context = TimeSeriesDataFrame.from_data_frame(
+            ctx_slice, id_column="item_id", timestamp_column="timestamp"
+        )
+
+        future_slice = combined_df.iloc[
+            cutoff_idx : cutoff_idx + prediction_length
+        ].copy()
+        if len(future_slice) < prediction_length:
+            missing = prediction_length - len(future_slice)
+            last_row = (
+                future_slice.iloc[[-1]]
+                if not future_slice.empty
+                else ctx_slice.iloc[[-1]]
+            )
+            padding = pd.concat([last_row] * missing)
+            last_ts = (
+                future_slice["timestamp"].iloc[-1]
+                if not future_slice.empty
+                else ctx_slice["timestamp"].iloc[-1]
+            )
+            padding["timestamp"] = pd.date_range(
+                start=last_ts + pd.Timedelta(minutes=1), periods=missing, freq="min"
+            )
+            future_slice = pd.concat([future_slice, padding])
+
+        future_covs = future_slice[known_covariates_names + ["timestamp"]].copy()
+        future_covs["item_id"] = "seq_0"
+
+        known_covariates = TimeSeriesDataFrame.from_data_frame(
+            future_covs, id_column="item_id", timestamp_column="timestamp"
+        )
+
+        prediction = predictor.predict(ts_context, known_covariates=known_covariates)
+        pred_mean = prediction.loc["seq_0"]["mean"].iloc[0]
+
+        return int(pred_mean > 0)
 
     @timer
     def run_cv(self, raw_tick_data, model=None):
@@ -487,7 +612,9 @@ class PalazzoChronosBinaryClassificationPipeline(PalazzoChronosPipeline):
         all_y_true = []
         all_y_pred = []
 
-        print(f"Starting Purged Cross-Validation ({n_splits} folds) for Binary Classification...")
+        print(
+            f"Starting Purged Cross-Validation ({n_splits} folds) for Binary Classification..."
+        )
 
         for i, (train_idx, test_idx) in enumerate(cv.split(features, y)):
             print(f"\n--- Fold {i + 1}/{n_splits} ---")
@@ -499,13 +626,16 @@ class PalazzoChronosBinaryClassificationPipeline(PalazzoChronosPipeline):
 
             train_items = []
             for seg_i, seg_idx in enumerate(segments_indices):
-                if len(seg_idx) == 0: continue
+                if len(seg_idx) == 0:
+                    continue
                 X_seg, y_seg = features.iloc[seg_idx], y.iloc[seg_idx]
                 seg_df = X_seg.copy()
                 seg_df["target"] = y_seg
                 seg_df["item_id"] = f"train_fold_{i}_seg_{seg_i}"
                 start_date = pd.Timestamp("2000-01-01")
-                seg_timestamps = pd.date_range(start=start_date, periods=len(seg_df), freq="min")
+                seg_timestamps = pd.date_range(
+                    start=start_date, periods=len(seg_df), freq="min"
+                )
                 seg_df["timestamp"] = seg_timestamps
                 train_items.append(seg_df)
 
@@ -514,12 +644,17 @@ class PalazzoChronosBinaryClassificationPipeline(PalazzoChronosPipeline):
                 train_df, id_column="item_id", timestamp_column="timestamp"
             )
 
-            known_covariates_names = [c for c in train_df.columns if c not in ["target", "item_id", "timestamp"]]
+            known_covariates_names = [
+                c
+                for c in train_df.columns
+                if c not in ["target", "item_id", "timestamp"]
+            ]
 
             # --- Fit Chronos on {+1, -1} labels ---
             fold_model_path = f"AutogluonModels/Chronos_Binary_Fold_{i}"
             if os.path.exists(fold_model_path):
                 import shutil
+
                 shutil.rmtree(fold_model_path, ignore_errors=True)
 
             predictor = TimeSeriesPredictor(
@@ -533,7 +668,13 @@ class PalazzoChronosBinaryClassificationPipeline(PalazzoChronosPipeline):
             )
             predictor.fit(
                 ts_train,
-                hyperparameters={"Chronos": {"model_path": model_path, "fine_tune": True, "fine_tune_batch_size": 16}},
+                hyperparameters={
+                    "Chronos": {
+                        "model_path": model_path,
+                        "fine_tune": True,
+                        "fine_tune_batch_size": 16,
+                    }
+                },
                 time_limit=300,
             )
 
@@ -543,14 +684,17 @@ class PalazzoChronosBinaryClassificationPipeline(PalazzoChronosPipeline):
             for seg_idx, seg_df in zip(segments_indices, train_items):
                 if len(seg_idx) > 0 and seg_idx[-1] < test_start_abs:
                     context_df = seg_df
-            if context_df is None: context_df = train_items[0]
+            if context_df is None:
+                context_df = train_items[0]
 
             X_test, y_test = features.iloc[test_idx], y.iloc[test_idx]
             test_df = X_test.copy()
             test_df["target"] = y_test
             last_ctx_ts = context_df["timestamp"].iloc[-1]
             start_test_ts = last_ctx_ts + pd.Timedelta(minutes=1)
-            test_timestamps = pd.date_range(start=start_test_ts, periods=len(test_df), freq="min")
+            test_timestamps = pd.date_range(
+                start=start_test_ts, periods=len(test_df), freq="min"
+            )
             test_df["timestamp"] = test_timestamps
             test_df["item_id"] = context_df["item_id"].iloc[0]
 
@@ -573,21 +717,41 @@ class PalazzoChronosBinaryClassificationPipeline(PalazzoChronosPipeline):
                     ctx_slice["item_id"] = f"seq_{k}"
                     batch_items.append(ctx_slice)
 
-                    future_slice = combined_df.iloc[cutoff_idx : cutoff_idx + prediction_length].copy()
-                    if len(future_slice) < prediction_length: # Padding
+                    future_slice = combined_df.iloc[
+                        cutoff_idx : cutoff_idx + prediction_length
+                    ].copy()
+                    if len(future_slice) < prediction_length:  # Padding
                         missing = prediction_length - len(future_slice)
-                        last_row = future_slice.iloc[[-1]] if not future_slice.empty else ctx_slice.iloc[[-1]]
+                        last_row = (
+                            future_slice.iloc[[-1]]
+                            if not future_slice.empty
+                            else ctx_slice.iloc[[-1]]
+                        )
                         padding = pd.concat([last_row] * missing)
-                        last_ts = future_slice["timestamp"].iloc[-1] if not future_slice.empty else ctx_slice["timestamp"].iloc[-1]
-                        padding["timestamp"] = pd.date_range(start=last_ts + pd.Timedelta(minutes=1), periods=missing, freq="min")
+                        last_ts = (
+                            future_slice["timestamp"].iloc[-1]
+                            if not future_slice.empty
+                            else ctx_slice["timestamp"].iloc[-1]
+                        )
+                        padding["timestamp"] = pd.date_range(
+                            start=last_ts + pd.Timedelta(minutes=1),
+                            periods=missing,
+                            freq="min",
+                        )
                         future_slice = pd.concat([future_slice, padding])
-                    
-                    future_covs = future_slice[known_covariates_names + ["timestamp"]].copy()
+
+                    future_covs = future_slice[
+                        known_covariates_names + ["timestamp"]
+                    ].copy()
                     future_covs["item_id"] = f"seq_{k}"
                     batch_covariates_list.append(future_covs)
-                
-                batch_ts = TimeSeriesDataFrame.from_data_frame(pd.concat(batch_items), "item_id", "timestamp")
-                batch_covariates = TimeSeriesDataFrame.from_data_frame(pd.concat(batch_covariates_list), "item_id", "timestamp")
+
+                batch_ts = TimeSeriesDataFrame.from_data_frame(
+                    pd.concat(batch_items), "item_id", "timestamp"
+                )
+                batch_covariates = TimeSeriesDataFrame.from_data_frame(
+                    pd.concat(batch_covariates_list), "item_id", "timestamp"
+                )
                 preds = predictor.predict(batch_ts, known_covariates=batch_covariates)
 
                 for k in range(start_k, end_k):
@@ -600,7 +764,9 @@ class PalazzoChronosBinaryClassificationPipeline(PalazzoChronosPipeline):
             # True classes are 1 if target was 1.0, else 0
             fold_y_true_class = (y_test.values > 0).astype(int)
 
-            fold_score = f1_score(fold_y_true_class, fold_y_pred_class, average="weighted")
+            fold_score = f1_score(
+                fold_y_true_class, fold_y_pred_class, average="weighted"
+            )
             acc = accuracy_score(fold_y_true_class, fold_y_pred_class)
             print(f"Fold {i + 1} F1: {fold_score:.4f}, Acc: {acc:.4f}")
 
@@ -621,10 +787,16 @@ class PalazzoChronosBinaryClassificationPipeline(PalazzoChronosPipeline):
         Log classification report for the fine-tuned model.
         """
         if hasattr(self, "y_true_all") and hasattr(self, "y_pred_all"):
-            print("\n--- Final Classification Report (Fine-Tuned Chronos CV Aggregated) ---")
+            print(
+                "\n--- Final Classification Report (Fine-Tuned Chronos CV Aggregated) ---"
+            )
             from sklearn.metrics import classification_report
 
-            print(classification_report(self.y_true_all, self.y_pred_all, target_names=['Down/Same', 'Up']))
+            print(
+                classification_report(
+                    self.y_true_all, self.y_pred_all, target_names=["Down/Same", "Up"]
+                )
+            )
 
             report = classification_report(
                 self.y_true_all, self.y_pred_all, output_dict=True
@@ -663,7 +835,6 @@ def main():
     # 3. Fine-tuning for Binary Classification (New method)
     pipeline = PalazzoChronosBinaryClassificationPipeline(config)
     experiment = "Chronos_Palazzo_FinetuneToClass"
-
 
     run_pipeline(
         pipeline=pipeline,

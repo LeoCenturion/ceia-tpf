@@ -1,10 +1,12 @@
 # src/data_acquisition/binance_client.py
 
 import logging
+import time
+from typing import Optional
+
 from binance import Client
 from binance.exceptions import BinanceAPIException
 
-import time
 
 class BinanceClient:
     """
@@ -32,7 +34,7 @@ class BinanceClient:
             self.logger.error(f"Failed to connect to Binance API: {e}")
             raise
 
-    def fetch_historical_data(self, symbol: str, interval: str, start_str: str, end_str: str = None) -> list:
+    def fetch_historical_data(self, symbol: str, interval: str, start_str: str, end_str: Optional[str] = None) -> list:
         """
         Fetches historical candlestick data from Binance.
 

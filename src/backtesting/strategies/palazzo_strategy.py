@@ -1,13 +1,18 @@
 import logging
-logger = logging.getLogger(__name__)
-import pandas as pd
+from typing import Dict, Optional
+
+
 import numpy as np
-from backtesting import Strategy
-from sklearn.preprocessing import StandardScaler
+import pandas as pd
 import xgboost as xgb
+from sklearn.preprocessing import StandardScaler
 
-from src.backtesting.backtesting import run_optimizations  # pylint: disable=no-name-in-module
+from backtesting import Strategy
+from src.backtesting.backtesting import (
+    run_optimizations,  # pylint: disable=no-name-in-module
+)
 
+logger = logging.getLogger(__name__)
 # --- Helper functions from src/xgboost_price_reversal_palazzo.py ---
 
 
@@ -106,11 +111,11 @@ class XGBoostPriceReversalPalazzoStrategy(Strategy):  # pylint: disable=attribut
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.processed_data = None
-        self.volume_bar_indices = None
-        self.model = None
-        self.scaler = None
-        self.in_trade = False
+        self.processed_data: Optional[pd.DataFrame] = None
+        self.volume_bar_indices: Optional[Dict[pd.Timestamp, int]] = None
+        self.model: Optional[xgb.XGBClassifier] = None
+        self.scaler: Optional[StandardScaler] = None
+        self.in_trade: bool = False
 
     def init(self):
         # 1. Pre-process data to get volume bars and features.
@@ -139,12 +144,12 @@ class XGBoostPriceReversalPalazzoStrategy(Strategy):  # pylint: disable=attribut
         self.scaler = StandardScaler()
 
     def next(self):
-        if not hasattr(self, "processed_data") or self.processed_data.empty:
+        if self.processed_data is None or self.processed_data.empty:
             return
 
         # Check if the current time bar corresponds to the completion of a volume bar
         current_timestamp = self.data.index[-1]
-        if current_timestamp not in self.volume_bar_indices:
+        if self.volume_bar_indices is None or current_timestamp not in self.volume_bar_indices:
             return
 
         # A volume bar has completed. Get its index.
@@ -169,7 +174,8 @@ class XGBoostPriceReversalPalazzoStrategy(Strategy):  # pylint: disable=attribut
 
             if y_train.nunique() < 2:
                 return  # Not enough classes to train, skip refitting
-
+            if self.scaler is None:
+                return
             X_train = self.scaler.fit_transform(X_train_raw)
 
             # Handle class imbalance
@@ -197,7 +203,7 @@ class XGBoostPriceReversalPalazzoStrategy(Strategy):  # pylint: disable=attribut
             self.model.fit(X_train, y_train)
 
         # Make prediction if model is trained
-        if self.model:
+        if self.model and self.scaler:
             current_features_df = self.processed_data.iloc[[bar_idx]]
             features = [col for col in current_features_df.columns if "feature_" in col]
             X_current_raw = current_features_df[features]

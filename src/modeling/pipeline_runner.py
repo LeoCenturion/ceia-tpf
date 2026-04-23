@@ -1,13 +1,11 @@
 import logging
+
 import numpy as np
-import pandas as pd
-import json  # Added this import
 from sklearn.base import clone
 from sklearn.metrics import (
     classification_report,
-    mean_squared_error,
-    mean_absolute_error,
 )
+
 from src.modeling.mlflow_utils import MLflowLogger
 
 

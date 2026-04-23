@@ -33,3 +33,7 @@ Data analysis notebooks and sctipts are found in data_analysis/. Before modifyin
 ## Dependency Rules
 
 - No module in `src/modeling` can import from `src/backtesting`
+
+# Trading bot
+
+in `src/app` you'll find a configurable trading bot. It pulls data from Binance exchange or from a mock exchange, feeds it to a given strategy to obtain signals and then buys or sells acordingly.

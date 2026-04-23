@@ -1,20 +1,20 @@
 import logging
-"""Data fetching and processing utilities."""
-
-import ccxt
-import pandas as pd
-import numpy as np
 import time
 from functools import wraps
+from typing import Optional
+
+import ccxt
+import numpy as np
+import pandas as pd
+from joblib import Parallel, cpu_count, delayed
 from statsmodels.tsa.stattools import adfuller
-from joblib import Parallel, delayed, cpu_count
+
 from src.constants import (
-    OPEN_COL,
+    CLOSE_COL,
     HIGH_COL,
     LOW_COL,
-    CLOSE_COL,
+    OPEN_COL,
     VOLUME_COL,
-    TIMESTAMP_COL,
 )
 
 
@@ -27,7 +27,9 @@ def timer(func):
         result = func(*args, **kwargs)
         end_time = time.perf_counter()
         duration = end_time - start_time
-        logging.debug(f"\n>>> Function '{func.__name__}' executed in {duration:.4f} seconds")
+        logging.debug(
+            f"\n>>> Function '{func.__name__}' executed in {duration:.4f} seconds"
+        )
         return result
 
     return wrapper
@@ -36,9 +38,9 @@ def timer(func):
 def fetch_historical_data(
     symbol: str = "BTC/USDT",
     timeframe: str = "1h",
-    start_date: str = None,
-    end_date: str = None,
-    data_path: str = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    data_path: Optional[str] = None,
 ) -> pd.DataFrame:
     """
     Fetch historical price data for backtesting.
@@ -62,15 +64,15 @@ def fetch_historical_data(
         df.set_index("timestamp", inplace=True)
 
         if start_date:
-            start_date = pd.to_datetime(start_date)
-            if start_date.tzinfo is not None:
-                start_date = start_date.tz_convert(None)
-            df = df[df.index >= start_date]
+            start_date_dt = pd.to_datetime(start_date)
+            if start_date_dt.tzinfo is not None:
+                start_date_dt = start_date_dt.tz_convert(None)
+            df = df[df.index >= start_date_dt]
         if end_date:
-            end_date = pd.to_datetime(end_date)
-            if end_date.tzinfo is not None:
-                end_date = end_date.tz_convert(None)
-            df = df[df.index <= end_date]
+            end_date_dt = pd.to_datetime(end_date)
+            if end_date_dt.tzinfo is not None:
+                end_date_dt = end_date_dt.tz_convert(None)
+            df = df[df.index <= end_date_dt]
 
     else:
         exchange = ccxt.binance(
@@ -171,8 +173,7 @@ def frac_diff_ffd(series, d, thres=1e-5):
     col_chunks = np.array_split(columns, n_batches)
     # Use backend='multiprocessing' to avoid ResourceTracker/loky cleanup errors
     batch_results = Parallel(n_jobs=n_jobs, backend="multiprocessing")(
-        delayed(_frac_diff_ffd_batch)(series[chunk], w, width)
-        for chunk in col_chunks
+        delayed(_frac_diff_ffd_batch)(series[chunk], w, width) for chunk in col_chunks
     )
     df = pd.concat(batch_results, axis=1)
     return df
@@ -190,7 +191,7 @@ def _check_stationarity_batch(df_chunk):
             if series.nunique() <= 1:
                 results.append(False)
                 continue
-            p_val = adfuller(series, maxlag=1, regression="c", autolag=None)[1]
+            p_val = adfuller(series, maxlag=1, regression="c", autolag=None)[1]  # type: ignore
             results.append(p_val < 0.05)
         except Exception:
             results.append(False)
@@ -246,9 +247,9 @@ def sma(series, n):
     return pd.Series(series).rolling(n).mean()
 
 
-def ewm(series, span):
+def ewm(series: pd.Series, span) -> pd.Series:
     """Calculate the exponential moving average of a series."""
-    return pd.Series(series).ewm(span=span, adjust=False).mean()
+    return series.ewm(span=span, adjust=False).mean()
 
 
 def std(series, n):
@@ -267,4 +268,3 @@ def adjust_data_to_ubtc(df: pd.DataFrame) -> pd.DataFrame:
         if col in df_copy.columns:
             df_copy[col] = df_copy[col] / 1_000_000
     return df_copy
-

@@ -2,6 +2,7 @@
 
 import pandas as pd
 
+
 def split_data(df: pd.DataFrame, train_size: float = 0.7, val_size: float = 0.15):
     """
     Splits the data into training, validation, and test sets.

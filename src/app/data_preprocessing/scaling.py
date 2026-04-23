@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
+
 def scale_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     Scales the numerical data using StandardScaler.

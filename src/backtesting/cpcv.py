@@ -2,6 +2,7 @@ import logging
 import random
 from itertools import combinations
 from math import comb
+from typing import Dict, List, Set, Tuple, cast
 
 import numpy as np
 import pandas as pd
@@ -9,13 +10,16 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-def time_based_partition(index: pd.DatetimeIndex, n_groups: int) -> list:
+def time_based_partition(index: pd.DatetimeIndex, n_groups: int) -> List[np.ndarray]:
     """Partitions data into N groups based on time."""
-    start_time, end_time = index.min(), index.max()
-    path_duration = (end_time - start_time) / n_groups
-    time_splits = [start_time + i * path_duration for i in range(n_groups + 1)]
+    start_time: pd.Timestamp = cast(pd.Timestamp, index.min())
+    end_time: pd.Timestamp = cast(pd.Timestamp, index.max())
+    path_duration: pd.Timedelta = (end_time - start_time) / n_groups
+    time_splits: List[pd.Timestamp] = [
+        start_time + i * path_duration for i in range(n_groups + 1)
+    ]
     time_splits[-1] = end_time
-    path_indices = [
+    path_indices: List[np.ndarray] = [
         np.where((index >= time_splits[i]) & (index < time_splits[i + 1]))[0]
         if i < n_groups - 1
         else np.where((index >= time_splits[i]) & (index <= time_splits[i + 1]))[0]
@@ -62,36 +66,42 @@ def purge_and_embargo_split(
     ]
     train_times = X.index[train_indices_orig]
     train_t1 = t1.loc[train_times]
-    logger.debug(f'Train before purge: {len(train_times)}')
+    logger.debug(f"Train before purge: {len(train_times)}")
     # Purging
-    purge_mask = pd.Series(False, index=train_times)
+    purge_mask: pd.Series = pd.Series(False, index=train_times)
     for start, end in test_path_time_ranges:
         purge_mask |= (train_times >= start) & (train_times <= end)
         purge_mask |= (train_t1 >= start) & (train_t1 <= end)
-    train_indices_purged = train_indices_orig[~purge_mask.values]
+    train_indices_purged = train_indices_orig[~np.array(purge_mask.values)]
 
     # Embargo
     embargo_td = (X.index[-1] - X.index[0]) * pct_embargo
     train_indices_final = train_indices_purged
     if embargo_td.total_seconds() > 0 and train_indices_purged.size > 0:
-        embargo_mask = pd.Series(False, index=X.index[train_indices_purged])
+        embargo_mask: pd.Series = pd.Series(False, index=X.index[train_indices_purged])
         for _, end in test_path_time_ranges:
             embargo_mask |= (X.index[train_indices_purged] > end) & (
                 X.index[train_indices_purged] <= end + embargo_td
             )
-        train_indices_final = train_indices_purged[~embargo_mask.values]
+        train_indices_final = train_indices_purged[~np.array(embargo_mask.values)]
 
     return train_indices_final, test_indices
 
 
-def _find_paths(splits, n_groups):
+def _find_paths(
+    splits: List[Tuple[int, ...]], n_groups: int
+) -> List[List[Tuple[int, ...]]]:
     """
     Finds all unique sets of splits that form a complete partition of the N groups.
     This is a recursive backtracking algorithm.
     """
-    memo = {}
+    memo: Dict[
+        Tuple[Tuple[int, ...], Tuple[int, ...]], List[List[Tuple[int, ...]]]
+    ] = {}
 
-    def solve(groups_tuple, available_splits_indices):
+    def solve(
+        groups_tuple: Tuple[int, ...], available_splits_indices: Tuple[int, ...]
+    ) -> List[List[Tuple[int, ...]]]:
         if not groups_tuple:
             return [[]]
         groups_tuple = tuple(sorted(groups_tuple))
@@ -99,7 +109,7 @@ def _find_paths(splits, n_groups):
         if state in memo:
             return memo[state]
 
-        res = []
+        res: List[List[Tuple[int, ...]]] = []
         first_group = groups_tuple[0]
 
         for i in available_splits_indices:
@@ -126,7 +136,7 @@ def _find_paths(splits, n_groups):
     raw_paths = solve(all_groups, all_splits_indices)
 
     # Deduplicate paths (the solver might find the same path with splits in a different order)
-    unique_paths = set()
+    unique_paths: Set[Tuple[Tuple[int, ...], ...]] = set()
     for p in raw_paths:
         canonical_path = tuple(sorted(p))
         unique_paths.add(canonical_path)
@@ -136,14 +146,14 @@ def _find_paths(splits, n_groups):
 
 def construct_backtest_paths(
     split_predictions: list, n_groups: int, k_test_groups: int
-):
+) -> List[Dict[str, np.ndarray]]:
     """
     Stitches together OOS predictions to form complete backtest paths
     based on the method described by Lopez de Prado, ensuring each
     prediction is used in at most one path.
     """
     all_preds = {p["test_path_idxs"]: p for p in split_predictions}
-    all_splits = list(all_preds.keys())
+    all_splits: List[Tuple[int, ...]] = list(all_preds.keys())
 
     # Step 1: Find all possible ways to form a complete path (a partition of N groups)
     all_possible_paths = _find_paths(all_splits, n_groups)
@@ -151,12 +161,12 @@ def construct_backtest_paths(
     # Step 2: Use a randomized greedy heuristic to select disjoint paths.
     # This is a heuristic for the set-packing problem, which is NP-hard.
     # We try multiple random orderings to find a better packing.
-    best_path_selection = []
+    best_path_selection: List[List[Tuple[int, ...]]] = []
     for _ in range(20):  # Number of random trials
         random.shuffle(all_possible_paths)
 
-        current_selection = []
-        used_splits = set()
+        current_selection: List[List[Tuple[int, ...]]] = []
+        used_splits: Set[Tuple[int, ...]] = set()
         for path_candidate in all_possible_paths:
             candidate_splits = set(path_candidate)
             if used_splits.isdisjoint(candidate_splits):
@@ -175,9 +185,7 @@ def construct_backtest_paths(
         else 0
     )
 
-    logger.info(
-        f"Constructed {len(selected_paths)} unique, disjoint backtest paths."
-    )
+    logger.info(f"Constructed {len(selected_paths)} unique, disjoint backtest paths.")
     if len(selected_paths) < expected_num_paths:
         logger.warning(
             f"Could only construct {len(selected_paths)} paths, "
@@ -186,7 +194,7 @@ def construct_backtest_paths(
         )
 
     # Step 3: Assemble the results for the selected paths
-    path_results = []
+    path_results: List[Dict[str, np.ndarray]] = []
     for path in selected_paths:
         path_y_true, path_y_pred = [], []
         for split_groups in path:
@@ -198,9 +206,9 @@ def construct_backtest_paths(
         if not path_y_true:
             continue
 
-        path_y_true = np.concatenate(path_y_true)
-        path_y_pred = np.concatenate(path_y_pred)
+        path_y_true_np = np.concatenate(path_y_true)
+        path_y_pred_np = np.concatenate(path_y_pred)
 
-        path_results.append({"y_true": path_y_true, "y_pred": path_y_pred})
+        path_results.append({"y_true": path_y_true_np, "y_pred": path_y_pred_np})
 
     return path_results

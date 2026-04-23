@@ -1,14 +1,16 @@
-import unittest
 import os
+import unittest
+
 import yaml
+
 from src.app.config import load_config
+
 
 class TestConfig(unittest.TestCase):
     def setUp(self):
         self.valid_config_data = {
-            'bot': {'name': 'Test Bot'},
+            'bot': {'name': 'Test Bot', 'strategy': {'name': 'macd', 'params': {}}},
             'exchange': {'name': 'binance_testnet'},
-            'strategy': {'name': 'macd', 'params': {}}
         }
         self.invalid_config_data = {
             'bot': {'name': 'Test Bot'}

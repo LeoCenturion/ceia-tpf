@@ -1,18 +1,17 @@
 import logging
-"""
-Functions for creating volume, dollar, and price change bars from tick data.
-"""
 
 import argparse
-from typing import Tuple
+from typing import Optional, Tuple
+
 import pandas as pd
+
 from src.constants import (
-    OPEN_COL,
+    CLOSE_COL,
     HIGH_COL,
     LOW_COL,
-    CLOSE_COL,
-    VOLUME_COL,
+    OPEN_COL,
     TIMESTAMP_COL,
+    VOLUME_COL,
 )
 
 
@@ -222,25 +221,25 @@ def create_tick_imbalance_bars(
     window_run_length: int = 20,
 ) -> Tuple[pd.DataFrame, pd.Series, pd.Series]:
     """
-    Creates tick imbalance bars (TIBs) with a configurable threshold strategy.
+       Creates tick imbalance bars (TIBs) with a configurable threshold strategy.
 
-    Args:
- o       df (pd.DataFrame): DataFrame with tick data. Must include 'Close' price.
-        threshold_type (str): The threshold strategy to use. One of:
-            - 'static': Use a fixed `static_threshold`.
-            - 'dynamic_imbalance': E[T] * E[b_t] (EWMA of bar sizes and tick imbalances).
-            - 'dynamic_runs': E[run] * E[b_t] (Rolling average of run lengths and tick imbalances).
-        static_threshold (float): Fixed threshold for the 'static' strategy.
-        initial_bar_size_estimate (int): Initial estimate for ticks per bar for 'dynamic_imbalance'.
-        span_bar_size (int): EWMA span for calculating E[T].
-        span_tick_imbalance (int): EWMA span for calculating E[b_t].
-        window_run_length (int): Rolling window size for calculating expected run length.
+       Args:
+    o       df (pd.DataFrame): DataFrame with tick data. Must include 'Close' price.
+           threshold_type (str): The threshold strategy to use. One of:
+               - 'static': Use a fixed `static_threshold`.
+               - 'dynamic_imbalance': E[T] * E[b_t] (EWMA of bar sizes and tick imbalances).
+               - 'dynamic_runs': E[run] * E[b_t] (Rolling average of run lengths and tick imbalances).
+           static_threshold (float): Fixed threshold for the 'static' strategy.
+           initial_bar_size_estimate (int): Initial estimate for ticks per bar for 'dynamic_imbalance'.
+           span_bar_size (int): EWMA span for calculating E[T].
+           span_tick_imbalance (int): EWMA span for calculating E[b_t].
+           window_run_length (int): Rolling window size for calculating expected run length.
 
-    Returns:
-        tuple[pd.DataFrame, pd.Series, pd.Series]: A tuple containing:
-            - A DataFrame of the tick imbalance bars.
-            - A Series of the imbalance thresholds over time.
-            - A Series of the cumulative imbalance over time.
+       Returns:
+           tuple[pd.DataFrame, pd.Series, pd.Series]: A tuple containing:
+               - A DataFrame of the tick imbalance bars.
+               - A Series of the imbalance thresholds over time.
+               - A Series of the cumulative imbalance over time.
     """
     if df.empty:
         return pd.DataFrame(), pd.Series(dtype=float), pd.Series(dtype=float)
@@ -252,7 +251,7 @@ def create_tick_imbalance_bars(
     cumulative_imbalance = 0.0
 
     df_reset = df.reset_index()
-    tick_signs = _get_signed_ticks(df_reset["Close"])
+    tick_signs = _get_signed_ticks(pd.Series(df_reset["Close"]))
 
     # --- Pre-computation for dynamic thresholds ---
     ewma_tick_imbalances = tick_signs.ewm(span=span_tick_imbalance, adjust=False).mean()
@@ -338,7 +337,7 @@ def create_tick_imbalance_bars(
 def create_volume_imbalance_bars(
     df: pd.DataFrame,
     volume_col: str = "Volume",
-    initial_bar_volume_estimate: float = None,
+    initial_bar_volume_estimate: Optional[float] = None,
     span_bar_volume: int = 20,
     span_tick_imbalance: int = 20,
 ) -> Tuple[pd.DataFrame, pd.Series, pd.Series]:
@@ -376,7 +375,7 @@ def create_volume_imbalance_bars(
     cumulative_imbalance = 0.0
 
     df_reset = df.reset_index()
-    tick_signs = _get_signed_ticks(df_reset["Close"])
+    tick_signs = _get_signed_ticks(pd.Series(df_reset["Close"]))
 
     # --- Initial estimate for bar volume if not provided ---
     if initial_bar_volume_estimate is None:

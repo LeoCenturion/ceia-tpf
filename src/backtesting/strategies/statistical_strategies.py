@@ -1,13 +1,18 @@
-import logging
-import pandas as pd
-import numpy as np
-from backtesting import Backtest
-from prophet import Prophet
-import statsmodels.api as sm
-from pykalman import KalmanFilter
-import logging
 import itertools
+import logging
+from typing import Any, Dict, List, Optional, Tuple
 
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+import optuna
+from numpy.typing import NDArray
+from prophet import Prophet
+from pykalman import KalmanFilter
+from statsmodels.tsa.arima.model import ARIMAResultsWrapper
+from statsmodels.tsa.statespace.sarimax import SARIMAXResultsWrapper
+
+from backtesting import Backtest
 from src.backtesting.backtesting import TrialStrategy, run_optimizations
 
 logger = logging.getLogger(__name__)
@@ -21,8 +26,8 @@ except ImportError:
 # Custom indicator for preprocessing
 def price_difference(series: np.ndarray) -> np.ndarray:
     """Calculates (price[i] - price[i-1])/price[i-1]."""
-    series: pd.Series = pd.Series(series)
-    return series.pct_change().fillna(0).values
+    series_pd: pd.Series = pd.Series(series)
+    return series_pd.pct_change().fillna(0).values
 
 
 def kalman_filter_indicator(series: np.ndarray) -> np.ndarray:
@@ -61,8 +66,8 @@ class ProphetStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outsi
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.model = None
-        self.forecast = None
+        self.model: Optional[Prophet] = None
+        self.forecast: Optional[pd.DataFrame] = None
 
     def init(self):
         pass
@@ -123,15 +128,16 @@ class ARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outside
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.model_fit = None
-        self.processed_data = None
+        self.model_fit: Optional[ARIMAResultsWrapper] = None
+        self.processed_data: Optional[np.ndarray] = None
 
     def init(self):
         self.processed_data = self.I(price_difference, self.data.Close)
 
     def next(self):
         price = self.data.Close[-1]
-
+        if self.processed_data is None:
+            return
         # Refit model periodically and if we have enough data
         if len(self.data) % self.refit_period == 0:
             try:
@@ -180,7 +186,9 @@ class ARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outside
             ),
         }
 
-    def save_artifacts(self, _trial, _stats, _bt):
+    def save_artifacts(
+        self, trial: optuna.Trial, stats: dict, bt: Backtest
+    ):  # pylint: disable=useless-super-delegation
         return
 
 
@@ -199,14 +207,16 @@ class SARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outsid
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.model_fit = None
-        self.processed_data = None
+        self.model_fit: Optional[SARIMAXResultsWrapper] = None
+        self.processed_data: Optional[np.ndarray] = None
 
     def init(self):
         self.processed_data = self.I(price_difference, self.data.Close)
 
     def next(self):
         price = self.data.Close[-1]
+        if self.processed_data is None:
+            return
 
         if len(self.data) % self.refit_period == 0:
             try:
@@ -272,13 +282,13 @@ class KalmanARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-o
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.model_fit = None
-        self.processed_data = None
-        self.kalman_state_mean = 0
-        self.kalman_state_covariance = 1
-        self.kalman_mean_history = []
-        self.kf = None
-        self.kalman_filtered_data = None
+        self.model_fit: Optional[ARIMAResultsWrapper] = None
+        self.processed_data: Optional[np.ndarray] = None
+        self.kalman_state_mean: Any = 0
+        self.kalman_state_covariance: Any = 1
+        self.kalman_mean_history: List[np.ndarray] = []
+        self.kf: Optional[KalmanFilter] = None
+        self.kalman_filtered_data: Optional[np.ndarray] = None
 
     def init(self):
         self.processed_data = self.I(price_difference, self.data.Close)
@@ -290,17 +300,23 @@ class KalmanARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-o
             n_dim_obs=1,
         )
 
-        self.kalman_filtered_data = self.I(kalman_filter_indicator, self.processed_data)
+        if self.processed_data is not None:
+            self.kalman_filtered_data = self.I(
+                kalman_filter_indicator, self.processed_data
+            )
 
     def kalman_update(self, series):
+        if self.kf is None:
+            return []
         if len(series) <= 1:  # Initialize the Kalman filter
-            self.kalman_state_mean, self.kalman_state_covariance = self.kf.filter(
-                series
-            )
+            (
+                self.kalman_state_mean,
+                self.kalman_state_covariance,
+            ) = self.kf.filter(series)
             logger.debug(self.kalman_state_mean)
             self.kalman_mean_history.append(self.kalman_state_mean[:, 0].flatten())
         else:
-            self.kalman_state_mean, self.kalman_state_covariance = (
+            (self.kalman_state_mean, self.kalman_state_covariance) = (
                 self.kf.filter_update(
                     self.kalman_state_mean, self.kalman_state_covariance, series
                 )
@@ -311,6 +327,8 @@ class KalmanARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-o
 
     def next(self):
         price = self.data.Close[-1]
+        if self.kalman_filtered_data is None or self.processed_data is None:
+            return
 
         # Refit model periodically and if we have enough data
         if len(self.data) % self.refit_period == 0:
@@ -340,7 +358,9 @@ class KalmanARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-o
                         tp=price * (1 + self.take_profit),
                     )
                 # Sell if forecast is < threshold % of current price
-                elif forecast_processed < self.threshold and not self.position.is_short:
+                elif (
+                    forecast_processed < self.threshold and not self.position.is_short
+                ):
                     # logging.debug(f'forecast: {forecast_processed}, trhesh: {self.threshold}, selling')
                     self.sell(
                         sl=price * (1 + self.stop_loss),

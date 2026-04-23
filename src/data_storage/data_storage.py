@@ -1,7 +1,9 @@
 # src/data_storage/data_storage.py
 
-import pandas as pd
 import logging
+
+import pandas as pd
+
 
 class DataStorage:
     """
@@ -33,7 +35,7 @@ class DataStorage:
             'close_time', 'quote_asset_volume', 'number_of_trades', 
             'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'
         ]
-        df = pd.DataFrame(data, columns=columns)
+        df = pd.DataFrame(data, columns=columns)  # type: ignore
         
         try:
             if self.format == 'csv':

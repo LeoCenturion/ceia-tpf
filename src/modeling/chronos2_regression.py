@@ -6,11 +6,11 @@ import numpy as np
 import optuna
 import pandas as pd
 import torch
-from sklearn.metrics import mean_squared_error, classification_report
+from chronos import Chronos2Pipeline
+from sklearn.metrics import classification_report, mean_squared_error
 from tqdm import trange
 
 from src.data_analysis import fetch_historical_data
-from chronos import Chronos2Pipeline
 
 # Determine device
 device = "cuda" if torch.cuda.is_available() else "cpu"

@@ -1,21 +1,23 @@
+import csv
 import logging
 import os
+import random
 import time
+from datetime import datetime
+from decimal import ROUND_DOWN, Decimal
+
 import pandas as pd
-from src.constants import (
-    OPEN_COL,
-    HIGH_COL,
-    LOW_COL,
-    CLOSE_COL,
-    VOLUME_COL,
-    TIMESTAMP_COL,
-)
 from binance.client import Client
 from binance.enums import ORDER_TYPE_MARKET, SIDE_BUY, SIDE_SELL
-import csv
-from datetime import datetime
-import random
-from decimal import Decimal, ROUND_DOWN
+
+from src.constants import (
+    CLOSE_COL,
+    HIGH_COL,
+    LOW_COL,
+    OPEN_COL,
+    TIMESTAMP_COL,
+    VOLUME_COL,
+)
 
 # API credentials from environment variables
 # Make sure to set BINANCE_API_KEY and BINANCE_API_SECRET in your environment
@@ -115,7 +117,7 @@ def get_historical_data(symbol, interval, lookback):
             "taker_buy_quote_asset_volume",
             "ignore",
         ],
-    )
+    )  # type: ignore
     df[CLOSE_COL.lower()] = pd.to_numeric(df[CLOSE_COL.lower()])
     df[TIMESTAMP_COL] = pd.to_datetime(df[TIMESTAMP_COL], unit="ms")
     return df
@@ -174,7 +176,9 @@ def execute_trade(
 
     if signal == "BUY":
         if current_position_value + trade_amount <= max_capital:
-            logging.debug(f"Executing BUY order for {trade_amount} USDT worth of {symbol}")
+            logging.debug(
+                f"Executing BUY order for {trade_amount} USDT worth of {symbol}"
+            )
             try:
                 # For SPOT market orders, we can specify quoteOrderQty for the amount in quote currency (USDT)
                 order = client.create_order(
@@ -217,7 +221,9 @@ def execute_trade(
             min_qty = symbol_info["min_qty"]
             min_notional = symbol_info["min_notional"]
         except ValueError as e:
-            logging.debug(f"Error getting symbol info: {e}. Cannot execute SELL order safely.")
+            logging.debug(
+                f"Error getting symbol info: {e}. Cannot execute SELL order safely."
+            )
             return open_position_quantity
 
         # Round quantity to the correct precision, rounding down
@@ -289,8 +295,7 @@ def main(strategy_func, trade_amount, max_capital):
         while True:
             try:
                 # We need enough data for MACD calculation, e.g., long_window + signal_window
-                df = get_histori
-                cal_data(symbol, timeframe, "100 minutes ago UTC")
+                df = get_historical_data(symbol, timeframe, "100 minutes ago UTC")
                 if len(df) < 26 + 9:  # not enough data for MACD
                     logging.debug("Not enough historical data yet. Waiting...")
                     time.sleep(60)

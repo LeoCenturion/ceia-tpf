@@ -3,6 +3,7 @@
 import pandas as pd
 from ta import add_all_ta_features
 
+
 def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """
     Adds technical indicators to the data.

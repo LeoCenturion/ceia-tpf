@@ -1,11 +1,12 @@
+import argparse
 import logging
+from typing import Any, Dict, Union
+
 import mlflow
 import numpy as np
-import pandas as pd
 import optuna
-import copy
-import argparse
-from sklearn.metrics import f1_score, classification_report
+import pandas as pd
+from sklearn.metrics import classification_report, f1_score
 
 from src.backtesting.cpcv import (
     construct_backtest_paths,
@@ -13,7 +14,6 @@ from src.backtesting.cpcv import (
     purge_and_embargo_split,
     time_based_partition,
 )
-from src.constants import CLOSE_COL, VOLUME_COL
 from src.data_analysis.data_analysis import fetch_historical_data
 from src.modeling.autogluon_adapter import AutoGluonAdapter
 from src.modeling.chronos_feature_pipeline import ChronosFeaturePipeline
@@ -28,7 +28,13 @@ class ChronosFeaturePipelineCPCV(ChronosFeaturePipeline):
     Extends ChronosFeaturePipeline with a dedicated method for running CPCV.
     """
 
-    def run_cpcv(self, raw_data, model_cls, model_params, experiment_name):
+    def run_cpcv(
+        self,
+        raw_data: pd.DataFrame,
+        model_cls: Any,
+        model_params: Dict[str, Any],
+        experiment_name: str,
+    ) -> float:
         """
         Runs Combinatorially Purged Cross-Validation for the ChronosFeaturePipeline.
         """
@@ -127,35 +133,35 @@ class ChronosFeaturePipelineCPCV(ChronosFeaturePipeline):
                     y_pred = result["y_pred"]
 
                     score = f1_score(
-                        y_true, y_pred, average="weighted", zero_division=0
+                        y_true, y_pred, average="weighted", zero_division="warn"
                     )
                     path_scores.append(score)
                     logger.info(
                         f"Path {i+1}/{len(path_results)} F1 Score (weighted): {score:.4f}"
                     )
 
-                    report = classification_report(
-                        y_true, y_pred, output_dict=True, zero_division=0
+                    report: Union[Dict[str, Any], str] = classification_report(
+                        y_true, y_pred, output_dict=True, zero_division="warn"
                     )
+                    if isinstance(report, dict):
+                        flat_report = {}
+                        for class_label, metrics in report.items():
+                            clean_class_label = class_label.replace(" ", "_")
+                            if isinstance(metrics, dict):
+                                for metric_name, value in metrics.items():
+                                    clean_metric_name = metric_name.replace("-", "_")
+                                    flat_report[
+                                        f"{clean_class_label}_{clean_metric_name}"
+                                    ] = float(value)
+                            else:
+                                flat_report[clean_class_label] = float(metrics)
 
-                    flat_report = {}
-                    for class_label, metrics in report.items():
-                        clean_class_label = class_label.replace(" ", "_")
-                        if isinstance(metrics, dict):
-                            for metric_name, value in metrics.items():
-                                clean_metric_name = metric_name.replace("-", "_")
-                                flat_report[
-                                    f"{clean_class_label}_{clean_metric_name}"
-                                ] = value
-                        else:
-                            flat_report[clean_class_label] = metrics
-
-                    mlflow.log_metrics(flat_report)
-                    mlflow.log_metric("f1_weighted", score)
+                        mlflow.log_metrics(flat_report)
+                    mlflow.log_metric("f1_weighted", float(score))
 
             logger.info("--- CPCV Path Results ---")
-            mean_f1 = np.mean(path_scores) if path_scores else 0
-            std_f1 = np.std(path_scores) if path_scores else 0
+            mean_f1 = np.mean(path_scores) if path_scores else 0.0
+            std_f1 = np.std(path_scores) if path_scores else 0.0
 
             if path_scores:
                 logger.info(
@@ -168,7 +174,7 @@ class ChronosFeaturePipelineCPCV(ChronosFeaturePipeline):
                 logger.warning("No complete backtest paths were evaluated.")
 
         logger.info("CPCV process finished.")
-        return mean_f1
+        return float(mean_f1)
 
 
 @setup_logging
@@ -182,7 +188,7 @@ def main():
     parser.add_argument(
         "--optimize",
         action="store_true",
-        help="Enable Optuna hyperparameter optimization."
+        help="Enable Optuna hyperparameter optimization.",
     )
     args = parser.parse_args()
 
@@ -192,7 +198,8 @@ def main():
     )
 
     if args.optimize:
-        def objective(trial):
+
+        def objective(trial: optuna.Trial) -> float:
             try:
                 # Define search space
                 chronos_model_name = trial.suggest_categorical(

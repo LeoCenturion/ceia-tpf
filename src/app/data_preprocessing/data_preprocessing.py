@@ -1,7 +1,9 @@
 # src/data_preprocessing/data_preprocessing.py
 
-import pandas as pd
 import logging
+
+import pandas as pd
+
 
 def load_data(file_path: str) -> pd.DataFrame:
     """

@@ -1,8 +1,10 @@
 import logging
-import pandas as pd
-import numpy as np
-import statsmodels.api as sm
 from datetime import timedelta
+
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+
 from src.data_analysis import fetch_historical_data
 
 
@@ -190,11 +192,11 @@ def backtest_har_volatility(
                 }
             )
             logging.debug(
-                f"Date: {current_forecast_date.strftime('%Y-%m-%d')}, Actual RV: {actual_rv:.8f}, Forecast RV: {forecast_rv:.8f}"
+                f"Date: {pd.to_datetime(current_forecast_date).strftime('%Y-%m-%d')}, Actual RV: {actual_rv:.8f}, Forecast RV: {forecast_rv:.8f}"
             )
         except Exception as e:
             logging.debug(
-                f"Error forecasting for {current_forecast_date.strftime('%Y-%m-%d')}: {e}"
+                f"Error forecasting for {pd.to_datetime(current_forecast_date).strftime('%Y-%m-%d')}: {e}"
             )
             results.append(
                 {

@@ -1,22 +1,24 @@
-import os
-import numpy as np
 import logging
+import os
 
-logger = logging.getLogger(__name__)
+import numpy as np
+
+
 import pandas as pd
 from sklearn.metrics import (
     classification_report,
-    precision_score,
     f1_score,
+    precision_score,
 )
 
 from src.data_analysis.data_analysis import fetch_historical_data
-from src.modeling.chronos_feature_pipeline import ChronosFeaturePipeline
-from src.modeling.autogluon_adapter import AutoGluonAdapter
-from src.modeling.pipeline_runner import run_pipeline
 from src.modeling import PurgedKFold
-from src.constants import VOLUME_COL, CLOSE_COL
+from src.modeling.autogluon_adapter import AutoGluonAdapter
+from src.modeling.chronos_feature_pipeline import ChronosFeaturePipeline
 from src.modeling.mlflow_utils import MLflowLogger
+from src.modeling.pipeline_runner import run_pipeline
+
+logger = logging.getLogger(__name__)
 
 
 class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
@@ -48,7 +50,9 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
         oof_probs = pd.Series(index=X.index, dtype=float)
         fold_f1_scores = []
 
-        logger.info(f"Generating OOF predictions with {self.config['n_splits']} folds...")
+        logger.info(
+            f"Generating OOF predictions with {self.config['n_splits']} folds..."
+        )
 
         for i, (train_idx, val_idx) in enumerate(cv.split(X, y)):
             # Split
@@ -56,7 +60,9 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
             y_train = y.iloc[train_idx]
             y_val = y.iloc[val_idx]
             sw_train = sw.iloc[train_idx]
-            logger.debug(f"Fold {i+1}: X_train shape: {X_train.shape}, X_val shape: {X_val.shape}, y_train shape: {y_train.shape}, y_val shape: {y_val.shape}, sw_train shape: {sw_train.shape}")
+            logger.debug(
+                f"Fold {i + 1}: X_train shape: {X_train.shape}, X_val shape: {X_val.shape}, y_train shape: {y_train.shape}, y_val shape: {y_val.shape}, sw_train shape: {sw_train.shape}"
+            )
 
             # Since model is AutoGluonAdapter, we instantiate it new for each fold
             # to ensure it's a fresh model.
@@ -118,11 +124,12 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
             if isinstance(metrics_dict, dict):
                 for metric_name, value in metrics_dict.items():
                     clean_metric_name = metric_name.replace("-", "_")
-                    flat_baseline_report[f"baseline_{clean_class_label}_{clean_metric_name}"] = value
+                    flat_baseline_report[
+                        f"baseline_{clean_class_label}_{clean_metric_name}"
+                    ] = value
             else:
                 flat_baseline_report[f"baseline_{clean_class_label}"] = metrics_dict
         mlflow_logger.log_metrics(flat_baseline_report)
-
 
         # Flatten and log meta-labeling report metrics
         flat_meta_labeling_report = {}
@@ -131,13 +138,21 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
             if isinstance(metrics_dict, dict):
                 for metric_name, value in metrics_dict.items():
                     clean_metric_name = metric_name.replace("-", "_")
-                    flat_meta_labeling_report[f"metalabeling_{clean_class_label}_{clean_metric_name}"] = value
+                    flat_meta_labeling_report[
+                        f"metalabeling_{clean_class_label}_{clean_metric_name}"
+                    ] = value
             else:
-                flat_meta_labeling_report[f"metalabeling_{clean_class_label}"] = metrics_dict
+                flat_meta_labeling_report[f"metalabeling_{clean_class_label}"] = (
+                    metrics_dict
+                )
         mlflow_logger.log_metrics(flat_meta_labeling_report)
 
-        mlflow_logger.log_artifact_dict(baseline_report, "baseline_classification_report.json")
-        mlflow_logger.log_artifact_dict(meta_labeling_report, "meta_labeling_classification_report.json")
+        mlflow_logger.log_artifact_dict(
+            baseline_report, "baseline_classification_report.json"
+        )
+        mlflow_logger.log_artifact_dict(
+            meta_labeling_report, "meta_labeling_classification_report.json"
+        )
 
         # Log AutoGluon Meta-Model Leaderboard
         if (
@@ -160,7 +175,9 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
             if leaderboard is not None and not leaderboard.empty:
                 best_meta_model_score = leaderboard.iloc[0]["score_test"]
                 best_meta_model_name = leaderboard.iloc[0]["model"]
-                mlflow_logger.log_metrics({"test_f1_best_meta_model": best_meta_model_score})
+                mlflow_logger.log_metrics(
+                    {"test_f1_best_meta_model": best_meta_model_score}
+                )
                 mlflow_logger.log_params({"best_meta_model_name": best_meta_model_name})
 
                 lb_path = "autogluon_meta_leaderboard.csv"
@@ -231,7 +248,9 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
             f"Before OOF generation - X_train shape: {X_train.shape}, y_train shape: {y_train.shape}, sw_train shape: {sw_train.shape}, t1_train shape: {t1_train.shape}"
         )
         if X_train.empty or y_train.empty:
-            raise ValueError("X_train or y_train is empty after internal split. Cannot generate OOF predictions.")
+            raise ValueError(
+                "X_train or y_train is empty after internal split. Cannot generate OOF predictions."
+            )
 
         # Generate OOF predictions
         oof_df = self.generate_oof_predictions(
@@ -314,7 +333,7 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
         Uses the new fit and predict methods internally.
         """
         mlflow_logger = MLflowLogger(experiment_name=experiment_name)
-        with mlflow_logger.start_run(run_name=f"Chronos_MetaLabeling_Run", nested=True):
+        with mlflow_logger.start_run(run_name="Chronos_MetaLabeling_Run", nested=True):
             mlflow_logger.log_params(
                 {"pipeline_config": self.config, "model_params": model_params}
             )

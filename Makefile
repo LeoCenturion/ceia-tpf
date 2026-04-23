@@ -17,3 +17,7 @@ sync-notebooks:
 jupyter:
 	poetry run jupyter notebook
 .PHONY: jupyter
+
+test:
+	poetry run python -m pytest
+.PHONY: test

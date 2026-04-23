@@ -142,7 +142,7 @@ def create_triple_barrier_labels(
     pt_mult, sl_mult = pt_sl_multipliers
     results = pd.DataFrame(
         index=close.index, columns=["label", "event_end_time"], dtype=object
-    )
+    )  # type: ignore
 
     # Align volatility index with close index to prevent mismatches
     volatility = volatility.reindex(close.index).fillna(method="ffill")

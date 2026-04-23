@@ -1,11 +1,13 @@
 import time
 from functools import wraps
+
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import log_loss, f1_score
-from sklearn.base import clone
 from scipy.stats import weightedtau
+from sklearn.base import clone
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import f1_score, log_loss
+
 
 def timer(func):
     """Decorator that prints the execution time of the function it decorates."""
@@ -76,9 +78,10 @@ def feature_importance_mda(model, X, y, cv, sample_weights, t1, scoring="neg_log
         scorer = log_loss
     else:
         # Assuming f1_score with "weighted" average
-        scorer = lambda y_true, y_pred, sample_weight, labels=None: f1_score(
-            y_true, y_pred, average="weighted", sample_weight=sample_weight
-        )
+        def scorer(y_true, y_pred, sample_weight, labels=None):
+            return f1_score(
+                    y_true, y_pred, average="weighted", sample_weight=sample_weight
+                )
 
     fold_importances = []
     for train_idx, test_idx in cv.split(X, y, groups=t1):

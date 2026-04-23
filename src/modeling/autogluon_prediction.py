@@ -7,8 +7,8 @@ from sklearn.metrics import f1_score
 
 from src.data_analysis import fetch_historical_data
 from src.data_analysis.indicators import (
-    create_features,
     create_ao_target,
+    create_features,
     create_price_change_target,
 )
 

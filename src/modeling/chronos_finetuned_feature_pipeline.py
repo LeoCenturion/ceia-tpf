@@ -1,27 +1,18 @@
 import logging
 import os
-import sys
 import shutil
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 import torch
-
-# Add project root to path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
 from chronos import ChronosPipeline
+from tqdm import tqdm
 
-from src.constants import CLOSE_COL, VOLUME_COL
 from src.data_analysis.data_analysis import fetch_historical_data
 from src.modeling.autogluon_adapter import AutoGluonAdapter
+from src.modeling.pipeline import timer
 from src.modeling.pipeline_runner import run_pipeline
 from src.modeling.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
-from src.modeling.pipeline import timer
-from src.modeling import PurgedKFold
 
 logger = logging.getLogger(__name__)
 
@@ -58,24 +49,31 @@ class FinetunedChronosFeaturePipeline(PalazzoXGBoostPipeline):
 
         chronos_embeddings = []
         indices = []
-        
-        for i in tqdm(range(0, len(bars) - window_size + 1, stride), desc="Generating Embeddings"):
+
+        for i in tqdm(
+            range(0, len(bars) - window_size + 1, stride), desc="Generating Embeddings"
+        ):
             window = bars.iloc[i : i + window_size]
             indices.append(window.index[-1])
             time_series_data = window["close_price"].values.astype(np.float32)
             time_series_tensor = torch.from_numpy(time_series_data)
 
-            input_ids, attention_mask, _ = self.chronos_tokenizer_for_embedding._input_transform(
-                time_series_tensor.unsqueeze(0)
+            input_ids, attention_mask, _ = (
+                self.chronos_tokenizer_for_embedding._input_transform(
+                    time_series_tensor.unsqueeze(0)
+                )
             )
             if torch.cuda.is_available():
-                input_ids, attention_mask = input_ids.to("cuda"), attention_mask.to("cuda")
+                input_ids, attention_mask = (
+                    input_ids.to("cuda"),
+                    attention_mask.to("cuda"),
+                )
 
             with torch.no_grad():
                 encoder_outputs = self.chronos_model_for_embedding.encode(
                     input_ids, attention_mask=attention_mask
                 )
-            
+
             embedding = encoder_outputs.mean(dim=1).squeeze().float().cpu().numpy()
             chronos_embeddings.append(embedding)
 
@@ -84,11 +82,13 @@ class FinetunedChronosFeaturePipeline(PalazzoXGBoostPipeline):
 
         return pd.DataFrame(
             np.array(chronos_embeddings),
-            index=pd.Index(indices, name='close_time'),
+            index=pd.Index(indices, name="close_time"),
             columns=[f"chronos_embed_{j}" for j in range(embedding.shape[0])],
         )
 
-    def cross_validation_feature_engineering(self, X_train_raw, X_test_raw, y_train_original, y_test_original):
+    def cross_validation_feature_engineering(
+        self, X_train_raw, X_test_raw, y_train_original, y_test_original
+    ):
         logger.info("Performing in-loop feature engineering via fine-tuning...")
 
         # --- 1. Get original bars data for this fold ---
@@ -96,32 +96,42 @@ class FinetunedChronosFeaturePipeline(PalazzoXGBoostPipeline):
         bars_test = self.bars_for_cv.loc[X_test_raw.index]
 
         # --- 2. Fine-tune Chronos on the training data for this fold ---
-        fold_model_path = f"AutogluonModels/FinetunedChronos_Temp_Fold"
+        fold_model_path = "AutogluonModels/FinetunedChronos_Temp_Fold"
         if os.path.exists(fold_model_path):
             shutil.rmtree(fold_model_path)
 
         # Use the actual classification labels for fine-tuning
         # Note: AutoGluon expects a DataFrame with 'timestamp', 'target', 'item_id'
-        train_df_finetune = pd.DataFrame({
-            "timestamp": bars_train.index,
-            "target": y_train_original.values, # Using original y_train for fine-tuning
-            "item_id": "fold_train",
-        })
+        train_df_finetune = pd.DataFrame(
+            {
+                "timestamp": bars_train.index,
+                "target": y_train_original.values,  # Using original y_train for fine-tuning
+                "item_id": "fold_train",
+            }
+        )
         ts_train_finetune = TimeSeriesDataFrame.from_data_frame(
             train_df_finetune, id_column="item_id", timestamp_column="timestamp"
         )
 
         predictor = TimeSeriesPredictor(
-            prediction_length=1, path=fold_model_path, target="target", verbosity=0, freq="min"
+            prediction_length=1,
+            path=fold_model_path,
+            target="target",
+            verbosity=0,
+            freq="min",
         )
         try:
             predictor.fit(
                 ts_train_finetune,
                 hyperparameters={
                     "Chronos": {
-                        "model_path": self.config.get("chronos_model_name", "amazon/chronos-t5-tiny"),
+                        "model_path": self.config.get(
+                            "chronos_model_name", "amazon/chronos-t5-tiny"
+                        ),
                         "fine_tune": True,
-                        "fine_tune_batch_size": self.config.get("fine_tune_batch_size", 16),
+                        "fine_tune_batch_size": self.config.get(
+                            "fine_tune_batch_size", 16
+                        ),
                     }
                 },
                 time_limit=self.config.get("finetune_time_limit", 300),
@@ -137,7 +147,9 @@ class FinetunedChronosFeaturePipeline(PalazzoXGBoostPipeline):
                 raise RuntimeError("AutoGluon predictor did not train any models.")
 
             finetuned_model_object = predictor._trainer.load_model(best_model_name)
-            finetuned_model_path = os.path.join(finetuned_model_object.path, "W0", "fine-tuned-ckpt")
+            finetuned_model_path = os.path.join(
+                finetuned_model_object.path, "W0", "fine-tuned-ckpt"
+            )
 
             finetuned_pipeline = ChronosPipeline.from_pretrained(
                 finetuned_model_path,
@@ -147,7 +159,9 @@ class FinetunedChronosFeaturePipeline(PalazzoXGBoostPipeline):
             self.chronos_model_for_embedding = finetuned_pipeline.model
             self.chronos_tokenizer_for_embedding = finetuned_pipeline.tokenizer
         except Exception as e:
-            logger.error(f"Failed to access fine-tuned Chronos model from predictor state: {e}")
+            logger.error(
+                f"Failed to access fine-tuned Chronos model from predictor state: {e}"
+            )
             return pd.DataFrame(), pd.DataFrame(), pd.Series(), pd.Series(), pd.Series()
 
         # --- 4. Generate embeddings and combine with tabular features ---
@@ -157,17 +171,24 @@ class FinetunedChronosFeaturePipeline(PalazzoXGBoostPipeline):
 
         # Ensure test set has the same columns, filling with NaN if empty
         if not chronos_features_train.empty:
-            chronos_features_test = chronos_features_test.reindex(columns=chronos_features_train.columns)
+            chronos_features_test = chronos_features_test.reindex(
+                columns=chronos_features_train.columns
+            )
 
         # Combine with the pre-computed tabular features passed into this method
-        X_train_final = pd.concat([X_train_raw, chronos_features_train], axis=1).dropna()
+        X_train_final = pd.concat(
+            [X_train_raw, chronos_features_train], axis=1
+        ).dropna()
         X_test_final = pd.concat([X_test_raw, chronos_features_test], axis=1).dropna()
 
         # --- 5. Align y_train, y_test, and sw_train to the final X_train_final and X_test_final ---
         y_train_final = y_train_original.loc[X_train_final.index]
-        y_test_final = y_test_original.loc[X_test_final.index] # Correctly use y_test_original
+        y_test_final = y_test_original.loc[
+            X_test_final.index
+        ]  # Correctly use y_test_original
 
         return X_train_final, X_test_final, y_train_final, y_test_final
+
 
 def run_single_pipeline():
     """Defines and runs a single pipeline for demonstration or debugging."""
@@ -209,9 +230,11 @@ def run_single_pipeline():
         data_path=data_path,
     )
 
+
 def main():
     """Main entry point for the script."""
     run_single_pipeline()
+
 
 if __name__ == "__main__":
     main()

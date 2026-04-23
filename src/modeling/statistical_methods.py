@@ -1,46 +1,29 @@
-import os
-import sys
-import time
-from functools import wraps
 
 
 import numpy as np
 import pandas as pd
-from sklearn.decomposition import PCA
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import cross_val_score
-from sklearn.metrics import log_loss, f1_score
-from sklearn.preprocessing import StandardScaler
 from sklearn.base import clone
-from statsmodels.tsa.stattools import adfuller
-from joblib import Parallel, delayed, cpu_count
+from sklearn.ensemble import RandomForestClassifier
 
+from src.constants import (
+    CLOSE_COL,
+)
 from src.data_analysis.bar_aggregation import create_dollar_bars
 from src.data_analysis.data_analysis import (
     fetch_historical_data,
-    get_weights_ffd,
-    frac_diff_ffd,
     find_minimum_d,
     timer,
 )
 from src.data_analysis.indicators import create_features
 from src.modeling import PurgedKFold
-from src.constants import (
-    OPEN_COL,
-    HIGH_COL,
-    LOW_COL,
-    CLOSE_COL,
-    VOLUME_COL,
-    TIMESTAMP_COL,
-)
-from src.modeling.pipeline import AbstractMLPipeline
 from src.modeling.feature_importance import (
-    feature_importance_mdi,
     feature_importance_mda,
-    feature_importance_sfi,
+    feature_importance_mdi,
     feature_importance_orthogonal,
+    feature_importance_sfi,
     weighted_kendalls_tau,
 )
+from src.modeling.pipeline import AbstractMLPipeline
 
 
 class MachineLearningPipeline(AbstractMLPipeline):
@@ -245,48 +228,7 @@ def main():
 
     model = RandomForestClassifier(n_estimators=1000, random_state=42, n_jobs=-1)
     
-    feature_whitelist = [
-        "avg_volume_20",
-        "ADX_14",
-        "Stoch_D_pct",
-        "open_pct_lag_1",
-        "VPT",
-        "low_pct_lag_1",
-        "high_pct_lag_1",
-        "pct_change",
-        "UO_7_14_28",
-        "MACD",
-        "RSI_pct",
-        "close_pct_lag_3",
-        "high_pct_lag_5",
-        "KAMA",
-        "Volume",
-        "VO",
-        "Stoch_K_pct",
-        "run",
-        "MACD_pct",
-        "high_pct_lag_2",
-        "CMF",
-        "AROONU_14",
-        "close_pct_lag_5",
-        "DMP_14",
-        "open_pct_lag_4",
-        "high_pct_lag_3",
-        "TSI_25_13",
-        "above_ema_40",
-        "low_pct_lag_3",
-        "TSIs_25_13",
-        "low_pct_lag_4",
-    ]
 
-    pca_whitelist = [
-        "PC2",
-        "PC3",
-        "PC4",
-        "PC6",
-        "PC1",
-        "PC5"
-    ]
     config = {
         "dollar_threshold": 1e9,
         "horizon": 8,

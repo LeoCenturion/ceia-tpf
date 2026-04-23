@@ -1,11 +1,15 @@
+import logging
+
 import pandas as pd
-from src.data_analysis.data_analysis import fetch_historical_data, adjust_data_to_ubtc
+
 from src.backtesting.cpcv_runner import run_cpcv_for_strategy
-from src.backtesting.strategies.chronos_metalabeling_strategy import ChronosMetaLabelingCPCVStrategy
+from src.backtesting.strategies.chronos_metalabeling_strategy import (
+    ChronosMetaLabelingCPCVStrategy,
+)
+from src.data_analysis.data_analysis import adjust_data_to_ubtc, fetch_historical_data
 from src.modeling.autogluon_adapter import AutoGluonAdapter
 from src.utils.logging_config import setup_logging
-import os
-import logging
+
 
 @setup_logging
 def main():

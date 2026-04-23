@@ -1,9 +1,9 @@
-import pandas as pd
-import numpy as np
-import shutil
 import os
-from sklearn.base import BaseEstimator, ClassifierMixin
+
+import pandas as pd
 from autogluon.tabular import TabularPredictor
+from sklearn.base import BaseEstimator, ClassifierMixin
+
 
 class AutoGluonAdapter(BaseEstimator, ClassifierMixin):
     """

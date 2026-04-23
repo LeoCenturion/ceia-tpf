@@ -1,5 +1,7 @@
-from backtesting.lib import crossover
+from typing import Optional
 
+import numpy as np
+from backtesting.lib import crossover
 from src.backtesting.backtesting import TrialStrategy, run_optimizations
 from src.data_analysis.data_analysis import ewm, pct_change, sma, std
 from src.data_analysis.indicators import rsi_indicator
@@ -13,8 +15,8 @@ class MaCrossover(TrialStrategy):  # pylint: disable=attribute-defined-outside-i
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.ma_short = None
-        self.ma_long = None
+        self.ma_short: Optional[np.ndarray] = None
+        self.ma_long: Optional[np.ndarray] = None
 
     def init(self):
         price_change = self.I(pct_change, self.data.Close)
@@ -23,6 +25,8 @@ class MaCrossover(TrialStrategy):  # pylint: disable=attribute-defined-outside-i
 
     def next(self):
         price = self.data.Close[-1]
+        if self.ma_short is None or self.ma_long is None:
+            return
         if crossover(self.ma_short, self.ma_long):
             self.buy(sl=price * (1 - self.stop_loss), tp=price * (1 + self.take_profit))
         elif crossover(self.ma_long, self.ma_short):
@@ -47,10 +51,10 @@ class BollingerBands(TrialStrategy):  # pylint: disable=attribute-defined-outsid
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.ma = None
-        self.std = None
-        self.upper_band = None
-        self.lower_band = None
+        self.ma: Optional[np.ndarray] = None
+        self.std: Optional[np.ndarray] = None
+        self.upper_band: Optional[np.ndarray] = None
+        self.lower_band: Optional[np.ndarray] = None
 
     def init(self):
         self.ma = self.I(sma, self.data.Close, self.bb_window)
@@ -60,9 +64,11 @@ class BollingerBands(TrialStrategy):  # pylint: disable=attribute-defined-outsid
 
     def next(self):
         price = self.data.Close[-1]
-        if price < self.lower_band:
+        if self.lower_band is None or self.upper_band is None:
+            return
+        if price < self.lower_band[-1]:
             self.buy(sl=price * (1 - self.stop_loss), tp=price * (1 + self.take_profit))
-        elif price > self.upper_band:
+        elif price > self.upper_band[-1]:
             self.sell(
                 sl=price * (1 + self.stop_loss), tp=price * (1 - self.take_profit)
             )
@@ -85,17 +91,20 @@ class MACD(TrialStrategy):  # pylint: disable=attribute-defined-outside-init
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.macd = None
-        self.signal = None
+        self.macd: Optional[np.ndarray] = None
+        self.signal: Optional[np.ndarray] = None
 
     def init(self):
         self.macd = self.I(ewm, self.data.Close, self.fast_span) - self.I(
             ewm, self.data.Close, self.slow_span
         )
-        self.signal = self.I(ewm, self.macd, self.signal_span)
+        if self.macd is not None:
+            self.signal = self.I(ewm, self.macd, self.signal_span)
 
     def next(self):
         price = self.data.Close[-1]
+        if self.macd is None or self.signal is None:
+            return
         if crossover(self.macd, self.signal):
             self.buy(sl=price * (1 - self.stop_loss), tp=price * (1 + self.take_profit))
         elif crossover(self.signal, self.macd):
@@ -121,13 +130,13 @@ class RSIDivergence(TrialStrategy):  # pylint: disable=attribute-defined-outside
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.rsi = None
+        self.rsi: Optional[np.ndarray] = None
 
     def init(self):
         self.rsi = self.I(rsi_indicator, self.data.Close, self.rsi_window)
 
     def next(self):
-        if len(self.data.Close) < self.divergence_period + 1:
+        if self.rsi is None or len(self.data.Close) < self.divergence_period + 1:
             return
 
         price = self.data.Close[-1]
@@ -173,19 +182,20 @@ class MultiIndicatorStrategy(TrialStrategy):  # pylint: disable=attribute-define
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.bb_ma = None
-        self.bb_std_dev = None
-        self.upper_band = None
-        self.lower_band = None
-        self.sma_fast = None
-        self.sma_slow = None
+        self.bb_ma: Optional[np.ndarray] = None
+        self.bb_std_dev: Optional[np.ndarray] = None
+        self.upper_band: Optional[np.ndarray] = None
+        self.lower_band: Optional[np.ndarray] = None
+        self.sma_fast: Optional[np.ndarray] = None
+        self.sma_slow: Optional[np.ndarray] = None
 
     def init(self):
         # Bollinger Bands
         self.bb_ma = self.I(sma, self.data.Close, self.bb_window)
         self.bb_std_dev = self.I(std, self.data.Close, self.bb_window)
-        self.upper_band = self.bb_ma + self.bb_std * self.bb_std_dev
-        self.lower_band = self.bb_ma - self.bb_std * self.bb_std_dev
+        if self.bb_ma is not None and self.bb_std_dev is not None:
+            self.upper_band = self.bb_ma + self.bb_std * self.bb_std_dev
+            self.lower_band = self.bb_ma - self.bb_std * self.bb_std_dev
 
         # SMAs for trend confirmation
         self.sma_fast = self.I(sma, self.data.Close, self.fast_sma_window)
@@ -206,12 +216,24 @@ class MultiIndicatorStrategy(TrialStrategy):  # pylint: disable=attribute-define
         # Entry logic
         if not self.position:
             # Long Entry: Price above upper BB & uptrend confirmed by SMAs
-            if price > self.upper_band and self.sma_fast > self.sma_slow:
+            if (
+                self.upper_band is not None
+                and self.sma_fast is not None
+                and self.sma_slow is not None
+                and price > self.upper_band[-1]
+                and self.sma_fast[-1] > self.sma_slow[-1]
+            ):
                 sl = price * (1 - self.trailing_sl_pct)
                 self.buy(sl=sl)
 
             # Short Entry: Price below lower BB & downtrend confirmed by SMAs
-            elif price < self.lower_band and self.sma_fast < self.sma_slow:
+            elif (
+                self.lower_band is not None
+                and self.sma_fast is not None
+                and self.sma_slow is not None
+                and price < self.lower_band[-1]
+                and self.sma_fast[-1] < self.sma_slow[-1]
+            ):
                 sl = price * (1 + self.trailing_sl_pct)
                 self.sell(sl=sl)
 

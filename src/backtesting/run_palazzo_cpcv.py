@@ -1,11 +1,14 @@
 import argparse
+import copy
 import logging
+from typing import Any, Dict
+
 import mlflow
 import numpy as np
-import xgboost as xgb
 import optuna
-import copy
-from sklearn.metrics import f1_score, classification_report
+import pandas as pd
+import xgboost as xgb
+from sklearn.metrics import classification_report, f1_score
 
 from src.backtesting.cpcv import (
     construct_backtest_paths,
@@ -15,29 +18,46 @@ from src.backtesting.cpcv import (
 )
 from src.data_analysis.data_analysis import fetch_historical_data
 from src.modeling.autogluon_adapter import AutoGluonAdapter
-from src.modeling.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
 from src.modeling.mlflow_utils import MLflowLogger
+from src.modeling.pipeline import AbstractMLPipeline
+from src.modeling.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
 from src.utils.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
 
 
 def run_cpcv_for_pipeline(
-    pipeline, raw_data, model_cls, model_params, experiment_name
-):
+    pipeline: PalazzoXGBoostPipeline,
+    raw_data: pd.DataFrame,
+    model_cls: Any,
+    model_params: Dict[str, Any],
+    experiment_name: str,
+) -> float:
     """
     Runs Combinatorially Purged Cross-Validation for a given ML pipeline.
     """
     # pylint: disable=too-many-locals
     mlflow_logger = MLflowLogger(experiment_name=experiment_name)
     run_name = f"CPCV_{pipeline.__class__.__name__}"
+    mean_f1 = 0.0
     with mlflow_logger.start_run(run_name=run_name):
         # Steps 1-3: Data processing from pipeline
-        bars = pipeline.step_1_data_structuring(raw_data)
-        features = pipeline.step_2_feature_engineering(bars)
-        y, sample_weights, t1_from_labeling = pipeline.step_3_labeling_and_weighting(
-            bars
-        )
+        bars = pipeline.step_1_data_structuring(raw_data)  # type: ignore
+        if bars is None:
+            logger.error("Data structuring returned None. Aborting CPCV.")
+            return 0.0
+        features = pipeline.step_2_feature_engineering(bars)  # type: ignore
+        if features is None:
+            logger.error("Feature engineering returned None. Aborting CPCV.")
+            return 0.0
+        (
+            y,
+            sample_weights,
+            t1_from_labeling,
+        ) = pipeline.step_3_labeling_and_weighting(bars)
+        if y is None or sample_weights is None or t1_from_labeling is None:
+            logger.error("Labeling and weighting returned None. Aborting CPCV.")
+            return 0.0
 
         common_index = features.index.intersection(y.index)
         X, y, sample_weights, t1 = (
@@ -118,42 +138,45 @@ def run_cpcv_for_pipeline(
 
         path_scores = []
         for i, result in enumerate(path_results):
-            path_run_name = f"path_{i+1}"
+            path_run_name = f"path_{i + 1}"
             with mlflow.start_run(run_name=path_run_name, nested=True):
                 y_true = result["y_true"]
                 y_pred = result["y_pred"]
 
                 # Calculate F1 score for logging and aggregation
-                score = f1_score(y_true, y_pred, average="weighted", zero_division=0)
+                score = f1_score(
+                    y_true, y_pred, average="weighted", zero_division="warn"
+                )
                 path_scores.append(score)
                 logger.info(
-                    f"Path {i+1}/{len(path_results)} F1 Score (weighted): {score:.4f}"
+                    f"Path {i + 1}/{len(path_results)} F1 Score (weighted): {score:.4f}"
                 )
 
                 # Generate detailed classification report
-                report = classification_report(
-                    y_true, y_pred, output_dict=True, zero_division=0
+                report: Dict[str, Any] = classification_report(
+                    y_true, y_pred, output_dict=True, zero_division="warn"
                 )
 
                 # Flatten the report for MLflow logging
-                flat_report = {}
-                for class_label, metrics in report.items():
-                    clean_class_label = class_label.replace(" ", "_")
-                    if isinstance(metrics, dict):
-                        for metric_name, value in metrics.items():
-                            clean_metric_name = metric_name.replace("-", "_")
-                            flat_report[
-                                f"{clean_class_label}_{clean_metric_name}"
-                            ] = value
-                    else:
-                        flat_report[clean_class_label] = metrics
+                if isinstance(report, dict):
+                    flat_report = {}
+                    for class_label, metrics in report.items():
+                        clean_class_label = class_label.replace(" ", "_")
+                        if isinstance(metrics, dict):
+                            for metric_name, value in metrics.items():
+                                clean_metric_name = metric_name.replace("-", "_")
+                                flat_report[
+                                    f"{clean_class_label}_{clean_metric_name}"
+                                ] = float(value)
+                        else:
+                            flat_report[clean_class_label] = float(metrics)
 
-                mlflow.log_metrics(flat_report)
-                mlflow.log_metric("f1_weighted", score)
+                    mlflow.log_metrics(flat_report)
+                mlflow.log_metric("f1_weighted", float(score))
 
         logger.info("--- CPCV Path Results ---")
-        mean_f1 = np.mean(path_scores) if path_scores else 0
-        std_f1 = np.std(path_scores) if path_scores else 0
+        mean_f1 = np.mean(path_scores) if path_scores else 0.0
+        std_f1 = np.std(path_scores) if path_scores else 0.0
         if path_scores:
             logger.info(
                 f"Individual Path F1 Scores: {[f'{s:.4f}' for s in path_scores]}"
@@ -165,7 +188,7 @@ def run_cpcv_for_pipeline(
             logger.warning("No complete backtest paths were evaluated.")
 
     logger.info("CPCV process finished.")
-    return mean_f1
+    return float(mean_f1)
 
 
 @setup_logging
@@ -236,14 +259,10 @@ def main():
             experiment_name=experiment_name,
         )
 
-        if not path_scores:
-            logger.error(
-                "CPCV execution resulted in no valid paths. Please check data and configuration."
-            )
-
     elif args.model == "autogluon":
         if args.optimize:
-            def autogluon_objective(trial):
+
+            def autogluon_objective(trial: optuna.Trial) -> float:
                 try:
                     base_model_params = {
                         "label": "label",
@@ -257,14 +276,16 @@ def main():
                         "time_limit": 600,
                         "verbosity": 1,
                     }
-                    
+
                     presets = trial.suggest_categorical(
                         "presets", ["medium_quality", "high_quality", "best_quality"]
                     )
-                    
+
                     model_params = copy.deepcopy(base_model_params)
                     model_params["presets"] = presets
-                    model_params["path"] = f"AutogluonModels/palazzo_cpcv_autogluon_trial_{trial.number}"
+                    model_params["path"] = (
+                        f"AutogluonModels/palazzo_cpcv_autogluon_trial_{trial.number}"
+                    )
 
                     return run_cpcv_for_pipeline(
                         pipeline=pipeline,
@@ -299,15 +320,13 @@ def main():
                 "path": "AutogluonModels/palazzo_cpcv_autogluon_run_single",  # Unique path for single run
             }
             experiment_name = "Palazzo_CPCV_AutoGluon_Single_Run"
-            path_scores = run_cpcv_for_pipeline(
+            run_cpcv_for_pipeline(
                 pipeline=pipeline,
                 raw_data=data,
                 model_cls=model_cls,
                 model_params=model_params,
                 experiment_name=experiment_name,
             )
-
-
 
 
 if __name__ == "__main__":

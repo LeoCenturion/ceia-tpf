@@ -1,5 +1,6 @@
 from binance.client import Client
 
+
 class BinanceClient:
     def __init__(self, api_key, api_secret, testnet=False):
         self.api_key = api_key
@@ -18,8 +19,8 @@ class BinanceClient:
             print(f"Connection failed: {e}")
             return False
 
-    def get_historical_klines(self, symbol, interval, start_str):
-        return self.client.get_historical_klines(symbol, interval, start_str)
+    def get_historical_klines(self, symbol, interval, start_str=None, limit=500):
+        return self.client.get_historical_klines(symbol=symbol, interval=interval, start_str=start_str, limit=limit)
 
     def get_latest_price(self, symbol):
         return self.client.get_symbol_ticker(symbol=symbol)['price']

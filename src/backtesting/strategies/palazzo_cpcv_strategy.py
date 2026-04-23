@@ -1,6 +1,5 @@
-import pandas as pd
 from src.backtesting.backtesting import TrialStrategy
-from src.modeling.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
+
 
 class PalazzoXGBoostCPCVStrategy(TrialStrategy):
     """
@@ -46,7 +45,9 @@ class PalazzoXGBoostCPCVStrategy(TrialStrategy):
 
         # Generate a prediction using the pre-trained pipeline
         # The pipeline's predict method should return a single signal (0 or 1)
-        prediction = self.trained_pipeline.predict(data_window)
+        prediction = 0
+        if self.trained_pipeline:
+            prediction = self.trained_pipeline.predict(data_window)
 
         self.signal = prediction
         

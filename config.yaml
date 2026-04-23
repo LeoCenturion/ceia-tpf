@@ -1,0 +1,17 @@
+exchange:
+  mock_file: './BTCUSDT_consolidated_klines.csv'
+
+bot:
+  symbol: 'BTC/USDT'
+  timeframe: '1m'
+  tick_interval: 0
+  strategy:
+    name: 'ChronosPalazzo'
+    volume_threshold: 1000
+    min_bars_to_fit: 30
+    refit_every_n_bars: 10
+  capital_allocation:
+    initial_balance: 10000.0
+    max_capital: 1000.0
+  risk_management:
+    stop_loss: 0.02

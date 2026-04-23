@@ -1,3 +1,7 @@
+from typing import Optional
+
+from numpy.typing import NDArray
+
 from src.backtesting.backtesting import TrialStrategy, run_optimizations
 from src.data_analysis.data_analysis import sma
 
@@ -188,7 +192,7 @@ class MartingaleWithTrendFilter(TrialStrategy):  # pylint: disable=attribute-def
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.ma = None
+        self.ma: Optional[NDArray] = None
         self.trend = 0  # 1 for up, -1 for down
         self.doubles_count = 0
         self.base_trade_size = 0
@@ -206,6 +210,7 @@ class MartingaleWithTrendFilter(TrialStrategy):  # pylint: disable=attribute-def
         if len(self.data.Close) < self.ma_window:
             return
 
+        assert self.ma is not None
         new_trend = 1 if self.data.Close[-1] > self.ma[-1] else -1
 
         if new_trend != self.trend:

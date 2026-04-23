@@ -1,20 +1,20 @@
-import pandas as pd
-import numpy as np
-from autogluon.multimodal import MultiModalPredictor
-from autogluon.timeseries import TimeSeriesPredictor, TimeSeriesDataFrame
-import optuna
 from functools import partial
-import matplotlib.pyplot as plt
 
-from src.data_analysis import fetch_historical_data
+import matplotlib.pyplot as plt
+import numpy as np
+import optuna
+import pandas as pd
+from autogluon.multimodal import MultiModalPredictor
+from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
+
 from src.constants import (
-    OPEN_COL,
+    CLOSE_COL,
     HIGH_COL,
     LOW_COL,
-    CLOSE_COL,
-    VOLUME_COL,
+    OPEN_COL,
     TIMESTAMP_COL,
 )
+from src.data_analysis import fetch_historical_data
 
 
 def run_multimodal_regression_backtest():

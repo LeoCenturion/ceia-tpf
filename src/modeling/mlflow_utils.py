@@ -1,8 +1,10 @@
-import mlflow
-import os
-import pandas as pd
 import json
+import os
 from datetime import datetime
+
+import mlflow
+import pandas as pd
+
 
 class MLflowLogger:
     def __init__(self, experiment_name, tracking_uri=None):
@@ -72,7 +74,6 @@ class MLflowLogger:
         """
         Log a dictionary as a JSON artifact.
         """
-        import json
         temp_filepath = f"temp_{artifact_path}"
         with open(temp_filepath, 'w') as f:
             json.dump(dictionary, f, indent=4)

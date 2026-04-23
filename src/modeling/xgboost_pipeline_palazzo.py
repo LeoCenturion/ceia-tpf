@@ -1,30 +1,23 @@
-import os
-import sys
 import numpy as np
 import pandas as pd
 import xgboost as xgb
-from sklearn.metrics import f1_score, classification_report
-from sklearn.preprocessing import StandardScaler
 from sklearn.utils.class_weight import compute_class_weight
-
-# Make the script runnable from anywhere
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
+from typing import cast
+from src.constants import (
+    CLOSE_COL,
+    HIGH_COL,
+    LOW_COL,
+    OPEN_COL,
+    VOLUME_COL,
+)
 from src.data_analysis.data_analysis import fetch_historical_data, timer
 from src.modeling.pipeline import AbstractMLPipeline
 from src.modeling.pipeline_runner import run_pipeline
-from src.constants import (
-    OPEN_COL,
-    HIGH_COL,
-    LOW_COL,
-    CLOSE_COL,
-    VOLUME_COL,
+from src.modeling.xgboost_price_reversal_palazzo import (
+    _create_reversal_features,
+    aggregate_to_volume_bars,
 )
 from src.modeling.xgboost_price_reversal_palazzo import (
-    aggregate_to_volume_bars,
-    _create_reversal_features,
     create_labels as palazzo_create_labels,
 )
 
@@ -36,7 +29,7 @@ class PalazzoXGBoostPipeline(AbstractMLPipeline):
         super().__init__(config)
 
     @timer
-    def step_1_data_structuring(self, raw_tick_data):
+    def step_1_data_structuring(self, raw_tick_data) -> pd.DataFrame:
         # Reuse aggregate_to_volume_bars from palazzo script
         df = aggregate_to_volume_bars(raw_tick_data, self.config["volume_threshold"])
         # Ensure index is datetime (aggregate_to_volume_bars returns RangeIndex with close_time col)
@@ -45,7 +38,7 @@ class PalazzoXGBoostPipeline(AbstractMLPipeline):
         return df
 
     @timer
-    def step_2_feature_engineering(self, bars):
+    def step_2_feature_engineering(self, bars) -> pd.DataFrame:
         # print("Step 2: Creating features...")
         # Prepare temp df with standard column names for the shared feature creator
         temp_df = pd.DataFrame(index=bars.index)
@@ -77,7 +70,9 @@ class PalazzoXGBoostPipeline(AbstractMLPipeline):
         return final_features.dropna()
 
     @timer
-    def step_3_labeling_and_weighting(self, bars):
+    def step_3_labeling_and_weighting(
+        self, bars
+    ) -> tuple[pd.Series, pd.Series, pd.DataFrame]:
         # print("Step 3: Creating target labels and sample weights...")
 
         # The `palazzo_create_labels` function is the correct source for the event
@@ -86,7 +81,7 @@ class PalazzoXGBoostPipeline(AbstractMLPipeline):
         df_labeled, t1 = palazzo_create_labels(bars.copy(), tau=self.config["tau"])
 
         # Balanced weights
-        y = df_labeled["label"]
+        y: pd.Series = cast(pd.Series, df_labeled["label"])
         weights = compute_class_weight("balanced", classes=np.unique(y), y=y)
         class_weight_dict = dict(zip(np.unique(y), weights))
         sample_weights = y.map(class_weight_dict)
@@ -130,7 +125,7 @@ def main():
         raw_data=raw_data,
         model_params=model_params,
         experiment_name="Palazzo_XGBoost_Pipeline",
-        data_path=data_path
+        data_path=data_path,
     )
 
 

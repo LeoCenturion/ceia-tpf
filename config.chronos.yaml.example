@@ -4,11 +4,15 @@ exchange:
   api_key: 'YOUR_API_KEY'
   api_secret: 'YOUR_API_SECRET'
   testnet: True
+  # mock_file: 'data/BTCUSDT_1m.csv' # Uncomment to use mock data
 
 bot:
   strategy:
     name: 'ChronosPalazzo'
-    model_path: '/path/to/your/chronos/model'
+    model_path: 'amazon/chronos-t5-small'
+    volume_threshold: 50000
+    refit_every_n_bars: 10
   symbol: 'BTC/USDT'
-  timeframe: '1h'
+  timeframe: '1m'
   capital_allocation: 1000.0 # in quote currency (e.g., USDT)
+  tick_interval: 1 # seconds
