@@ -29,7 +29,7 @@
 - [x] Task: Integrate the new strategy into the bot's `StrategyFactory`. c7cb46f
     - [x] Modify `src/app/strategy.py` to import `ChronosPalazzoStrategy`.
     - [x] Add a new case in the `create_strategy` method to handle `name='ChronosPalazzo'`.
-- [ ] Task: Create an example configuration file.
-    - [ ] Create a new file named `config.chronos.yaml.example` in the root directory.
-    - [ ] Add the necessary configuration for the bot and the new strategy, including a placeholder for the `model_path`.
+- [x] Task: Create an example configuration file. f66fbb2
+    - [x] Create a new file named `config.chronos.yaml.example` in the root directory.
+    - [x] Add the necessary configuration for the bot and the new strategy, including a placeholder for the `model_path`.
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Integration and Configuration' (Protocol in workflow.md)
