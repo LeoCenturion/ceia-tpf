@@ -1,0 +1,14 @@
+# Example configuration for the ChronosPalazzoStrategy
+exchange:
+  name: 'binance'
+  api_key: 'YOUR_API_KEY'
+  api_secret: 'YOUR_API_SECRET'
+  testnet: True
+
+bot:
+  strategy:
+    name: 'ChronosPalazzo'
+    model_path: '/path/to/your/chronos/model'
+  symbol: 'BTC/USDT'
+  timeframe: '1h'
+  capital_allocation: 1000.0 # in quote currency (e.g., USDT)
