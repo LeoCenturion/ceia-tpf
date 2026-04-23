@@ -21,7 +21,7 @@
         - [x] Implement the logic to convert the numerical prediction to a "BUY" (> 0) or "SELL" (<= 0) signal.
         - [x] In the case of an exception, log the error and return `None`.
     - [x] Implement a `get_order_size` method (e.g., returning a fixed default value).
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Strategy Implementation' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Strategy Implementation' (Protocol in workflow.md) [checkpoint: 81cfd26]
 
 ## Phase 2: Integration and Configuration
 
