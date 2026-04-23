@@ -26,9 +26,9 @@
 ## Phase 2: Integration and Configuration
 
 - [x] Task: Write a failing test to ensure the `StrategyFactory` can create the `ChronosPalazzoStrategy`. d9bcbba
-- [ ] Task: Integrate the new strategy into the bot's `StrategyFactory`.
-    - [ ] Modify `src/app/strategy.py` to import `ChronosPalazzoStrategy`.
-    - [ ] Add a new case in the `create_strategy` method to handle `name='ChronosPalazzo'`.
+- [x] Task: Integrate the new strategy into the bot's `StrategyFactory`. c7cb46f
+    - [x] Modify `src/app/strategy.py` to import `ChronosPalazzoStrategy`.
+    - [x] Add a new case in the `create_strategy` method to handle `name='ChronosPalazzo'`.
 - [ ] Task: Create an example configuration file.
     - [ ] Create a new file named `config.chronos.yaml.example` in the root directory.
     - [ ] Add the necessary configuration for the bot and the new strategy, including a placeholder for the `model_path`.
