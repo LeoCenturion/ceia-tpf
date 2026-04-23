@@ -21,7 +21,7 @@ class TestChronosPalazzoStrategy(unittest.TestCase):
         self.assertEqual(strategy.model, self.mock_model)
 
     @patch('autogluon.timeseries.TimeSeriesPredictor.load')
-    @patch('src.modeling.chronos_modeling.PalazzoChronosBinaryClassificationPipeline')
+    @patch('src.modeling.chronos_pipeline_palazzo.PalazzoChronosBinaryClassificationPipeline')
     def test_get_signal_buy(self, mock_pipeline_class, mock_load):
         self.mock_model.predict.return_value = pd.DataFrame({'mean': [1]})
         mock_load.return_value = self.mock_model
@@ -38,7 +38,7 @@ class TestChronosPalazzoStrategy(unittest.TestCase):
         self.assertEqual(signal, 'BUY')
 
     @patch('autogluon.timeseries.TimeSeriesPredictor.load')
-    @patch('src.modeling.chronos_modeling.PalazzoChronosBinaryClassificationPipeline')
+    @patch('src.modeling.chronos_pipeline_palazzo.PalazzoChronosBinaryClassificationPipeline')
     def test_get_signal_sell(self, mock_pipeline_class, mock_load):
         self.mock_model.predict.return_value = pd.DataFrame({'mean': [-1]})
         mock_load.return_value = self.mock_model
@@ -58,7 +58,7 @@ class TestChronosPalazzoStrategy(unittest.TestCase):
         self.assertEqual(signal, 'SELL')
 
     @patch('autogluon.timeseries.TimeSeriesPredictor.load')
-    @patch('src.modeling.chronos_modeling.PalazzoChronosBinaryClassificationPipeline')
+    @patch('src.modeling.chronos_pipeline_palazzo.PalazzoChronosBinaryClassificationPipeline')
     @patch('logging.error')
     def test_get_signal_prediction_error(self, mock_log_error, mock_pipeline_class, mock_load):
         self.mock_model.predict.side_effect = Exception("Prediction failed")
