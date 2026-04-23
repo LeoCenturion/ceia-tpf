@@ -2,7 +2,7 @@
 
 ## Phase 1: Strategy Implementation
 
-- [ ] Task: Create the new strategy file at `src/app/chronos_strategy.py`.
+- [x] Task: Create the new strategy file at `src/app/chronos_strategy.py` 488f4dd
 - [ ] Task: Write failing tests for the `ChronosPalazzoStrategy`.
     - [ ] Create test file `tests/app/test_chronos_strategy.py`.
     - [ ] Write a test to ensure the strategy class can be initialized and loads a mocked model.
