@@ -3,12 +3,12 @@
 ## Phase 1: Strategy Implementation
 
 - [x] Task: Create the new strategy file at `src/app/chronos_strategy.py` 488f4dd
-- [ ] Task: Write failing tests for the `ChronosPalazzoStrategy`.
-    - [ ] Create test file `tests/app/test_chronos_strategy.py`.
-    - [ ] Write a test to ensure the strategy class can be initialized and loads a mocked model.
-    - [ ] Write a test that simulates receiving market data and asserts that the strategy returns a "BUY" signal when the mocked model's prediction is positive.
-    - [ ] Write a test that asserts the strategy returns a "SELL" signal when the mocked model's prediction is zero or negative.
-    - [ ] Write a test to verify that an error is logged and no signal is returned if the model prediction fails.
+- [x] Task: Write failing tests for the `ChronosPalazzoStrategy`. a0fd2b6
+    - [x] Create test file `tests/app/test_chronos_strategy.py`.
+    - [x] Write a test to ensure the strategy class can be initialized and loads a mocked model.
+    - [x] Write a test that simulates receiving market data and asserts that the strategy returns a "BUY" signal when the mocked model's prediction is positive.
+    - [x] Write a test that asserts the strategy returns a "SELL" signal when the mocked model's prediction is zero or negative.
+    - [x] Write a test to verify that an error is logged and no signal is returned if the model prediction fails.
 - [ ] Task: Implement the `ChronosPalazzoStrategy` class in `src/app/chronos_strategy.py` to pass the tests.
     - [ ] Implement the `__init__` method to load the `TimeSeriesPredictor` from a path provided in the config.
     - [ ] Implement the `get_signal` method.
