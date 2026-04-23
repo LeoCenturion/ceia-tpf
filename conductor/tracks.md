@@ -35,5 +35,5 @@ The requirements are
 
 ---
 
-- [ ] **Track: implement PalazzoChronosBinaryClassificationPipeline for the trading bot**
+- [~] **Track: implement PalazzoChronosBinaryClassificationPipeline for the trading bot**
 *Link: [./tracks/chronos_strategy_20260421/](./tracks/chronos_strategy_20260421/)*
