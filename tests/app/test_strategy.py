@@ -1,6 +1,6 @@
 import unittest
 import pandas as pd
-from src.app.strategy import Strategy, MACDStrategy
+from src.app.strategy import Strategy, MACDStrategy, StrategyFactory
 
 class TestStrategy(unittest.TestCase):
     def test_strategy_interface(self):
@@ -12,6 +12,11 @@ class TestStrategy(unittest.TestCase):
         strategy = DummyStrategy()
         self.assertEqual(strategy.get_signal(None), "HOLD")
         self.assertEqual(strategy.get_order_size(), 0)
+
+class TestStrategyFactory(unittest.TestCase):
+    def test_create_chronos_strategy_fails(self):
+        with self.assertRaises(ValueError):
+            StrategyFactory.create_strategy(name='ChronosPalazzo', config={})
 
 class TestMACDStrategy(unittest.TestCase):
     def setUp(self):
