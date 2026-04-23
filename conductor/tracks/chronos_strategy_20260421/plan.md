@@ -32,4 +32,4 @@
 - [x] Task: Create an example configuration file. f66fbb2
     - [x] Create a new file named `config.chronos.yaml.example` in the root directory.
     - [x] Add the necessary configuration for the bot and the new strategy, including a placeholder for the `model_path`.
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Integration and Configuration' (Protocol in workflow.md)
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Integration and Configuration' (Protocol in workflow.md) [checkpoint: 4ba039d]
