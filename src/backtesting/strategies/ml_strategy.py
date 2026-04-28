@@ -1,11 +1,10 @@
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd
 import xgboost as xgb
 from numpy.typing import NDArray
-from pandas import DataFrame, Index, Series
 from scipy.signal import find_peaks
 from scipy.stats import pearsonr
 from sklearn.ensemble import RandomForestClassifier
@@ -761,7 +760,9 @@ class XGBoostPriceReversalStrategy(Strategy):  # pylint: disable=attribute-defin
             peak_threshold=self.peak_threshold,
         )
         y = reversal_data["target"]
-        self.target_series = y.map(lambda x: {-1: 0, 0: 1, 1: 2}.get(x, x)).bfill().ffill()
+        self.target_series = (
+            y.map(lambda x: {-1: 0, 0: 1, 1: 2}.get(x, x)).bfill().ffill()
+        )
 
     def next(self):
         # Retrain the model periodically

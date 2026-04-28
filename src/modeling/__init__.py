@@ -59,7 +59,7 @@ class PurgedKFold(_BaseKFold):
             # --- Training set before test set ---
             # Handle case where test_start_idx is 0 or out of bounds for t1.index
             if test_start_idx >= len(self.t1.index):
-                test_start_time = None # Should not happen if test_ranges are valid
+                test_start_time = None  # Should not happen if test_ranges are valid
             else:
                 test_start_time = self.t1.index[test_start_idx]
 
@@ -76,12 +76,18 @@ class PurgedKFold(_BaseKFold):
             if len(test_indices) == 0:
                 latest_end_in_test = None
             else:
-                latest_end_in_test = self.t1.iloc[test_indices].max() # This is where the error likely occurred before
+                latest_end_in_test = self.t1.iloc[
+                    test_indices
+                ].max()  # This is where the error likely occurred before
 
             if latest_end_in_test is not None:
-                first_start_after_test_idx = self.t1.index.searchsorted(latest_end_in_test)
+                first_start_after_test_idx = self.t1.index.searchsorted(
+                    latest_end_in_test
+                )
             else:
-                first_start_after_test_idx = len(indices) # Effectively no 'after' training set if test is empty
+                first_start_after_test_idx = len(
+                    indices
+                )  # Effectively no 'after' training set if test is empty
 
             train_indices_after = indices[first_start_after_test_idx + embargo_size :]
 

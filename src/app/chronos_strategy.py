@@ -1,5 +1,5 @@
 import logging
-from typing import Literal, Any, Tuple, Optional, Union
+from typing import Literal, Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -15,14 +15,14 @@ class ChronosPalazzoStrategy(Strategy):
         self.pipeline = PalazzoChronosBinaryClassificationPipeline(config)
 
         # Volume bar settings
-        self.volume_threshold: float = config.get('volume_threshold', 50000)
+        self.volume_threshold: float = config.get("volume_threshold", 50000)
         self.current_bar_data: list[pd.Series] = []
         self.cumulative_volume: float = 0.0
         self.volume_bars: pd.DataFrame = pd.DataFrame()
         self.last_processed_timestamp: Optional[pd.Timestamp] = None
 
         # Model refitting settings
-        self.refit_every_n_bars: int = config.get('refit_every_n_bars', 10)
+        self.refit_every_n_bars: int = config.get("refit_every_n_bars", 10)
         self.bars_since_refit: int = 0
         self.model_is_fit: bool = False
         self.min_bars_to_fit: int = config.get("min_bars_to_fit", 30)
@@ -30,6 +30,28 @@ class ChronosPalazzoStrategy(Strategy):
         # Predictor state (populated by pipeline.fit_predictor)
         self.predictor: Any = None
         self.known_covariates_names: Optional[list[str]] = None
+
+        warmup_csv: Optional[str] = config.get("warmup_csv")
+        if warmup_csv:
+            warmup_lookback: Optional[int] = config.get("warmup_lookback")
+            self._warmup_from_csv(warmup_csv, warmup_lookback)
+
+    def _warmup_from_csv(self, path: str, lookback: Optional[int]) -> None:
+        logging.info(f"Warming up from historical data: {path}")
+        df = pd.read_csv(path, parse_dates=["date"], index_col="date")
+        df.index = pd.to_datetime(df.index)
+        df = df[["open", "high", "low", "close", "volume"]]
+        if lookback is not None:
+            df = df.iloc[-lookback:]
+        self._process_new_1m_bars(df)
+        discarded = len(self.current_bar_data)
+        self.current_bar_data = []
+        self.cumulative_volume = 0.0
+        logging.info(
+            f"Warmup complete: {len(self.volume_bars)} volume bars built "
+            f"from {len(df)} historical 1m bars "
+            f"(discarded {discarded} partial 1m bars at boundary)."
+        )
 
     def _process_new_1m_bars(self, data: pd.DataFrame) -> bool:
         new_bars_generated: bool = False
@@ -52,7 +74,7 @@ class ChronosPalazzoStrategy(Strategy):
 
         for timestamp, row in new_data.iterrows():
             self.current_bar_data.append(row)
-            self.cumulative_volume += float(row['volume'])
+            self.cumulative_volume += float(row["volume"])
 
             logging.debug(
                 f"  1m bar @ {timestamp} | close: {row['close']} | "
@@ -70,26 +92,36 @@ class ChronosPalazzoStrategy(Strategy):
     def _create_volume_bar(self) -> None:
         bar_df = pd.DataFrame(self.current_bar_data)
 
-        open_price: float = float(bar_df['open'].iloc[0])
-        high_price: float = float(bar_df['high'].max())
-        low_price: float = float(bar_df['low'].min())
-        close_price: float = float(bar_df['close'].iloc[-1])
+        open_price: float = float(bar_df["open"].iloc[0])
+        high_price: float = float(bar_df["high"].max())
+        low_price: float = float(bar_df["low"].min())
+        close_price: float = float(bar_df["close"].iloc[-1])
         # Convert index to list and then access the last element
         close_time: pd.Timestamp = pd.to_datetime(list(bar_df.index)[-1])
 
-        bar_log_returns = np.log(bar_df['close'] / bar_df['close'].shift(1)).dropna()
-        intra_bar_std: float = float(bar_log_returns.std()) if len(bar_log_returns) > 1 else 0.0
+        bar_log_returns = np.log(bar_df["close"] / bar_df["close"].shift(1)).dropna()
+        intra_bar_std: float = (
+            float(bar_log_returns.std()) if len(bar_log_returns) > 1 else 0.0
+        )
 
-        new_volume_bar = pd.DataFrame([{'open_price': open_price,
-                                        'High': high_price,
-                                        'Low': low_price,
-                                        'close_price': close_price,
-                                        'total_volume': self.cumulative_volume,
-                                        'intra_bar_std': intra_bar_std}],
-                                      index=pd.Index([close_time]))
+        new_volume_bar = pd.DataFrame(
+            [
+                {
+                    "open_price": open_price,
+                    "High": high_price,
+                    "Low": low_price,
+                    "close_price": close_price,
+                    "total_volume": self.cumulative_volume,
+                    "intra_bar_std": intra_bar_std,
+                }
+            ],
+            index=pd.Index([close_time]),
+        )
 
-        new_volume_bar['bar_return'] = (new_volume_bar['close_price'] / new_volume_bar['open_price']) - 1
-        bar_return: float = float(new_volume_bar['bar_return'].iloc[0])
+        new_volume_bar["bar_return"] = (
+            new_volume_bar["close_price"] / new_volume_bar["open_price"]
+        ) - 1
+        bar_return: float = float(new_volume_bar["bar_return"].iloc[0])
 
         self.volume_bars = pd.concat([self.volume_bars, new_volume_bar])
 
@@ -108,12 +140,18 @@ class ChronosPalazzoStrategy(Strategy):
         new_bars_generated: bool = self._process_new_1m_bars(data)
 
         if not new_bars_generated:
-            logging.debug("No volume bar completed this tick; skipping signal generation.")
+            logging.debug(
+                "No volume bar completed this tick; skipping signal generation."
+            )
             return "HOLD"
 
         try:
-            features: pd.DataFrame = self.pipeline.step_2_feature_engineering(self.volume_bars.copy())
-            y: pd.Series = self.pipeline.step_3_labeling_and_weighting(self.volume_bars.copy())[0]
+            features: pd.DataFrame = self.pipeline.step_2_feature_engineering(
+                self.volume_bars.copy()
+            )
+            y: pd.Series = self.pipeline.step_3_labeling_and_weighting(
+                self.volume_bars.copy()
+            )[0]
 
             common_idx = features.index.intersection(y.index)
             features = features.loc[common_idx]
@@ -126,12 +164,17 @@ class ChronosPalazzoStrategy(Strategy):
                 )
                 return "HOLD"
 
-            if not self.model_is_fit or self.bars_since_refit >= self.refit_every_n_bars:
+            if (
+                not self.model_is_fit
+                or self.bars_since_refit >= self.refit_every_n_bars
+            ):
                 logging.info(
                     f"Fitting model on {len(features)} volume bars "
                     f"(bars since last fit: {self.bars_since_refit})"
                 )
-                self.predictor, self.known_covariates_names = self.pipeline.fit_predictor(features, y)
+                self.predictor, self.known_covariates_names = (
+                    self.pipeline.fit_predictor(features, y)
+                )
                 self.model_is_fit = True
                 self.bars_since_refit = 0
                 logging.debug("Model fit complete.")
@@ -140,13 +183,17 @@ class ChronosPalazzoStrategy(Strategy):
                 logging.info("Model is fit, generating signal.")
                 # Ensure known_covariates_names is not None
                 if self.known_covariates_names is None:
-                    logging.warning("known_covariates_names is None, cannot predict. Returning HOLD.")
+                    logging.warning(
+                        "known_covariates_names is None, cannot predict. Returning HOLD."
+                    )
                     return "HOLD"
-                
+
                 predicted_class: int = self.pipeline.predict_next(
                     self.predictor, features, y, self.known_covariates_names
                 )
-                signal: Literal["BUY", "SELL", "HOLD"] = 'BUY' if predicted_class == 1 else 'SELL'
+                signal: Literal["BUY", "SELL", "HOLD"] = (
+                    "BUY" if predicted_class == 1 else "SELL"
+                )
                 logging.debug(f"Predicted class: {predicted_class} → signal: {signal}")
                 return signal
 

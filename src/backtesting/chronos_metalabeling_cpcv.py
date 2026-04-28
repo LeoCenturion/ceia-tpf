@@ -69,9 +69,7 @@ def run_cpcv_for_metalabeling_pipeline(
         # --- Step 1: Data Structuring ---
         logger.info(f"Raw data shape before structuring: {raw_data.shape}")
         initial_bars = initial_pipeline.step_1_data_structuring(raw_data)
-        logger.info(
-            f"Shape after step_1_data_structuring (bars): {initial_bars.shape}"
-        )
+        logger.info(f"Shape after step_1_data_structuring (bars): {initial_bars.shape}")
         if initial_bars.empty:
             raise ValueError(
                 "Initial data structuring resulted in no bars. Cannot proceed with CPCV."
@@ -98,11 +96,9 @@ def run_cpcv_for_metalabeling_pipeline(
         )
 
         # Align all initial data to the common index for CPCV partitioning
-        common_initial_index = (
-            initial_features.index.intersection(initial_labels.index).intersection(
-                initial_t1.index
-            )
-        )
+        common_initial_index = initial_features.index.intersection(
+            initial_labels.index
+        ).intersection(initial_t1.index)
         X_cpcv = initial_features.loc[common_initial_index]
         y_cpcv = initial_labels.loc[common_initial_index]
         t1_cpcv = initial_t1.loc[common_initial_index]
@@ -189,14 +185,14 @@ def run_cpcv_for_metalabeling_pipeline(
             test_bars_fold = fold_pipeline.step_1_data_structuring(test_data_raw)
             if test_bars_fold.empty:
                 logger.warning(
-                    f"Skipping fold {fold+1} because no bars were generated for test data raw."
+                    f"Skipping fold {fold + 1} because no bars were generated for test data raw."
                 )
                 continue
 
             X_test_fold = fold_pipeline.step_2_feature_engineering(test_bars_fold)
             if X_test_fold.empty:
                 logger.warning(
-                    f"Skipping fold {fold+1} because no features were generated for test bars fold."
+                    f"Skipping fold {fold + 1} because no features were generated for test bars fold."
                 )
                 continue
 
@@ -211,7 +207,7 @@ def run_cpcv_for_metalabeling_pipeline(
 
             if X_test_fold_aligned.empty or y_test_fold_aligned.empty:
                 logger.warning(
-                    f"Skipping fold {fold+1} because aligned test features or labels are empty."
+                    f"Skipping fold {fold + 1} because aligned test features or labels are empty."
                 )
                 continue
 
@@ -246,7 +242,7 @@ def run_cpcv_for_metalabeling_pipeline(
         )
 
         for i, result in enumerate(path_results):
-            path_run_name = f"path_{i+1}"
+            path_run_name = f"path_{i + 1}"
             with mlflow.start_run(run_name=path_run_name, nested=True):
                 y_true = result["y_true"]
                 y_pred = result["y_pred"]
@@ -257,7 +253,7 @@ def run_cpcv_for_metalabeling_pipeline(
                 )
                 path_scores.append(float(score))
                 logger.info(
-                    f"Path {i+1}/{len(path_results)} F1 Score (weighted): {score:.4f}"
+                    f"Path {i + 1}/{len(path_results)} F1 Score (weighted): {score:.4f}"
                 )
 
                 report: Union[Dict[str, Any], str] = classification_report(
@@ -308,7 +304,7 @@ def main():
     raw_data = fetch_historical_data(
         symbol="BTC/USDT",
         timeframe="1m",
-        data_path=data_path
+        data_path=data_path,
         # start_date="2022-01-01T00:00:00Z"
     )
 

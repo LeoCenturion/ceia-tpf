@@ -19,7 +19,6 @@ from src.backtesting.cpcv import (
 from src.data_analysis.data_analysis import fetch_historical_data
 from src.modeling.autogluon_adapter import AutoGluonAdapter
 from src.modeling.mlflow_utils import MLflowLogger
-from src.modeling.pipeline import AbstractMLPipeline
 from src.modeling.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
 from src.utils.logging_config import setup_logging
 

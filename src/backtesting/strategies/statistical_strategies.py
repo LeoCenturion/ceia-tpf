@@ -1,12 +1,11 @@
 import itertools
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, List, Optional
 
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 import optuna
-from numpy.typing import NDArray
 from prophet import Prophet
 from pykalman import KalmanFilter
 from statsmodels.tsa.arima.model import ARIMAResultsWrapper
@@ -43,8 +42,12 @@ class SmaCross(TrialStrategy):
     n2 = 20
 
     def init(self):
-        self.sma1 = self.I(lambda x: pd.Series(x).rolling(self.n1).mean(), self.data.Close)
-        self.sma2 = self.I(lambda x: pd.Series(x).rolling(self.n2).mean(), self.data.Close)
+        self.sma1 = self.I(
+            lambda x: pd.Series(x).rolling(self.n1).mean(), self.data.Close
+        )
+        self.sma2 = self.I(
+            lambda x: pd.Series(x).rolling(self.n2).mean(), self.data.Close
+        )
 
     def next(self):
         if self.sma1 > self.sma2:
@@ -186,9 +189,7 @@ class ARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-outside
             ),
         }
 
-    def save_artifacts(
-        self, trial: optuna.Trial, stats: dict, bt: Backtest
-    ):  # pylint: disable=useless-super-delegation
+    def save_artifacts(self, trial: optuna.Trial, stats: dict, bt: Backtest):  # pylint: disable=useless-super-delegation
         return
 
 
@@ -358,9 +359,7 @@ class KalmanARIMAStrategy(TrialStrategy):  # pylint: disable=attribute-defined-o
                         tp=price * (1 + self.take_profit),
                     )
                 # Sell if forecast is < threshold % of current price
-                elif (
-                    forecast_processed < self.threshold and not self.position.is_short
-                ):
+                elif forecast_processed < self.threshold and not self.position.is_short:
                     # logging.debug(f'forecast: {forecast_processed}, trhesh: {self.threshold}, selling')
                     self.sell(
                         sl=price * (1 + self.stop_loss),

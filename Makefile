@@ -21,3 +21,11 @@ jupyter:
 test:
 	poetry run python -m pytest
 .PHONY: test
+
+format:
+	ruff format && ruff check ./src/ ./tests/ --fix
+.PHONY: format
+
+analyze:
+	poerty run pyright ./src ./tests
+.PHONY: analyze

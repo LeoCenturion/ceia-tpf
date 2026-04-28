@@ -13,7 +13,9 @@ class BinanceClient:
     A client for interacting with the Binance API.
     """
 
-    def __init__(self, api_key: str, api_secret: str, max_retries: int = 3, retry_delay: int = 60):
+    def __init__(
+        self, api_key: str, api_secret: str, max_retries: int = 3, retry_delay: int = 60
+    ):
         """
         Initializes the Binance client.
 
@@ -34,7 +36,9 @@ class BinanceClient:
             self.logger.error(f"Failed to connect to Binance API: {e}")
             raise
 
-    def fetch_historical_data(self, symbol: str, interval: str, start_str: str, end_str: Optional[str] = None) -> list:
+    def fetch_historical_data(
+        self, symbol: str, interval: str, start_str: str, end_str: Optional[str] = None
+    ) -> list:
         """
         Fetches historical candlestick data from Binance.
 
@@ -47,25 +51,31 @@ class BinanceClient:
             list: A list of candlestick data.
         """
         if end_str:
-            self.logger.info(f"Fetching historical data for {symbol} with interval {interval} from {start_str} to {end_str}.")
+            self.logger.info(
+                f"Fetching historical data for {symbol} with interval {interval} from {start_str} to {end_str}."
+            )
         else:
-            self.logger.info(f"Fetching historical data for {symbol} with interval {interval} from {start_str}.")
-        
+            self.logger.info(
+                f"Fetching historical data for {symbol} with interval {interval} from {start_str}."
+            )
+
         for i in range(self.max_retries):
             try:
                 return self.client.get_historical_klines(
                     symbol=symbol,
                     interval=interval,
                     start_str=start_str,
-                    end_str=end_str
+                    end_str=end_str,
                 )
             except BinanceAPIException as e:
                 if e.status_code == 429:
-                    self.logger.warning(f"Rate limit exceeded. Retrying in {self.retry_delay} seconds...")
+                    self.logger.warning(
+                        f"Rate limit exceeded. Retrying in {self.retry_delay} seconds..."
+                    )
                     time.sleep(self.retry_delay)
                 else:
                     self.logger.error(f"Error fetching historical data: {e}")
                     return []
-        
+
         self.logger.error("Max retries exceeded. Failed to fetch historical data.")
         return []

@@ -23,6 +23,7 @@ def timer(func):
 
     return wrapper
 
+
 @timer
 def feature_importance_mdi(model, X, y):
     """
@@ -80,8 +81,8 @@ def feature_importance_mda(model, X, y, cv, sample_weights, t1, scoring="neg_log
         # Assuming f1_score with "weighted" average
         def scorer(y_true, y_pred, sample_weight, labels=None):
             return f1_score(
-                    y_true, y_pred, average="weighted", sample_weight=sample_weight
-                )
+                y_true, y_pred, average="weighted", sample_weight=sample_weight
+            )
 
     fold_importances = []
     for train_idx, test_idx in cv.split(X, y, groups=t1):
@@ -120,8 +121,8 @@ def feature_importance_mda(model, X, y, cv, sample_weights, t1, scoring="neg_log
                 sample_weight_test.values,
                 labels=labels if scorer == log_loss else None,
             )
-            
-            # If Loss (log_loss): diff = Loss_orig - Loss_perm. 
+
+            # If Loss (log_loss): diff = Loss_orig - Loss_perm.
             # We want Loss_perm - Loss_orig, so we negate it.
             # If Accuracy (f1): diff = Acc_orig - Acc_perm.
             # We want Acc_orig - Acc_perm, so we keep it.
@@ -129,7 +130,7 @@ def feature_importance_mda(model, X, y, cv, sample_weights, t1, scoring="neg_log
                 importance = -diff
             else:
                 importance = diff
-                
+
             feature_scores.append(importance)
 
         fold_importances.append(pd.Series(feature_scores, index=X.columns))

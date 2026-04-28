@@ -37,6 +37,7 @@ import pandas as pd
 # Shared helpers
 # ---------------------------------------------------------------------------
 
+
 def _write_klines_csv(path, n_rows=10, base_ts=1577836800000):
     """Write a minimal klines CSV with constant prices (used by API contract tests)."""
     with open(path, "w") as f:
@@ -85,17 +86,17 @@ def _write_ohlcv_csv(path, n_rows, volume=1.0):
 # MockBinanceClient — Binance API contract
 # ---------------------------------------------------------------------------
 
+
 class TestMockExchangeAPIContract(unittest.TestCase):
     """MockBinanceClient must return klines with the exact types the real API uses."""
 
     def setUp(self):
-        self.tmp = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".csv", delete=False
-        )
+        self.tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False)
         self.tmp.close()
         _write_klines_csv(self.tmp.name, n_rows=10)
 
         from src.app.mock_exchange import MockBinanceClient
+
         self.client = MockBinanceClient(
             api_key=None, api_secret=None, mock_file=self.tmp.name
         )
@@ -127,8 +128,9 @@ class TestMockExchangeAPIContract(unittest.TestCase):
         kline = self._first_kline()
         for idx in (1, 2, 3, 4, 5, 7, 9, 10, 11):
             self.assertIsInstance(
-                kline[idx], str,
-                f"Field [{idx}] should be str, got {type(kline[idx]).__name__}"
+                kline[idx],
+                str,
+                f"Field [{idx}] should be str, got {type(kline[idx]).__name__}",
             )
 
     def test_ignore_field_is_string_zero(self):
@@ -166,9 +168,8 @@ class TestMockExchangeAPIContract(unittest.TestCase):
             )
 
         from src.app.mock_exchange import MockBinanceClient
-        client = MockBinanceClient(
-            api_key=None, api_secret=None, mock_file=tmp.name
-        )
+
+        client = MockBinanceClient(api_key=None, api_secret=None, mock_file=tmp.name)
         kline = client.get_historical_klines("BTCUSDT", "1m", limit=1)[0]
         os.unlink(tmp.name)
 
@@ -197,6 +198,7 @@ class TestMockExchangeAPIContract(unittest.TestCase):
 # ChronosPalazzoStrategy — end-to-end with MockBinanceClient
 # ---------------------------------------------------------------------------
 
+
 class TestChronosPalazzoStrategyEndToEnd(unittest.TestCase):
     """
     End-to-end tests for ChronosPalazzoStrategy.
@@ -224,26 +226,45 @@ class TestChronosPalazzoStrategyEndToEnd(unittest.TestCase):
     @staticmethod
     def _klines_to_df(klines):
         """Convert raw klines list to a timestamped DataFrame, mirroring bot.py."""
-        df = pd.DataFrame(klines, columns=[
-            'timestamp', 'open', 'high', 'low', 'close', 'volume',
-            'close_time', 'quote_asset_volume', 'number_of_trades',
-            'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore',
-        ])
+        df = pd.DataFrame(
+            klines,
+            columns=[
+                "timestamp",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "close_time",
+                "quote_asset_volume",
+                "number_of_trades",
+                "taker_buy_base_asset_volume",
+                "taker_buy_quote_asset_volume",
+                "ignore",
+            ],
+        )
         for col in (
-            'open', 'high', 'low', 'close', 'volume',
-            'quote_asset_volume', 'taker_buy_base_asset_volume',
-            'taker_buy_quote_asset_volume',
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "quote_asset_volume",
+            "taker_buy_base_asset_volume",
+            "taker_buy_quote_asset_volume",
         ):
             df[col] = pd.to_numeric(df[col])
-        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-        return df.set_index('timestamp')
+        df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+        return df.set_index("timestamp")
 
     def _make_client(self, path):
         from src.app.mock_exchange import MockBinanceClient
+
         return MockBinanceClient(api_key=None, api_secret=None, mock_file=path)
 
     def _make_strategy(self, extra_config=None):
         from src.app.chronos_strategy import ChronosPalazzoStrategy
+
         return ChronosPalazzoStrategy({**self._CONFIG, **(extra_config or {})})
 
     # -------------------------------------------------------------------------
@@ -265,7 +286,7 @@ class TestChronosPalazzoStrategyEndToEnd(unittest.TestCase):
             klines = client.get_historical_klines("BTCUSDT", "1m", limit=5)
             signal = strategy.get_signal(self._klines_to_df(klines))
 
-            self.assertEqual(signal, 'HOLD')
+            self.assertEqual(signal, "HOLD")
             self.assertEqual(len(strategy.volume_bars), 0)
         finally:
             os.unlink(tmp.name)
@@ -283,7 +304,7 @@ class TestChronosPalazzoStrategyEndToEnd(unittest.TestCase):
         tmp = tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w")
         tmp.close()
         try:
-            _write_ohlcv_csv(tmp.name, n_rows=50, volume=1.0)   # → 25 bars
+            _write_ohlcv_csv(tmp.name, n_rows=50, volume=1.0)  # → 25 bars
             client = self._make_client(tmp.name)
             strategy = self._make_strategy()
 
@@ -292,7 +313,14 @@ class TestChronosPalazzoStrategyEndToEnd(unittest.TestCase):
 
             self.assertGreater(len(strategy.volume_bars), 0)
             bar = strategy.volume_bars.iloc[0]
-            for col in ("open_price", "close_price", "High", "Low", "total_volume", "bar_return"):
+            for col in (
+                "open_price",
+                "close_price",
+                "High",
+                "Low",
+                "total_volume",
+                "bar_return",
+            ):
                 self.assertIn(col, bar.index, f"Volume bar missing column '{col}'")
         finally:
             os.unlink(tmp.name)
@@ -311,16 +339,19 @@ class TestChronosPalazzoStrategyEndToEnd(unittest.TestCase):
         tmp = tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w")
         tmp.close()
         try:
-            _write_ohlcv_csv(tmp.name, n_rows=20, volume=1.0)   # → 10 bars
+            _write_ohlcv_csv(tmp.name, n_rows=20, volume=1.0)  # → 10 bars
             client = self._make_client(tmp.name)
             strategy = self._make_strategy()
 
             klines = client.get_historical_klines("BTCUSDT", "1m", limit=20)
             signal = strategy.get_signal(self._klines_to_df(klines))
 
-            self.assertGreater(len(strategy.volume_bars), 0,
-                               "Bars should have been formed even if model cannot train")
-            self.assertEqual(signal, 'HOLD')
+            self.assertGreater(
+                len(strategy.volume_bars),
+                0,
+                "Bars should have been formed even if model cannot train",
+            )
+            self.assertEqual(signal, "HOLD")
             self.assertFalse(strategy.model_is_fit)
         finally:
             os.unlink(tmp.name)
@@ -377,9 +408,12 @@ class TestChronosPalazzoStrategyEndToEnd(unittest.TestCase):
             klines = client.get_historical_klines("BTCUSDT", "1m", limit=400)
             signal = strategy.get_signal(self._klines_to_df(klines))
 
-            self.assertTrue(strategy.model_is_fit, "Model should have fit with 200 bars")
-            self.assertIn(signal, ("BUY", "SELL"),
-                          f"Expected BUY or SELL, got: {signal!r}")
+            self.assertTrue(
+                strategy.model_is_fit, "Model should have fit with 200 bars"
+            )
+            self.assertIn(
+                signal, ("BUY", "SELL"), f"Expected BUY or SELL, got: {signal!r}"
+            )
         finally:
             os.unlink(tmp.name)
 
@@ -415,10 +449,16 @@ class TestChronosPalazzoStrategyEndToEnd(unittest.TestCase):
             klines2 = client.get_historical_klines("BTCUSDT", "1m", limit=350)
             signal2 = strategy.get_signal(self._klines_to_df(klines2))
 
-            self.assertGreater(len(strategy.volume_bars), bars_after_first,
-                               "New bars must have been formed in the second call")
-            self.assertEqual(strategy.bars_since_refit, 0,
-                             "bars_since_refit must reset to 0 after refit")
+            self.assertGreater(
+                len(strategy.volume_bars),
+                bars_after_first,
+                "New bars must have been formed in the second call",
+            )
+            self.assertEqual(
+                strategy.bars_since_refit,
+                0,
+                "bars_since_refit must reset to 0 after refit",
+            )
             self.assertIn(signal2, ("BUY", "SELL"))
         finally:
             os.unlink(tmp.name)

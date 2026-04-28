@@ -67,7 +67,7 @@ def run_cpcv_for_strategy(
 
             if test_indices.size == 0 or train_indices.size == 0:
                 logger.warning(
-                    f"Skipping split {i+1} due to empty train or test set after purging."
+                    f"Skipping split {i + 1} due to empty train or test set after purging."
                 )
                 continue
 
@@ -140,9 +140,7 @@ def run_cpcv_for_strategy(
                 # and then compute the Sharpe ratio.
 
                 # Dummy calculation for now:
-                path_returns = (
-                    pd.Series(path_y_true).pct_change() * path_predictions
-                )
+                path_returns = pd.Series(path_y_true).pct_change() * path_predictions
                 path_sharpe = (
                     path_returns.mean() / path_returns.std() * np.sqrt(365 * 24)
                 )  # Annualized Sharpe for hourly data

@@ -149,7 +149,10 @@ class XGBoostPriceReversalPalazzoStrategy(Strategy):  # pylint: disable=attribut
 
         # Check if the current time bar corresponds to the completion of a volume bar
         current_timestamp = self.data.index[-1]
-        if self.volume_bar_indices is None or current_timestamp not in self.volume_bar_indices:
+        if (
+            self.volume_bar_indices is None
+            or current_timestamp not in self.volume_bar_indices
+        ):
             return
 
         # A volume bar has completed. Get its index.

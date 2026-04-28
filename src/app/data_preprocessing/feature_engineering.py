@@ -19,6 +19,7 @@ def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
     )
     return df
 
+
 def add_time_based_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     Adds time-based features to the data.
@@ -29,9 +30,10 @@ def add_time_based_features(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: The data with time-based features.
     """
-    df['hour'] = df['timestamp'].dt.hour
-    df['dayofweek'] = df['timestamp'].dt.dayofweek
+    df["hour"] = df["timestamp"].dt.hour
+    df["dayofweek"] = df["timestamp"].dt.dayofweek
     return df
+
 
 def add_lagged_features(df: pd.DataFrame, col: str, lags: list) -> pd.DataFrame:
     """
@@ -46,5 +48,5 @@ def add_lagged_features(df: pd.DataFrame, col: str, lags: list) -> pd.DataFrame:
         pd.DataFrame: The data with lagged features.
     """
     for lag in lags:
-        df[f'{col}_lag_{lag}'] = df[col].shift(lag)
+        df[f"{col}_lag_{lag}"] = df[col].shift(lag)
     return df

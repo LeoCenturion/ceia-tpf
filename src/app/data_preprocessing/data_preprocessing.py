@@ -23,6 +23,7 @@ def load_data(file_path: str) -> pd.DataFrame:
         logger.error(f"File not found: {file_path}")
         return pd.DataFrame()
 
+
 def prepare_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     Prepares the data for cleaning.
@@ -38,6 +39,7 @@ def prepare_data(df: pd.DataFrame) -> pd.DataFrame:
     # Add any data preparation steps here
     return df
 
+
 def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     Cleans the data by handling missing values and outliers.
@@ -50,18 +52,18 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     logger = logging.getLogger(__name__)
     logger.info("Cleaning data.")
-    
+
     # Handle missing values
     df = df.ffill()
-    
+
     # Handle outliers
     for col in df.columns:
-        if df[col].dtype in ['int64', 'float64']:
+        if df[col].dtype in ["int64", "float64"]:
             q1 = df[col].quantile(0.25)
             q3 = df[col].quantile(0.75)
             iqr = q3 - q1
             lower_bound = q1 - 1.5 * iqr
             upper_bound = q3 + 1.5 * iqr
             df[col] = df[col].clip(lower=lower_bound, upper=upper_bound)
-            
+
     return df

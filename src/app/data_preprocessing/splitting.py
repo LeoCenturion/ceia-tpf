@@ -17,9 +17,9 @@ def split_data(df: pd.DataFrame, train_size: float = 0.7, val_size: float = 0.15
     """
     train_end = int(len(df) * train_size)
     val_end = train_end + int(len(df) * val_size)
-    
+
     train_df = df.iloc[:train_end]
     val_df = df.iloc[train_end:val_end]
     test_df = df.iloc[val_end:]
-    
+
     return train_df, val_df, test_df

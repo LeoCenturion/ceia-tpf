@@ -75,7 +75,9 @@ def plot_trades(transactions_file, symbol):
     start_date = trades_df[TIMESTAMP_COL].min() - pd.Timedelta(hours=1)
     end_date = trades_df[TIMESTAMP_COL].max() + pd.Timedelta(hours=1)
 
-    logging.debug(f"Fetching historical data for {symbol} from {start_date} to {end_date}...")
+    logging.debug(
+        f"Fetching historical data for {symbol} from {start_date} to {end_date}..."
+    )
 
     # Binance API expects strings for dates
     ohlc_df = get_historical_data(
@@ -83,7 +85,9 @@ def plot_trades(transactions_file, symbol):
     )
 
     if ohlc_df.empty:
-        logging.debug("Could not fetch historical data for the specified range. Cannot plot.")
+        logging.debug(
+            "Could not fetch historical data for the specified range. Cannot plot."
+        )
         return
 
     add_plots = []

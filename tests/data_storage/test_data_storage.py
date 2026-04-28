@@ -17,10 +17,23 @@ class TestDataStorage(unittest.TestCase):
         """
         Set up the test environment.
         """
-        self.csv_file = 'test_data.csv'
-        self.parquet_file = 'test_data.parquet'
+        self.csv_file = "test_data.csv"
+        self.parquet_file = "test_data.parquet"
         self.data = [
-            [1503388800000, '4235.43000000', '4235.43000000', '4235.43000000', '4235.43000000', '0.00000000', 1503388859999, '0.00000000', 0, '0.00000000', '0.00000000', '0']
+            [
+                1503388800000,
+                "4235.43000000",
+                "4235.43000000",
+                "4235.43000000",
+                "4235.43000000",
+                "0.00000000",
+                1503388859999,
+                "0.00000000",
+                0,
+                "0.00000000",
+                "0.00000000",
+                "0",
+            ]
         ]
 
     def tearDown(self):
@@ -36,11 +49,11 @@ class TestDataStorage(unittest.TestCase):
         """
         Test saving data to a CSV file.
         """
-        storage = DataStorage(self.csv_file, format='csv')
+        storage = DataStorage(self.csv_file, format="csv")
         storage.save_data(self.data)
-        
+
         self.assertTrue(os.path.exists(self.csv_file))
-        
+
         df = pd.read_csv(self.csv_file)
         self.assertEqual(len(df), 1)
 
@@ -48,11 +61,11 @@ class TestDataStorage(unittest.TestCase):
         """
         Test saving data to a Parquet file.
         """
-        storage = DataStorage(self.parquet_file, format='parquet')
+        storage = DataStorage(self.parquet_file, format="parquet")
         storage.save_data(self.data)
-        
+
         self.assertTrue(os.path.exists(self.parquet_file))
-        
+
         df = pd.read_parquet(self.parquet_file)
         self.assertEqual(len(df), 1)
 
@@ -60,9 +73,10 @@ class TestDataStorage(unittest.TestCase):
         """
         Test that an unsupported format is handled correctly.
         """
-        storage = DataStorage('test.txt', format='txt')
+        storage = DataStorage("test.txt", format="txt")
         storage.save_data(self.data)
-        self.assertFalse(os.path.exists('test.txt'))
+        self.assertFalse(os.path.exists("test.txt"))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

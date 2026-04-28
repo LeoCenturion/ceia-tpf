@@ -127,7 +127,7 @@ class ChronosFeaturePipelineCPCV(ChronosFeaturePipeline):
 
             path_scores = []
             for i, result in enumerate(path_results):
-                path_run_name = f"path_{i+1}"
+                path_run_name = f"path_{i + 1}"
                 with mlflow.start_run(run_name=path_run_name, nested=True):
                     y_true = result["y_true"]
                     y_pred = result["y_pred"]
@@ -137,7 +137,7 @@ class ChronosFeaturePipelineCPCV(ChronosFeaturePipeline):
                     )
                     path_scores.append(score)
                     logger.info(
-                        f"Path {i+1}/{len(path_results)} F1 Score (weighted): {score:.4f}"
+                        f"Path {i + 1}/{len(path_results)} F1 Score (weighted): {score:.4f}"
                     )
 
                     report: Union[Dict[str, Any], str] = classification_report(

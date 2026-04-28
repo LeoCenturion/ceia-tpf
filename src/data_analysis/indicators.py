@@ -236,7 +236,9 @@ def stc(
     )
 
 
-def vortex(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14) -> pd.DataFrame:
+def vortex(
+    high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14
+) -> pd.DataFrame:
     """Calculate the Vortex Indicator."""
     tr = true_range(high, low, close)
 
@@ -253,7 +255,9 @@ def vortex(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14) -> pd
     return pd.DataFrame({f"VTXP_{n}": vip, f"VTXM_{n}": vim})
 
 
-def bollinger_bands(close: pd.Series, n: int = 20, std_dev: float = 2.0) -> pd.DataFrame:
+def bollinger_bands(
+    close: pd.Series, n: int = 20, std_dev: float = 2.0
+) -> pd.DataFrame:
     """Calculate Bollinger Bands."""
     sma_val = sma(close, n)
     std_val = std(close, n)
@@ -294,7 +298,9 @@ def donchian_channels(high: pd.Series, low: pd.Series, n: int = 20) -> pd.DataFr
     return pd.DataFrame({f"DCU_{n}_{n}": upper, f"DCL_{n}_{n}": lower})
 
 
-def volume_oscillator(volume: pd.Series, short_period: int = 14, long_period: int = 28) -> pd.Series:
+def volume_oscillator(
+    volume: pd.Series, short_period: int = 14, long_period: int = 28
+) -> pd.Series:
     """Calculates the Volume Oscillator."""
     short_ma = sma(volume, short_period)
     long_ma = sma(volume, long_period)
@@ -320,14 +326,16 @@ def kama(close: pd.Series, n: int = 10, pow1: int = 2, pow2: int = 30) -> pd.Ser
     close_values = close.values
     sc_values = sc.values
     kama_arr = np.full(len(close), np.nan)
-    kama_arr[n-1] = close_values[n-1]
-    
+    kama_arr[n - 1] = close_values[n - 1]
+
     for i in range(n, len(close)):
         if np.isnan(sc_values[i]):
-             kama_arr[i] = kama_arr[i-1] # Carry forward if SC is NaN
+            kama_arr[i] = kama_arr[i - 1]  # Carry forward if SC is NaN
         else:
-             kama_arr[i] = kama_arr[i-1] + sc_values[i] * (close_values[i] - kama_arr[i-1])
-             
+            kama_arr[i] = kama_arr[i - 1] + sc_values[i] * (
+                close_values[i] - kama_arr[i - 1]
+            )
+
     return pd.Series(kama_arr, index=close.index)
 
 
@@ -404,7 +412,9 @@ def create_features(
         # New Volume Features
         features["VO"] = volume_oscillator(df[VOLUME_COL])
         features["VPT"] = volume_price_trend(df[CLOSE_COL], df[VOLUME_COL])
-        features["CMF"] = chaikin_money_flow(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL], df[VOLUME_COL])
+        features["CMF"] = chaikin_money_flow(
+            df[HIGH_COL], df[LOW_COL], df[CLOSE_COL], df[VOLUME_COL]
+        )
 
     # Momentum Indicators
     features["RSI"] = rsi_indicator(df[CLOSE_COL], n=14)
@@ -419,7 +429,7 @@ def create_features(
     stoch_price = stochastic_oscillator(df[HIGH_COL], df[LOW_COL], df[CLOSE_COL])
     features["Stoch_K"] = stoch_price["%K"]
     features["Stoch_D"] = stoch_price["%D"]
-    
+
     # New Trend Indicator
     features["KAMA"] = kama(df[CLOSE_COL])
 
@@ -438,11 +448,11 @@ def create_features(
     features = pd.concat([features, vortex_df], axis=1)
     if "VTXP_14" in features.columns and "VTXM_14" in features.columns:
         features["VORTEX_diff"] = features["VTXP_14"] - features["VTXM_14"]
-    
+
     # --- Statistical Features on Returns (Rolling) ---
     # "aggregated returns data... accumulated, average, and standard deviation values"
     # "z-score of the returns values... considering only the last z-score"
-    roll_window = 20 # Standard window, can be adjusted
+    roll_window = 20  # Standard window, can be adjusted
     features["returns_roll_sum"] = close_pct.rolling(roll_window).sum()
     features["returns_roll_mean"] = close_pct.rolling(roll_window).mean()
     features["returns_roll_std"] = close_pct.rolling(roll_window).std()
@@ -485,7 +495,9 @@ def create_features(
     features.replace([np.inf, -np.inf], np.nan, inplace=True)
     features.ffill(inplace=True)
     features.bfill(inplace=True)
-    features.fillna(0, inplace=True) # Final fallback for any remaining NaNs (e.g. empty series)
+    features.fillna(
+        0, inplace=True
+    )  # Final fallback for any remaining NaNs (e.g. empty series)
 
     return features
 

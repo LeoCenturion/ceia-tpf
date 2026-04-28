@@ -14,7 +14,7 @@ class MLflowLogger:
         if tracking_uri is None:
             # Default to a local sqlite database in the project root
             tracking_uri = "sqlite:///mlflow.db"
-            
+
         mlflow.set_tracking_uri(tracking_uri)
         mlflow.set_experiment(experiment_name)
         self.run = None
@@ -28,17 +28,17 @@ class MLflowLogger:
 
     def log_params(self, params, prefix=None):
         """
-        Log a dictionary of parameters. 
+        Log a dictionary of parameters.
         Flattens nested dictionaries if necessary or logs them as strings.
         """
         for k, v in params.items():
             key_name = f"{prefix}.{k}" if prefix else k
             if isinstance(v, dict):
                 # Recursively log nested dicts or convert to string if too deep
-                # For simplicity in this utility, we'll converting dicts to string representations 
+                # For simplicity in this utility, we'll converting dicts to string representations
                 # for complex hyperparams to avoid cluttering MLflow params with too many nested keys
                 # unless simple.
-                self.log_params(v, prefix=key_name) 
+                self.log_params(v, prefix=key_name)
             else:
                 mlflow.log_param(key_name, v)
 
@@ -52,17 +52,17 @@ class MLflowLogger:
         filename = os.path.basename(data_path)
         start_date = "N/A"
         end_date = "N/A"
-        
+
         if isinstance(data.index, pd.DatetimeIndex):
             start_date = data.index.min().isoformat()
             end_date = data.index.max().isoformat()
-        
+
         info = {
             "data_filename": filename,
             "data_start_date": start_date,
             "data_end_date": end_date,
             "data_rows": data.shape[0],
-            "data_cols": data.shape[1]
+            "data_cols": data.shape[1],
         }
         self.log_params(info)
 
@@ -75,7 +75,7 @@ class MLflowLogger:
         Log a dictionary as a JSON artifact.
         """
         temp_filepath = f"temp_{artifact_path}"
-        with open(temp_filepath, 'w') as f:
+        with open(temp_filepath, "w") as f:
             json.dump(dictionary, f, indent=4)
         mlflow.log_artifact(temp_filepath)
         os.remove(temp_filepath)

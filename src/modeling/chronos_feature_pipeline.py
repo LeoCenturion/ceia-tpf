@@ -34,19 +34,25 @@ class ChronosFeaturePipeline(PalazzoXGBoostPipeline):
 
     @timer
     def step_2_feature_engineering(self, bars):
-        logger.debug("Step 2: Generating Chronos features and combining with tabular...")
+        logger.debug(
+            "Step 2: Generating Chronos features and combining with tabular..."
+        )
         logger.debug(f"Shape of bars entering feature engineering: {bars.shape}")
 
         # 1. Generate standard tabular features using parent logic
         tabular_features = super().step_2_feature_engineering(
             bars
         )  # This already calls dropna()
-        logger.debug(f"Shape of tabular_features after parent engineering: {tabular_features.shape}")
+        logger.debug(
+            f"Shape of tabular_features after parent engineering: {tabular_features.shape}"
+        )
 
         # Ensure we have a clean index after dropping NaNs from parent feature engineering
         common_index = tabular_features.index.intersection(bars.index)
         bars_aligned = bars.loc[common_index]
-        logger.debug(f"Shape of bars_aligned after common index intersection: {bars_aligned.shape}")
+        logger.debug(
+            f"Shape of bars_aligned after common index intersection: {bars_aligned.shape}"
+        )
 
         # 2. Load Chronos components (if not already loaded)
         if self.chronos_model is None:
@@ -108,7 +114,9 @@ class ChronosFeaturePipeline(PalazzoXGBoostPipeline):
             )
         else:
             chronos_features_df = pd.DataFrame(index=pd.Index([]))
-        logger.debug(f"Shape of chronos_features_df after embedding: {chronos_features_df.shape}")
+        logger.debug(
+            f"Shape of chronos_features_df after embedding: {chronos_features_df.shape}"
+        )
 
         # Align chronos_features_df to tabular_features index before concatenation
         final_common_index = tabular_features.index.intersection(
@@ -116,14 +124,20 @@ class ChronosFeaturePipeline(PalazzoXGBoostPipeline):
         )
         aligned_tabular_features = tabular_features.loc[final_common_index]
         aligned_chronos_features = chronos_features_df.loc[final_common_index]
-        logger.debug(f"Shape of aligned_tabular_features: {aligned_tabular_features.shape}")
-        logger.debug(f"Shape of aligned_chronos_features: {aligned_chronos_features.shape}")
+        logger.debug(
+            f"Shape of aligned_tabular_features: {aligned_tabular_features.shape}"
+        )
+        logger.debug(
+            f"Shape of aligned_chronos_features: {aligned_chronos_features.shape}"
+        )
 
         # 4. Combine Chronos embeddings with tabular features
         combined_features = pd.concat(
             [aligned_tabular_features, aligned_chronos_features], axis=1
         )
-        logger.debug(f"Shape of combined_features before final dropna: {combined_features.shape}")
+        logger.debug(
+            f"Shape of combined_features before final dropna: {combined_features.shape}"
+        )
 
         final_features = combined_features.dropna()
         logger.debug(f"Final shape of features after dropna: {final_features.shape}")
@@ -182,8 +196,10 @@ def objective(trial, raw_data):
     """Optuna objective function for Chronos Feature pipeline."""
     # Pipeline hyperparameters
     chronos_window_size = trial.suggest_int("chronos_window_size", 32, 256, step=64)
-    chronos_model_name = trial.suggest_categorical("chronos_model_name", ["amazon/chronos-t5-tiny", "amazon/chronos-t5-small"])
-    
+    chronos_model_name = trial.suggest_categorical(
+        "chronos_model_name", ["amazon/chronos-t5-tiny", "amazon/chronos-t5-small"]
+    )
+
     pipeline_config = {
         "volume_threshold": 50000,
         "tau": 0.7,
@@ -198,7 +214,7 @@ def objective(trial, raw_data):
     # Model hyperparameters
     presets = trial.suggest_categorical("presets", ["medium_quality", "high_quality"])
     time_limit = trial.suggest_int("time_limit", 300, 600, step=300)
-    
+
     model_params = {
         "label": "label",
         "eval_metric": "f1_weighted",
@@ -209,7 +225,7 @@ def objective(trial, raw_data):
     }
 
     pipeline = ChronosFeaturePipeline(pipeline_config)
-    
+
     try:
         model = AutoGluonAdapter(**model_params)
         _, scores, _, _, _, _, _ = pipeline.run_cv(raw_data, model)
@@ -218,6 +234,7 @@ def objective(trial, raw_data):
     except Exception as e:
         logger.error(f"Trial {trial.number} failed: {e}")
         return 0.0
+
 
 def run_optuna_study(raw_data, data_path, n_trials=10):
     """
@@ -236,11 +253,8 @@ def run_optuna_study(raw_data, data_path, n_trials=10):
         load_if_exists=True,
     )
 
-    objective_with_data = partial(
-        objective, 
-        raw_data=raw_data
-    )
-    
+    objective_with_data = partial(objective, raw_data=raw_data)
+
     def mlflow_callback(study, trial):
         with mlflow.start_run(run_name=f"chronos_trial_{trial.number}"):
             mlflow.log_params(trial.params)
@@ -257,6 +271,7 @@ def run_optuna_study(raw_data, data_path, n_trials=10):
             print(f"  {key}: {value}")
     except ValueError:
         print("No successful trials were completed.")
+
 
 def run_single_pipeline():
     data_path = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv"
@@ -285,7 +300,7 @@ def run_single_pipeline():
         "label": "label",
         "eval_metric": "f1_weighted",
         # "presets": "medium_quality", # Commented out for 'best_quality' preset
-        "presets": "best_quality", # Using 'best_quality' as the highest known preset, 'extreme' is not a recognized preset.
+        "presets": "best_quality",  # Using 'best_quality' as the highest known preset, 'extreme' is not a recognized preset.
         "time_limit": 600,
         "verbosity": 1,
         "path": "AutogluonModels/chronos_feature_pipeline_run",
@@ -302,9 +317,16 @@ def run_single_pipeline():
         data_path=data_path,
     )
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Run Chronos Feature Pipeline or Optuna study.")
-    parser.add_argument('--optimize', action='store_true', help='Run Optuna hyperparameter optimization study.')
+    parser = argparse.ArgumentParser(
+        description="Run Chronos Feature Pipeline or Optuna study."
+    )
+    parser.add_argument(
+        "--optimize",
+        action="store_true",
+        help="Run Optuna hyperparameter optimization study.",
+    )
     args = parser.parse_args()
 
     data_path = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv"
@@ -322,4 +344,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

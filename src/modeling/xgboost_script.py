@@ -60,7 +60,9 @@ def filter_features_whitelist(stationary_features, whitelist):
     missing_features = set(whitelist) - set(available_features)
 
     if missing_features:
-        print(f"Warning: {len(missing_features)} features from whitelist not found in data: {missing_features}")
+        print(
+            f"Warning: {len(missing_features)} features from whitelist not found in data: {missing_features}"
+        )
 
     print(f"Original Feature Count: {len(stationary_features.columns)}")
     print(f"Keeping {len(available_features)} features: {available_features}")
@@ -75,9 +77,9 @@ def orthogonalize_pca(stationary_features, n_components=0.95):
     stationary_features_scaled = pd.DataFrame(
         scaler.fit_transform(stationary_features),
         index=stationary_features.index,
-        columns=stationary_features.columns
+        columns=stationary_features.columns,
     )
-    
+
     # Orthogonalize features using PCA
     pca = PCA(n_components=None, random_state=42)
     orthogonal_features_data = pca.fit_transform(stationary_features_scaled)
@@ -103,7 +105,7 @@ def step_2_feature_engineering(bars, feature_whitelist=None):
 
     # Fractional differentiation to reach stationarity
     d_star, stationary_features = find_minimum_d(features)
-    print(f'minimum d: {d_star}')
+    print(f"minimum d: {d_star}")
     return features, stationary_features
 
 
@@ -180,7 +182,7 @@ def get_num_co_events(close_idx, t1, molecule):
     t1 = t1.fillna(close_idx[-1])
     t1 = t1[t1.index.isin(molecule)]
     t1 = t1.loc[molecule]
-    
+
     # Use searchsorted to find integer locations for slicing the DatetimeIndex
     idx_start = close_idx.searchsorted(t1.index[0])
     idx_end = close_idx.searchsorted(t1.max())
@@ -259,36 +261,43 @@ def machine_learning_cycle(raw_tick_data, model, config):
     bars = step_1_data_structuring(raw_tick_data, config["dollar_threshold"])
 
     # Step 2: Feature Engineering (Stationary Features Only)
-    features, stationary_features = step_2_feature_engineering(bars, config.get("feature_whitelist"))
+    features, stationary_features = step_2_feature_engineering(
+        bars, config.get("feature_whitelist")
+    )
 
     # Step 3: Labeling and Weighting
     labels, sample_weights = step_3_labeling_and_weighting(bars, config)
-    
+
     # Align data for labeling
     t1 = labels["t1"]
-    
+
     # We first align the features with the labels/weights before splitting
     # This ensures indices match across X, y, and weights
-    combined = pd.concat([labels["bin"], stationary_features, sample_weights], axis=1).dropna()
-    
+    combined = pd.concat(
+        [labels["bin"], stationary_features, sample_weights], axis=1
+    ).dropna()
+
     # Separate back into components
     # X_raw contains the stationary features (not yet scaled/PCA'd)
     X_raw = combined[stationary_features.columns]
     y = combined["bin"]
-    
+
     # XGBoost Requirement: Map labels to [0, num_classes-1]
     from sklearn.preprocessing import LabelEncoder
+
     le = LabelEncoder()
     y_mapped_values = le.fit_transform(y)
     y_mapped = pd.Series(y_mapped_values, index=y.index)
     num_classes = len(le.classes_)
-    print(f"Detected {num_classes} classes: {le.classes_}. Mapped to: {np.unique(y_mapped_values)}")
+    print(
+        f"Detected {num_classes} classes: {le.classes_}. Mapped to: {np.unique(y_mapped_values)}"
+    )
 
     # Update model num_class if it's an XGBClassifier
     if hasattr(model, "set_params"):
         if isinstance(model, xgb.XGBClassifier):
-             model.set_params(num_class=num_classes)
-             model.set_params(objective="multi:softmax")
+            model.set_params(num_class=num_classes)
+            model.set_params(objective="multi:softmax")
 
     sample_weights_series = combined["sample_weight"]
     t1_series = t1.loc[X_raw.index]
@@ -300,7 +309,7 @@ def machine_learning_cycle(raw_tick_data, model, config):
     )
 
     scores = []
-    
+
     # We need to store the columns of the PCA for consistency
 
     for train_idx, test_idx in cv.split(X_raw, y_mapped, groups=t1_series):
@@ -312,7 +321,7 @@ def machine_learning_cycle(raw_tick_data, model, config):
         # 2. Fit Scaler on TRAIN only, apply to both
         scaler = StandardScaler()
         X_train_scaled = scaler.fit_transform(X_train_raw)
-        X_test_scaled = scaler.transform(X_test_raw) # Leakage prevented
+        X_test_scaled = scaler.transform(X_test_raw)  # Leakage prevented
 
         # 3. Fit PCA on TRAIN only, apply to both
         pca_fold = PCA(n_components=None, random_state=42)
@@ -327,10 +336,11 @@ def machine_learning_cycle(raw_tick_data, model, config):
 
         # 4. Filter PCA features based on whitelist if provided
         if config.get("pca_whitelist"):
-            available_pcs = [c for c in config["pca_whitelist"] if c in X_train_df.columns]
+            available_pcs = [
+                c for c in config["pca_whitelist"] if c in X_train_df.columns
+            ]
             X_train_df = X_train_df[available_pcs]
             X_test_df = X_test_df[available_pcs]
-        
 
         # Use clone to ensure a fresh instance for each fold
         fold_model = clone(model)
@@ -347,17 +357,17 @@ def machine_learning_cycle(raw_tick_data, model, config):
     # --- Final Fit on Full Dataset (for Feature Importance Analysis) ---
     scaler_final = StandardScaler()
     X_raw_scaled = scaler_final.fit_transform(X_raw)
-    
+
     pca_final = PCA(n_components=None, random_state=42)
     X_pca_final = pca_final.fit_transform(X_raw_scaled)
-    
+
     num_pcs_final = X_pca_final.shape[1]
     pc_cols_final = [f"PC{i + 1}" for i in range(num_pcs_final)]
     X_final = pd.DataFrame(X_pca_final, index=X_raw.index, columns=pc_cols_final)
-    
+
     if config.get("pca_whitelist"):
-         available_pcs = [c for c in config["pca_whitelist"] if c in X_final.columns]
-         X_final = X_final[available_pcs]
+        available_pcs = [c for c in config["pca_whitelist"] if c in X_final.columns]
+        X_final = X_final[available_pcs]
 
     trained_model = clone(model)
     if isinstance(trained_model, xgb.XGBClassifier):
@@ -367,7 +377,16 @@ def machine_learning_cycle(raw_tick_data, model, config):
     trained_model.fit(X_final, y_mapped, sample_weight=sample_weights_series.values)
 
     # Return y_mapped so subsequent functions know the true labels used by the model
-    return trained_model, scores, X_final, y_mapped, sample_weights_series, t1_series, features, pca_final
+    return (
+        trained_model,
+        scores,
+        X_final,
+        y_mapped,
+        sample_weights_series,
+        t1_series,
+        features,
+        pca_final,
+    )
 
 
 def main():
@@ -391,9 +410,8 @@ def main():
         n_jobs=-1,
         objective="multi:softmax",
         num_class=3,
-        colsample_bytree=0.5  # Analogous to selecting subset of features like max_features in RF
+        colsample_bytree=0.5,  # Analogous to selecting subset of features like max_features in RF
     )
-    
 
     config = {
         "dollar_threshold": 1e9,
@@ -457,7 +475,7 @@ def main():
 
     # # --- Ensemble Feature Selection ---
     # print("--- Ensemble Feature Selection (Original Features) ---")
-    
+
     # # Calculate MDI on original features for comparison
     # print("Computing MDI on original features...")
     # # Again, MDI uses RF proxy
@@ -479,14 +497,14 @@ def main():
     # # Weighted Ensemble Score emphasizing Interactions (MDA) over Isolation (SFI)
     # # Weights: MDA (50%), MDI (30%), SFI (20%)
     # feature_board['Ensemble_Score'] = (
-    #     feature_board_rank['MDA'] * 0.5 + 
-    #     feature_board_rank['MDI'] * 0.3 + 
+    #     feature_board_rank['MDA'] * 0.5 +
+    #     feature_board_rank['MDI'] * 0.3 +
     #     feature_board_rank['SFI'] * 0.2
     # )
 
     # # Sort by Ensemble Score
     # feature_board = feature_board.sort_values(by='Ensemble_Score', ascending=False)
-    
+
     # print("Top 20 Features by Ensemble Score (Average Percentile Rank):")
     # print(feature_board.head(20))
 

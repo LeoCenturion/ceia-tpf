@@ -1,5 +1,3 @@
-
-
 import numpy as np
 import pandas as pd
 from sklearn.base import clone
@@ -53,7 +51,9 @@ class MachineLearningPipeline(AbstractMLPipeline):
         missing_features = set(whitelist) - set(available_features)
 
         if missing_features:
-            print(f"Warning: {len(missing_features)} features from whitelist not found in data: {missing_features}")
+            print(
+                f"Warning: {len(missing_features)} features from whitelist not found in data: {missing_features}"
+            )
 
         print(f"Original Feature Count: {len(stationary_features.columns)}")
         print(f"Keeping {len(available_features)} features: {available_features}")
@@ -70,11 +70,13 @@ class MachineLearningPipeline(AbstractMLPipeline):
 
         # Filter features based on whitelist
         if self.config.get("feature_whitelist") is not None:
-            features = self.filter_features_whitelist(features, self.config["feature_whitelist"])
+            features = self.filter_features_whitelist(
+                features, self.config["feature_whitelist"]
+            )
 
         # Fractional differentiation to reach stationarity
         d_star, stationary_features = find_minimum_d(features)
-        print(f'minimum d: {d_star}')
+        print(f"minimum d: {d_star}")
         return stationary_features
 
     # Step 3: Labeling and Weighting
@@ -208,7 +210,9 @@ class MachineLearningPipeline(AbstractMLPipeline):
         num_co_events = self.get_num_co_events(
             close.index, events_for_weights["t1"], labels.index
         )
-        sample_weights = self.get_sample_weights(events_for_weights["t1"], num_co_events, close)
+        sample_weights = self.get_sample_weights(
+            events_for_weights["t1"], num_co_events, close
+        )
 
         return labels["bin"], sample_weights, labels["t1"]
 
@@ -227,7 +231,6 @@ def main():
     raw_tick_data.index = pd.to_datetime(raw_tick_data.index)
 
     model = RandomForestClassifier(n_estimators=1000, random_state=42, n_jobs=-1)
-    
 
     config = {
         "dollar_threshold": 1e9,
@@ -238,12 +241,12 @@ def main():
         "n_splits": 3,
         "pct_embargo": 0.01,
         "feature_whitelist": None,
-        "pca_whitelist": None
+        "pca_whitelist": None,
     }
 
     pipeline = MachineLearningPipeline(config)
-    trained_model, scores, X, y, sample_weights, t1, pca = (
-        pipeline.run_cv(raw_tick_data, model)
+    trained_model, scores, X, y, sample_weights, t1, pca = pipeline.run_cv(
+        raw_tick_data, model
     )
 
     print(f"Model: {trained_model}")
@@ -270,8 +273,8 @@ def main():
     print(mda_importance)
 
     # 2b. Mean Decrease Accuracy (MDA) - on original features
-    # Note: This part needs the 'features' (original ones). 
-    # Since AbstractMLPipeline.run_cv doesn't return original features, 
+    # Note: This part needs the 'features' (original ones).
+    # Since AbstractMLPipeline.run_cv doesn't return original features,
     # we need to call step_2_feature_engineering again or modify run_cv.
     # For now, let's just use the features from the pipeline.
     print("\n2b. Mean Decrease Accuracy (MDA) on original features:")

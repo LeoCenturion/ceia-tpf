@@ -5,13 +5,13 @@ import logging
 import os
 import re
 from abc import abstractmethod
-from typing import Any, Hashable, Type, Union, cast
+from typing import Any, Type, Union, cast
 
 import mlflow
 import numpy as np
 import optuna
 import pandas as pd
-from pandas import DataFrame, DatetimeIndex, Series, Timestamp
+from pandas import Timestamp
 from sklearn.metrics import f1_score
 
 from backtesting import Backtest, Strategy

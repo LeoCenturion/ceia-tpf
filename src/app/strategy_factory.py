@@ -1,6 +1,4 @@
-from abc import ABC, abstractmethod
-from typing import Literal, Any
-import pandas as pd
+from typing import Any
 
 from src.app.chronos_strategy import ChronosPalazzoStrategy
 from src.app.strategy import Strategy, MACDStrategy

@@ -10,6 +10,8 @@ bot:
     volume_threshold: 1000
     min_bars_to_fit: 30
     refit_every_n_bars: 10
+    warmup_csv: './BTCUSDT_consolidated_klines.csv'
+    warmup_lookback: 5000  # number of 1m bars to load; omit or set null for all history
   capital_allocation:
     initial_balance: 10000.0
     max_capital: 1000.0

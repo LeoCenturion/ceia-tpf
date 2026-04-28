@@ -10,7 +10,7 @@ class DataStorage:
     A class for storing data.
     """
 
-    def __init__(self, file_path: str, format: str = 'csv'):
+    def __init__(self, file_path: str, format: str = "csv"):
         """
         Initializes the DataStorage.
 
@@ -31,16 +31,25 @@ class DataStorage:
         """
         self.logger.info(f"Saving data to {self.file_path} in {self.format} format.")
         columns = [
-            'timestamp', 'open', 'high', 'low', 'close', 'volume', 
-            'close_time', 'quote_asset_volume', 'number_of_trades', 
-            'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'
+            "timestamp",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "close_time",
+            "quote_asset_volume",
+            "number_of_trades",
+            "taker_buy_base_asset_volume",
+            "taker_buy_quote_asset_volume",
+            "ignore",
         ]
         df = pd.DataFrame(data, columns=columns)  # type: ignore
-        
+
         try:
-            if self.format == 'csv':
+            if self.format == "csv":
                 df.to_csv(self.file_path, index=False)
-            elif self.format == 'parquet':
+            elif self.format == "parquet":
                 df.to_parquet(self.file_path, index=False)
             else:
                 self.logger.error(f"Unsupported format: {self.format}")

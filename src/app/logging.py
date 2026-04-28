@@ -2,7 +2,9 @@ import logging.config
 import os
 
 
-def setup_logging(default_path='logging.ini', default_level=logging.INFO, env_key='LOG_CFG'):
+def setup_logging(
+    default_path="logging.ini", default_level=logging.INFO, env_key="LOG_CFG"
+):
     """
     Setup logging configuration
     """
@@ -14,4 +16,3 @@ def setup_logging(default_path='logging.ini', default_level=logging.INFO, env_ke
         logging.config.fileConfig(path, disable_existing_loggers=False)
     else:
         logging.basicConfig(level=default_level)
-
