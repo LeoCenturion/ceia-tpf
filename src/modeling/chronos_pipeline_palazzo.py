@@ -819,7 +819,7 @@ def main():
     config = {
         "volume_threshold": 50000,
         "prediction_length": 2,
-        "chronos_model": "amazon/chronos-t5-small",
+        "chronos_model": "amazon/chronos-bolt-tiny",
         "n_splits": 3,
     }
 

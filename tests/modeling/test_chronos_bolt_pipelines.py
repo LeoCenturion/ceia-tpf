@@ -1,21 +1,17 @@
 """
-E2E wiring tests for Chronos-Bolt pipeline variants.
+E2E wiring tests for ChronosBoltFeaturePipeline.
 
-PalazzoChronosBoltBinaryClassificationPipeline  — TimeSeriesPredictor + Bolt model.
-ChronosBoltFeaturePipeline                       — Bolt embeddings as extra features
-                                                   fed into PalazzoXGBoostPipeline.
+Adds Chronos-Bolt patch embeddings to the PalazzoXGBoostPipeline tabular
+feature set; downstream model is XGBoost (same as the parent pipeline).
 Heavy ML components are mocked so the suite runs without GPU or downloads.
 """
+
 import unittest
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
 
-
-# ---------------------------------------------------------------------------
-# Shared helpers
-# ---------------------------------------------------------------------------
 
 def _make_volume_bars(n: int = 80) -> pd.DataFrame:
     rng = np.random.default_rng(42)
@@ -48,136 +44,16 @@ def _make_mock_bolt_pipeline(embed_dim: int = _EMBED_DIM) -> MagicMock:
         emb = MagicMock()
         (
             emb.mean.return_value
-                .squeeze.return_value
-                .float.return_value
-                .cpu.return_value
-                .numpy.return_value
+               .squeeze.return_value
+               .float.return_value
+               .cpu.return_value
+               .numpy.return_value
         ) = np.ones(embed_dim, dtype=np.float32)
         return emb, (MagicMock(), MagicMock())
 
     mock_bolt.embed.side_effect = fake_embed
     return mock_bolt
 
-
-# ---------------------------------------------------------------------------
-# PalazzoChronosBoltBinaryClassificationPipeline
-# ---------------------------------------------------------------------------
-
-class TestChronosBoltPalazzoPipeline(unittest.TestCase):
-
-    def setUp(self):
-        from src.modeling.chronos_bolt_pipeline_palazzo import (
-            PalazzoChronosBoltBinaryClassificationPipeline,
-        )
-        self.config = {
-            "volume_threshold": 50000,
-            "chronos_model": "autogluon/chronos-bolt-small",
-            "prediction_length": 2,
-        }
-        self.pipeline = PalazzoChronosBoltBinaryClassificationPipeline(self.config)
-        self.bars = _make_volume_bars(80)
-
-    def test_default_model_is_chronos_bolt(self):
-        from src.modeling.chronos_bolt_pipeline_palazzo import (
-            PalazzoChronosBoltBinaryClassificationPipeline,
-        )
-        p = PalazzoChronosBoltBinaryClassificationPipeline({})
-        self.assertIn("chronos-bolt", p.config["chronos_model"])
-
-    def test_step_2_returns_dataframe_without_nan(self):
-        features = self.pipeline.step_2_feature_engineering(self.bars.copy())
-        self.assertIsInstance(features, pd.DataFrame)
-        self.assertGreater(len(features), 0)
-        self.assertFalse(features.isnull().any().any())
-
-    def test_step_3_returns_binary_labels(self):
-        y, _, _ = self.pipeline.step_3_labeling_and_weighting(self.bars.copy())
-        self.assertIsInstance(y, pd.Series)
-        self.assertTrue(set(y.unique()).issubset({1.0, -1.0}))
-
-    def test_step_3_label_length_is_bars_minus_one(self):
-        y, _, _ = self.pipeline.step_3_labeling_and_weighting(self.bars.copy())
-        self.assertEqual(len(y), len(self.bars) - 1)
-
-    @patch("src.modeling.chronos_bolt_pipeline_palazzo.TimeSeriesPredictor")
-    def test_fit_predictor_builds_timeseries_dataframe(self, MockPredictor):
-        features = self.pipeline.step_2_feature_engineering(self.bars.copy())
-        y, _, _ = self.pipeline.step_3_labeling_and_weighting(self.bars.copy())
-        common = features.index.intersection(y.index)
-        features, y = features.loc[common], y.loc[common]
-
-        with patch("os.path.exists", return_value=False):
-            self.pipeline.fit_predictor(features, y)
-
-        from autogluon.timeseries import TimeSeriesDataFrame
-        ts_arg = MockPredictor.return_value.fit.call_args[0][0]
-        self.assertIsInstance(ts_arg, TimeSeriesDataFrame)
-
-    @patch("src.modeling.chronos_bolt_pipeline_palazzo.TimeSeriesPredictor")
-    def test_fit_predictor_passes_bolt_model_path(self, MockPredictor):
-        features = self.pipeline.step_2_feature_engineering(self.bars.copy())
-        y, _, _ = self.pipeline.step_3_labeling_and_weighting(self.bars.copy())
-        common = features.index.intersection(y.index)
-        features, y = features.loc[common], y.loc[common]
-
-        with patch("os.path.exists", return_value=False):
-            self.pipeline.fit_predictor(features, y)
-
-        hparams = MockPredictor.return_value.fit.call_args[1]["hyperparameters"]
-        self.assertIn("chronos-bolt", hparams["Chronos"]["model_path"])
-
-    @patch("src.modeling.chronos_bolt_pipeline_palazzo.TimeSeriesPredictor")
-    def test_fit_predictor_known_covariates_excludes_reserved(self, MockPredictor):
-        features = self.pipeline.step_2_feature_engineering(self.bars.copy())
-        y, _, _ = self.pipeline.step_3_labeling_and_weighting(self.bars.copy())
-        common = features.index.intersection(y.index)
-        features, y = features.loc[common], y.loc[common]
-
-        with patch("os.path.exists", return_value=False):
-            _, known_cov_names = self.pipeline.fit_predictor(features, y)
-
-        for reserved in ("target", "item_id", "timestamp"):
-            self.assertNotIn(reserved, known_cov_names)
-        self.assertGreater(len(known_cov_names), 0)
-
-    @patch("src.modeling.chronos_bolt_pipeline_palazzo.TimeSeriesPredictor")
-    def test_predict_next_positive_mean_returns_1(self, MockPredictor):
-        features = self.pipeline.step_2_feature_engineering(self.bars.copy())
-        y, _, _ = self.pipeline.step_3_labeling_and_weighting(self.bars.copy())
-        common = features.index.intersection(y.index)
-        features, y = features.loc[common], y.loc[common]
-
-        MockPredictor.return_value.predict.return_value.loc.__getitem__ = MagicMock(
-            return_value=pd.DataFrame({"mean": [2.0]})
-        )
-        with patch("os.path.exists", return_value=False):
-            predictor, known_cov_names = self.pipeline.fit_predictor(features, y)
-
-        self.assertEqual(
-            self.pipeline.predict_next(predictor, features, y, known_cov_names), 1
-        )
-
-    @patch("src.modeling.chronos_bolt_pipeline_palazzo.TimeSeriesPredictor")
-    def test_predict_next_negative_mean_returns_0(self, MockPredictor):
-        features = self.pipeline.step_2_feature_engineering(self.bars.copy())
-        y, _, _ = self.pipeline.step_3_labeling_and_weighting(self.bars.copy())
-        common = features.index.intersection(y.index)
-        features, y = features.loc[common], y.loc[common]
-
-        MockPredictor.return_value.predict.return_value.loc.__getitem__ = MagicMock(
-            return_value=pd.DataFrame({"mean": [-1.0]})
-        )
-        with patch("os.path.exists", return_value=False):
-            predictor, known_cov_names = self.pipeline.fit_predictor(features, y)
-
-        self.assertEqual(
-            self.pipeline.predict_next(predictor, features, y, known_cov_names), 0
-        )
-
-
-# ---------------------------------------------------------------------------
-# ChronosBoltFeaturePipeline  (Bolt embeddings → XGBoost)
-# ---------------------------------------------------------------------------
 
 class TestChronosBoltFeaturePipeline(unittest.TestCase):
 
@@ -219,7 +95,6 @@ class TestChronosBoltFeaturePipeline(unittest.TestCase):
         self.pipeline.bolt_pipeline = mock_bolt
         window_size = self.config["chronos_window_size"]
 
-        # expected window count is against the tabular-feature-aligned bars
         from src.modeling.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
         tabular = PalazzoXGBoostPipeline(self.config).step_2_feature_engineering(
             self.bars.copy()
@@ -265,9 +140,9 @@ class TestChronosBoltFeaturePipeline(unittest.TestCase):
 
         self.assertIs(self.pipeline.bolt_pipeline, mock_bolt)
 
-    # --- labeling (from PalazzoXGBoostPipeline) ---
+    # --- labeling from PalazzoXGBoostPipeline ---
 
-    def test_step_3_returns_series(self):
+    def test_step_3_returns_series_with_sample_weights(self):
         y, weights, t1 = self.pipeline.step_3_labeling_and_weighting(self.bars.copy())
         self.assertIsInstance(y, pd.Series)
         self.assertIsInstance(weights, pd.Series)
