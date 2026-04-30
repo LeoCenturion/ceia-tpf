@@ -205,8 +205,8 @@ def run_single_pipeline():
         "tau": 0.7,
         "n_splits": 3,
         "pct_embargo": 0.01,
-        "chronos_model_name": "amazon/chronos-t5-tiny",
-        "chronos_window_size": 128,
+        "chronos_model_name": "amazon/chronos-bolt-tiny",
+        "chronos_window_size": 32,
         "finetune_time_limit": 300,
         "fine_tune_batch_size": 16,
     }
