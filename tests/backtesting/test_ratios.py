@@ -4,9 +4,11 @@ import numpy as np
 import pandas as pd
 
 from src.backtesting.ratios import (
+    calmar_ratio,
     deflated_sharpe_ratio,
     path_to_returns,
     probabilistic_sharpe_ratio,
+    sharpe_ratio,
 )
 
 
@@ -14,8 +16,10 @@ from src.backtesting.ratios import (
 # Helpers that mirror how cpcv_runner.py builds paths
 # ---------------------------------------------------------------------------
 
-def _make_path(n_obs: int, drift: float = 0.001, vol: float = 0.02,
-               signal: int = 1, seed: int = 0) -> dict:
+
+def _make_path(
+    n_obs: int, drift: float = 0.001, vol: float = 0.02, signal: int = 1, seed: int = 0
+) -> dict:
     """Synthetic CPCV path: prices from a log-normal process, constant signal."""
     rng = np.random.default_rng(seed)
     log_rets = rng.normal(drift, vol, n_obs)
@@ -24,8 +28,9 @@ def _make_path(n_obs: int, drift: float = 0.001, vol: float = 0.02,
     return {"y_true": prices, "y_pred": signals}
 
 
-def _make_paths(n_paths: int, n_obs: int = 250, drift: float = 0.001,
-                vol: float = 0.02) -> list:
+def _make_paths(
+    n_paths: int, n_obs: int = 250, drift: float = 0.001, vol: float = 0.02
+) -> list:
     return [_make_path(n_obs, drift=drift, vol=vol, seed=i) for i in range(n_paths)]
 
 
@@ -33,8 +38,8 @@ def _make_paths(n_paths: int, n_obs: int = 250, drift: float = 0.001,
 # path_to_returns
 # ---------------------------------------------------------------------------
 
-class TestPathToReturns(unittest.TestCase):
 
+class TestPathToReturns(unittest.TestCase):
     def test_length_drops_first_nan(self):
         path = _make_path(100, signal=1)
         rets = path_to_returns(path)
@@ -62,8 +67,8 @@ class TestPathToReturns(unittest.TestCase):
 # Probabilistic Sharpe Ratio
 # ---------------------------------------------------------------------------
 
-class TestProbabilisticSharpeRatio(unittest.TestCase):
 
+class TestProbabilisticSharpeRatio(unittest.TestCase):
     def test_output_is_probability(self):
         rng = np.random.default_rng(0)
         for _ in range(10):
@@ -91,7 +96,9 @@ class TestProbabilisticSharpeRatio(unittest.TestCase):
         self.assertGreater(psr_low, psr_high)
 
     def test_too_few_observations_returns_nan(self):
-        self.assertTrue(np.isnan(probabilistic_sharpe_ratio(np.array([0.01, -0.01, 0.02]))))
+        self.assertTrue(
+            np.isnan(probabilistic_sharpe_ratio(np.array([0.01, -0.01, 0.02])))
+        )
 
     def test_cpcv_path_roundtrip(self):
         """PSR accepts output of path_to_returns without error."""
@@ -110,6 +117,7 @@ class TestProbabilisticSharpeRatio(unittest.TestCase):
         # SR_hat * sqrt(T-1) / sqrt(1 + ...) ≈ SR_hat * sqrt(T)
         naive_z = sr_hat * np.sqrt(len(r) - 1)
         from scipy.special import ndtr
+
         naive_psr = float(ndtr(naive_z))
         self.assertAlmostEqual(psr, naive_psr, places=1)
 
@@ -137,6 +145,9 @@ class TestProbabilisticSharpeRatio(unittest.TestCase):
         self.assertTrue(np.isfinite(psr_dirty))
         self.assertGreaterEqual(psr_dirty, 0.0)
         self.assertLessEqual(psr_dirty, 1.0)
+        self.assertTrue(np.isfinite(psr_clean))
+        self.assertGreaterEqual(psr_clean, 0.0)
+        self.assertLessEqual(psr_clean, 1.0)
 
     def test_exactly_four_observations(self):
         # n=4 is the minimum accepted; kurtosis denominator uses n-1=3 (no blow-up).
@@ -159,8 +170,8 @@ class TestProbabilisticSharpeRatio(unittest.TestCase):
 # Deflated Sharpe Ratio
 # ---------------------------------------------------------------------------
 
-class TestDeflatedSharpeRatio(unittest.TestCase):
 
+class TestDeflatedSharpeRatio(unittest.TestCase):
     def test_output_is_probability(self):
         paths = _make_paths(5, n_obs=250)
         returns_list = [path_to_returns(p) for p in paths]
@@ -251,6 +262,114 @@ class TestDeflatedSharpeRatio(unittest.TestCase):
         self.assertTrue(np.isfinite(dsr))
         self.assertGreaterEqual(dsr, 0.0)
         self.assertLessEqual(dsr, 1.0)
+
+
+# ---------------------------------------------------------------------------
+# sharpe_ratio
+# ---------------------------------------------------------------------------
+
+
+class TestSharpeRatio(unittest.TestCase):
+    def test_positive_drift_gives_positive_sharpe(self):
+        rng = np.random.default_rng(0)
+        r = rng.normal(0.01, 0.02, 500)
+        self.assertGreater(sharpe_ratio(r), 0.0)
+
+    def test_negative_drift_gives_negative_sharpe(self):
+        rng = np.random.default_rng(1)
+        r = rng.normal(-0.01, 0.02, 500)
+        self.assertLess(sharpe_ratio(r), 0.0)
+
+    def test_zero_std_returns_nan(self):
+        r = np.full(50, 0.005)
+        self.assertTrue(np.isnan(sharpe_ratio(r)))
+
+    def test_fewer_than_two_obs_returns_nan(self):
+        self.assertTrue(np.isnan(sharpe_ratio(np.array([0.01]))))
+        self.assertTrue(np.isnan(sharpe_ratio(np.array([]))))
+
+    def test_periods_per_year_scales_annualized_value(self):
+        rng = np.random.default_rng(2)
+        r = rng.normal(0.005, 0.02, 300)
+        sr_daily = sharpe_ratio(r, periods_per_year=365)
+        sr_hourly = sharpe_ratio(r, periods_per_year=365 * 24)
+        self.assertGreater(sr_hourly, sr_daily)
+
+    def test_nan_values_are_filtered(self):
+        rng = np.random.default_rng(3)
+        clean = rng.normal(0.005, 0.02, 200)
+        dirty = clean.copy()
+        dirty[::20] = np.nan
+        sr_clean = sharpe_ratio(clean)
+        sr_dirty = sharpe_ratio(dirty)
+        # Both finite and same sign
+        self.assertTrue(np.isfinite(sr_dirty))
+        self.assertEqual(np.sign(sr_clean), np.sign(sr_dirty))
+
+    def test_accepts_pandas_series(self):
+        rng = np.random.default_rng(4)
+        r = pd.Series(rng.normal(0.005, 0.02, 100))
+        result = sharpe_ratio(r)
+        self.assertTrue(np.isfinite(result))
+
+
+# ---------------------------------------------------------------------------
+# calmar_ratio
+# ---------------------------------------------------------------------------
+
+
+class TestCalmarRatio(unittest.TestCase):
+    def test_no_drawdown_returns_nan(self):
+        # Monotonically increasing prices → no drawdown
+        r = np.full(50, 0.01)  # constant positive returns
+        self.assertTrue(np.isnan(calmar_ratio(r)))
+
+    def test_fewer_than_two_obs_returns_nan(self):
+        self.assertTrue(np.isnan(calmar_ratio(np.array([0.01]))))
+        self.assertTrue(np.isnan(calmar_ratio(np.array([]))))
+
+    def test_with_drawdown_returns_finite(self):
+        rng = np.random.default_rng(5)
+        r = rng.normal(0.001, 0.02, 300)
+        cr = calmar_ratio(r)
+        self.assertTrue(np.isfinite(cr))
+
+    def test_positive_mean_positive_calmar_when_drawdown_exists(self):
+        rng = np.random.default_rng(6)
+        r = rng.normal(0.01, 0.03, 500)
+        # Inject a large drawdown so max_dd > 0
+        r[100:110] = -0.1
+        cr = calmar_ratio(r)
+        if np.isfinite(cr):
+            # sign should match the sign of annualized return
+            ann_ret = r.mean() * (365 * 24)
+            self.assertEqual(np.sign(cr), np.sign(ann_ret))
+
+    def test_accepts_pandas_series(self):
+        rng = np.random.default_rng(7)
+        r = pd.Series(rng.normal(0.001, 0.02, 300))
+        r.iloc[50] = -0.15  # force a drawdown
+        cr = calmar_ratio(r)
+        self.assertTrue(np.isfinite(cr))
+
+    def test_nan_values_are_filtered(self):
+        rng = np.random.default_rng(8)
+        r = rng.normal(0.001, 0.02, 300)
+        r[50] = -0.2  # ensure drawdown
+        dirty = r.copy()
+        dirty[::30] = np.nan
+        cr_dirty = calmar_ratio(dirty)
+        self.assertTrue(np.isfinite(cr_dirty))
+
+    def test_periods_per_year_scales_result(self):
+        rng = np.random.default_rng(9)
+        r = rng.normal(0.001, 0.02, 300)
+        r[50] = -0.2  # ensure drawdown
+        cr_daily = calmar_ratio(r, periods_per_year=365)
+        cr_hourly = calmar_ratio(r, periods_per_year=365 * 24)
+        # Calmar scales linearly with periods_per_year (same max_dd, scaled return)
+        if np.isfinite(cr_daily) and np.isfinite(cr_hourly):
+            self.assertAlmostEqual(cr_hourly / cr_daily, 24.0, places=5)
 
 
 if __name__ == "__main__":

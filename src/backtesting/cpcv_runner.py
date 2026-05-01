@@ -1,4 +1,6 @@
 import logging
+import os
+import tempfile
 from typing import Any, Dict, List, Type, Union
 
 import mlflow
@@ -13,6 +15,13 @@ from src.backtesting.cpcv import (
     purge_and_embargo_split,
     time_based_partition,
 )
+from src.backtesting.ratios import (
+    calmar_ratio,
+    deflated_sharpe_ratio,
+    path_to_returns,
+    probabilistic_sharpe_ratio,
+    sharpe_ratio,
+)
 from src.backtesting.strategies.statistical_strategies import SmaCross
 from src.data_analysis.data_analysis import adjust_data_to_ubtc, fetch_historical_data
 from src.modeling.mlflow_utils import MLflowLogger
@@ -20,11 +29,102 @@ from src.modeling.mlflow_utils import MLflowLogger
 logger = logging.getLogger(__name__)
 
 
+def _save_paths_artifact(paths: list) -> None:
+    """
+    Serialize all path predictions to a CSV and log it as an MLflow artifact
+    under the ``predictions/`` directory of the currently active run.
+    """
+    rows = []
+    for i, path in enumerate(paths):
+        for yt, yp in zip(path["y_true"], path["y_pred"]):
+            rows.append({"path": i + 1, "y_true": float(yt), "y_pred": float(yp)})
+
+    df = pd.DataFrame(rows)
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".csv", delete=False, prefix="cpcv_predictions_"
+    ) as f:
+        df.to_csv(f, index=False)
+        tmp_path = f.name
+
+    try:
+        mlflow.log_artifact(tmp_path, artifact_path="predictions")
+        logger.info(
+            f"Saved predictions artifact: {len(df)} rows across {len(paths)} paths."
+        )
+    finally:
+        os.remove(tmp_path)
+
+
+def _evaluate_paths_returns(
+    path_results: list,
+    mlflow_logger: MLflowLogger,
+    periods_per_year: int = 365 * 24,
+) -> List[float]:
+    """
+    Evaluate CPCV paths using return-based metrics.
+
+    Computes annualized Sharpe ratio, Calmar ratio, and Probabilistic Sharpe
+    Ratio per path (logged to nested MLflow runs), then logs the Deflated
+    Sharpe Ratio as the multiple-testing-corrected summary to the parent run.
+
+    Expects path_results entries with ``y_true`` as Close prices and
+    ``y_pred`` as position signals (−1, 0, 1).
+    """
+    all_returns: List[pd.Series] = []
+    path_sharpes: List[float] = []
+
+    for i, path in enumerate(path_results):
+        with mlflow.start_run(run_name=f"path_{i + 1}", nested=True):
+            rets = path_to_returns(path)
+            all_returns.append(rets)
+
+            sr = sharpe_ratio(rets, periods_per_year)
+            cr = calmar_ratio(rets, periods_per_year)
+            psr = probabilistic_sharpe_ratio(rets)
+
+            safe_sr = float(sr) if np.isfinite(sr) else 0.0
+            path_sharpes.append(safe_sr)
+
+            metrics: Dict[str, float] = {"sharpe_ratio": safe_sr}
+            if np.isfinite(cr):
+                metrics["calmar_ratio"] = float(cr)
+            if np.isfinite(psr):
+                metrics["probabilistic_sharpe_ratio"] = float(psr)
+            mlflow.log_metrics(metrics)
+
+            cr_str = f"{cr:.4f}" if np.isfinite(cr) else "nan"
+            psr_str = f"{psr:.4f}" if np.isfinite(psr) else "nan"
+            logger.info(
+                f"Path {i + 1}/{len(path_results)} | "
+                f"Sharpe: {safe_sr:.4f} | Calmar: {cr_str} | PSR: {psr_str}"
+            )
+
+    if path_sharpes:
+        dsr = deflated_sharpe_ratio(all_returns)
+        summary: Dict[str, float] = {
+            "sharpe_mean": float(np.nanmean(path_sharpes)),
+            "sharpe_std": float(np.nanstd(path_sharpes)),
+        }
+        if np.isfinite(dsr):
+            summary["deflated_sharpe_ratio"] = float(dsr)
+        mlflow_logger.log_metrics(summary)
+        dsr_str = f"{dsr:.4f}" if np.isfinite(dsr) else "nan"
+        logger.info(
+            f"Sharpe across paths: {[f'{s:.4f}' for s in path_sharpes]} | "
+            f"Mean: {np.nanmean(path_sharpes):.4f} | DSR: {dsr_str}"
+        )
+    else:
+        logger.warning("No complete backtest paths were evaluated.")
+
+    return path_sharpes
+
+
 def _evaluate_paths_f1(
     path_results: list,
     mlflow_logger: MLflowLogger,
 ) -> List[float]:
     """Evaluate backtest paths with weighted F1 and log nested MLflow runs."""
+    _save_paths_artifact(path_results)
     path_scores: List[float] = []
     for i, result in enumerate(path_results):
         with mlflow.start_run(run_name=f"path_{i + 1}", nested=True):
@@ -129,23 +229,8 @@ def run_cpcv_for_strategy(
         paths = construct_backtest_paths(split_predictions, n_groups, k_test_groups)
         logging.info(f"Constructed {len(paths)} backtest paths.")
 
-        path_sharpe_ratios = []
-        for i, path in enumerate(paths):
-            path_predictions = path["y_pred"]
-            path_y_true = path["y_true"]
-            with mlflow.start_run(run_name=f"path_{i + 1}", nested=True):
-                path_returns = pd.Series(path_y_true).pct_change() * path_predictions
-                path_sharpe = (
-                    path_returns.mean() / path_returns.std() * np.sqrt(365 * 24)
-                )
-                if np.isinf(path_sharpe) or np.isnan(path_sharpe):
-                    path_sharpe = 0.0
-                path_sharpe_ratios.append(path_sharpe)
-                mlflow.log_metric("sharpe_ratio", path_sharpe)
-
-        if path_sharpe_ratios:
-            mlflow_logger.log_metrics({"sharpe_mean": np.nanmean(path_sharpe_ratios)})
-            mlflow_logger.log_metrics({"sharpe_std": np.nanstd(path_sharpe_ratios)})
+        _save_paths_artifact(paths)
+        _evaluate_paths_returns(paths, mlflow_logger)
 
     finally:
         mlflow_logger.end_run()

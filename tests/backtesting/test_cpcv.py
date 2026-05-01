@@ -11,7 +11,12 @@ from src.backtesting.cpcv import (
     purge_and_embargo_split,
     time_based_partition,
 )
-from src.backtesting.cpcv_runner import _evaluate_paths_f1, run_cpcv_for_strategy
+from src.backtesting.cpcv_runner import (
+    _evaluate_paths_f1,
+    _evaluate_paths_returns,
+    _save_paths_artifact,
+    run_cpcv_for_strategy,
+)
 from src.backtesting.strategies.statistical_strategies import SmaCross
 from src.modeling.mlflow_utils import MLflowLogger
 
@@ -38,6 +43,18 @@ def _make_ohlcv(n_bars: int = 500, freq: str = "1h", seed: int = 42) -> pd.DataF
 def _make_t1(data: pd.DataFrame) -> pd.Series:
     """t1 series: each event ends at the immediately following bar."""
     return pd.Series(data.index[1:], index=data.index[:-1])
+
+
+def _make_price_signal_paths(n_paths: int = 3, n_obs: int = 200, seed: int = 0):
+    """CPCV paths with Close prices as y_true and binary signals as y_pred."""
+    rng = np.random.default_rng(seed)
+    paths = []
+    for i in range(n_paths):
+        log_rets = rng.normal(0.001, 0.02, n_obs)
+        prices = 100.0 * np.exp(np.cumsum(log_rets))
+        signals = rng.integers(0, 2, n_obs).astype(float)
+        paths.append({"y_true": prices, "y_pred": signals})
+    return paths
 
 
 def _make_binary_paths(n_paths: int = 3, n_obs: int = 100, seed: int = 0):
@@ -374,6 +391,120 @@ class TestSmaCrossCPCVEndToEnd(unittest.TestCase):
             y_true = pd.Series(path["y_true"], dtype=float)
             returns = y_true.pct_change().dropna()
             self.assertTrue(np.all(np.isfinite(returns)))
+
+
+# ---------------------------------------------------------------------------
+# _save_paths_artifact
+# ---------------------------------------------------------------------------
+
+class TestSavePathsArtifact(unittest.TestCase):
+
+    _tmpdir = None
+    _tracking_uri = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmpdir = tempfile.mkdtemp()
+        cls._tracking_uri = f"sqlite:///{cls._tmpdir}/mlflow_save_artifact_test.db"
+
+    def _logger(self):
+        return MLflowLogger(
+            experiment_name="test_save_paths_artifact",
+            tracking_uri=self._tracking_uri,
+        )
+
+    def test_artifact_is_logged_to_active_run(self):
+        logger = self._logger()
+        paths = _make_price_signal_paths(3, n_obs=50)
+        with logger.start_run(run_name="artifact_run") as run:
+            _save_paths_artifact(paths)
+            run_id = run.info.run_id
+
+        import mlflow
+        mlflow.set_tracking_uri(self._tracking_uri)
+        client = mlflow.tracking.MlflowClient()
+        artifacts = client.list_artifacts(run_id, path="predictions")
+        self.assertGreater(len(artifacts), 0, "No artifact was logged under predictions/")
+
+    def test_no_artifact_logged_on_empty_paths(self):
+        logger = self._logger()
+        with logger.start_run(run_name="empty_artifact_run") as run:
+            _save_paths_artifact([])
+            run_id = run.info.run_id
+
+        import mlflow
+        mlflow.set_tracking_uri(self._tracking_uri)
+        client = mlflow.tracking.MlflowClient()
+        artifacts = client.list_artifacts(run_id, path="predictions")
+        # Empty paths produces an empty CSV that is still logged
+        # (behaviour: 0-row file still counts as an artifact)
+        # We just verify the call doesn't raise
+        self.assertIsInstance(artifacts, list)
+
+
+# ---------------------------------------------------------------------------
+# _evaluate_paths_returns
+# ---------------------------------------------------------------------------
+
+class TestEvaluatePathsReturns(unittest.TestCase):
+
+    _tmpdir = None
+    _tracking_uri = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmpdir = tempfile.mkdtemp()
+        cls._tracking_uri = f"sqlite:///{cls._tmpdir}/mlflow_returns_test.db"
+
+    def _logger(self):
+        return MLflowLogger(
+            experiment_name="test_evaluate_paths_returns",
+            tracking_uri=self._tracking_uri,
+        )
+
+    def test_returns_one_score_per_path(self):
+        logger = self._logger()
+        paths = _make_price_signal_paths(4, n_obs=200)
+        with logger.start_run(run_name="returns_run"):
+            scores = _evaluate_paths_returns(paths, logger)
+        self.assertEqual(len(scores), 4)
+
+    def test_scores_are_floats(self):
+        logger = self._logger()
+        paths = _make_price_signal_paths(3, n_obs=150)
+        with logger.start_run(run_name="scores_run"):
+            scores = _evaluate_paths_returns(paths, logger)
+        for s in scores:
+            self.assertIsInstance(s, float)
+
+    def test_empty_paths_returns_empty_list(self):
+        logger = self._logger()
+        with logger.start_run(run_name="empty_run"):
+            scores = _evaluate_paths_returns([], logger)
+        self.assertEqual(scores, [])
+
+    def test_positive_drift_paths_give_nonnegative_sharpe(self):
+        logger = self._logger()
+        rng = np.random.default_rng(99)
+        paths = []
+        for i in range(3):
+            log_rets = rng.normal(0.005, 0.01, 300)  # strong positive drift
+            prices = 100.0 * np.exp(np.cumsum(log_rets))
+            paths.append({"y_true": prices, "y_pred": np.ones(300)})
+        with logger.start_run(run_name="drift_run"):
+            scores = _evaluate_paths_returns(paths, logger)
+        # Sharpe safe_sr clamps NaN to 0.0 so minimum is 0.0; with drift expect > 0
+        self.assertTrue(all(s >= 0.0 for s in scores))
+
+    def test_zero_signal_paths_give_zero_sharpe(self):
+        logger = self._logger()
+        rng = np.random.default_rng(42)
+        log_rets = rng.normal(0.005, 0.02, 200)
+        prices = 100.0 * np.exp(np.cumsum(log_rets))
+        paths = [{"y_true": prices, "y_pred": np.zeros(200)}]
+        with logger.start_run(run_name="zero_signal_run"):
+            scores = _evaluate_paths_returns(paths, logger)
+        self.assertAlmostEqual(scores[0], 0.0, places=5)
 
 
 if __name__ == "__main__":

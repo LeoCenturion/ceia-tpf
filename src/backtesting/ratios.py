@@ -8,7 +8,7 @@ References:
 
 from __future__ import annotations
 
-from typing import Dict, List, Union
+from typing import Dict, List, Sequence, Union
 
 import numpy as np
 import pandas as pd
@@ -16,6 +16,43 @@ from scipy import stats
 from scipy.special import ndtr
 
 _EULER_GAMMA = 0.5772156649015328
+
+
+def sharpe_ratio(
+    returns: Union[np.ndarray, pd.Series],
+    periods_per_year: int = 365 * 24,
+) -> float:
+    """Annualized Sharpe ratio assuming a zero risk-free rate."""
+    r = np.asarray(returns, dtype=float)
+    r = r[np.isfinite(r)]
+    if len(r) < 2:
+        return np.nan
+    std = r.std(ddof=1)
+    if std == 0.0:
+        return np.nan
+    return float(r.mean() / std * np.sqrt(periods_per_year))
+
+
+def calmar_ratio(
+    returns: Union[np.ndarray, pd.Series],
+    periods_per_year: int = 365 * 24,
+) -> float:
+    """
+    Calmar ratio = annualized return / maximum drawdown.
+
+    Returns NaN when there is no drawdown (all returns positive) or fewer than
+    two finite observations.
+    """
+    r = pd.Series(np.asarray(returns, dtype=float))
+    r = r[np.isfinite(r)]
+    if len(r) < 2:
+        return np.nan
+    annualized_return = float(r.mean() * periods_per_year)
+    cum = (1.0 + r).cumprod()
+    max_dd = float(abs(((cum - cum.cummax()) / cum.cummax()).min()))
+    if max_dd == 0.0:
+        return np.nan
+    return annualized_return / max_dd
 
 
 def path_to_returns(path: Dict[str, np.ndarray]) -> pd.Series:
@@ -96,7 +133,7 @@ def _expected_max_sr(n_trials: int) -> float:
 
 
 def deflated_sharpe_ratio(
-    returns_list: List[Union[np.ndarray, pd.Series]],
+    returns_list: Sequence[Union[np.ndarray, pd.Series]],
     benchmark_sr: float = 0.0,
 ) -> float:
     """
