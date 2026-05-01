@@ -15,7 +15,7 @@ from pandas import Timestamp
 from sklearn.metrics import f1_score
 
 from backtesting import Backtest, Strategy
-from backtesting._broker import Broker  # type: ignore
+from backtesting.backtesting import _Broker as Broker  # type: ignore
 from src.data_analysis import (
     adjust_data_to_ubtc,
     fetch_historical_data,
