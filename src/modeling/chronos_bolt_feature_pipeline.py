@@ -227,15 +227,15 @@ def run_single_pipeline():
         "n_splits": 3,
         "pct_embargo": 0.01,
         "use_pca": False,  # PCA might be redundant with Chronos embeddings, can be experimented with
-        "chronos_model_name": _DEFAULT_BOLT_MODEL,
-        "chronos_window_size": 32,
+        "chronos_model_name": "amazon/chronos-bolt-small",
+        "chronos_window_size": 64,
         "chronos_stride": 1,
     }
 
     model_params = {
         "label": "label",
         "eval_metric": "f1_weighted",
-        "presets": "medium_quality",  # Commented out for 'best_quality' preset
+        "presets": "best_quality",  # Commented out for 'best_quality' preset
         # "presets": "best_quality",  # Using 'best_quality' as the highest known preset, 'extreme' is not a recognized preset.
         "time_limit": 600,
         "verbosity": 1,

@@ -9,7 +9,7 @@ import pandas as pd
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
 from sklearn.metrics import accuracy_score, f1_score
 from tqdm import tqdm
-
+from typing import Dict
 
 from src.constants import VOLUME_COL
 from src.data_analysis.data_analysis import fetch_historical_data, timer
@@ -513,10 +513,10 @@ class PalazzoChronosBinaryClassificationPipeline(PalazzoChronosPipeline):
                 "Chronos": {
                     "model_path": chronos_model,
                     "fine_tune": True,
-                    "fine_tune_batch_size": 16,
+                    "fine_tune_batch_size": self.config.get("fine_tune_batch_size", 16),
                 }
             },
-            time_limit=300,
+            time_limit=self.config.get("time_limit", 300),
         )
 
         return predictor, known_covariates_names
@@ -587,6 +587,18 @@ class PalazzoChronosBinaryClassificationPipeline(PalazzoChronosPipeline):
 
         return int(pred_mean > 0)
 
+    def build_hyperparameters(self) -> Dict:
+        model_path = self.config.get("chronos_model", "amazon/chronos-t5-small")
+        hyperparameter_key = "Chronos2" if ("chronos2" in model_path.lower() or "chronos-2" in model_path.lower()) else "Chronos"
+
+        return {
+            hyperparameter_key: {
+                "model_path": model_path,
+                "fine_tune": True,
+                "fine_tune_batch_size": self.config.get("fine_tune_batch_size", 16),
+            }
+        }
+
     @timer
     def run_cv(self, raw_tick_data, model=None):
         """
@@ -610,7 +622,6 @@ class PalazzoChronosBinaryClassificationPipeline(PalazzoChronosPipeline):
         cv = PurgedKFold(n_splits=n_splits, t1=t1, pct_embargo=pct_embargo)
 
         prediction_length = self.config.get("prediction_length", 2)
-        model_path = self.config.get("chronos_model", "amazon/chronos-t5-small")
 
         scores = []
         all_y_true = []
@@ -672,15 +683,7 @@ class PalazzoChronosBinaryClassificationPipeline(PalazzoChronosPipeline):
             )
             predictor.fit(
                 ts_train,
-                hyperparameters={
-                    "Chronos": {
-                        "model_path": model_path,
-                        "fine_tune": True,
-                        "fine_tune_batch_size": self.config.get(
-                            "fine_tune_batch_size", 16
-                        ),
-                    }
-                },
+                hyperparameters=self.build_hyperparameters(),
                 time_limit=self.config.get("time_limit", 300),
             )
 
@@ -910,9 +913,10 @@ def main():
     else:
         config = {
             "volume_threshold": 50000,
-            "prediction_length": 2,
-            "chronos_model": "amazon/chronos-bolt-tiny",
+            # "prediction_length": 2,
+            "chronos_model": "autogluon/chronos-2-small",
             "n_splits": 3,
+            "fine_tune_batch_size": 32,
         }
 
         # --- CHOOSE THE PIPELINE TO RUN ---
