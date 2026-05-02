@@ -247,9 +247,9 @@ def sma(series, n):
     return pd.Series(series).rolling(n).mean()
 
 
-def ewm(series: pd.Series, span) -> pd.Series:
+def ewm(series, span) -> pd.Series:
     """Calculate the exponential moving average of a series."""
-    return series.ewm(span=span, adjust=False).mean()
+    return pd.Series(series).ewm(span=span, adjust=False).mean()
 
 
 def std(series, n):

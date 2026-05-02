@@ -15,8 +15,8 @@ class MaCrossover(TrialStrategy):  # pylint: disable=attribute-defined-outside-i
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.ma_short: Optional[np.ndarray] = None
-        self.ma_long: Optional[np.ndarray] = None
+        self.ma_short: np.ndarray = np.ndarray([])
+        self.ma_long: np.ndarray = np.ndarray([])
 
     def init(self):
         price_change = self.I(pct_change, self.data.Close)
@@ -354,9 +354,9 @@ def main():
     strategies = {
         # "MaCrossover": MaCrossover,
         # "BollingerBands": BollingerBands,
-        # "MACD": MACD,
+        "MACD": MACD,
         # "RSIDivergence": RSIDivergence,
-        "MultiIndicatorStrategy": MultiIndicatorStrategy,
+        # "MultiIndicatorStrategy": MultiIndicatorStrategy,
         # "SwingTrading": SwingTrading
     }
     run_optimizations(

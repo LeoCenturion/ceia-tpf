@@ -72,10 +72,11 @@ def _evaluate_paths_returns(
     """
     all_returns: List[pd.Series] = []
     path_sharpes: List[float] = []
+    path_psrs: List[float] = []
 
     for i, path in enumerate(path_results):
         with mlflow.start_run(run_name=f"path_{i + 1}", nested=True):
-            rets = path_to_returns(path)
+            rets = path_to_returns(path, commission=0.001)
             all_returns.append(rets)
 
             sr = sharpe_ratio(rets, periods_per_year)
@@ -84,6 +85,8 @@ def _evaluate_paths_returns(
 
             safe_sr = float(sr) if np.isfinite(sr) else 0.0
             path_sharpes.append(safe_sr)
+            if np.isfinite(psr):
+                path_psrs.append(float(psr))
 
             metrics: Dict[str, float] = {"sharpe_ratio": safe_sr}
             if np.isfinite(cr):
@@ -107,11 +110,14 @@ def _evaluate_paths_returns(
         }
         if np.isfinite(dsr):
             summary["deflated_sharpe_ratio"] = float(dsr)
+        if path_psrs:
+            summary["psr_mean"] = float(np.mean(path_psrs))
         mlflow_logger.log_metrics(summary)
         dsr_str = f"{dsr:.4f}" if np.isfinite(dsr) else "nan"
+        psr_mean_str = f"{np.mean(path_psrs):.4f}" if path_psrs else "nan"
         logger.info(
             f"Sharpe across paths: {[f'{s:.4f}' for s in path_sharpes]} | "
-            f"Mean: {np.nanmean(path_sharpes):.4f} | DSR: {dsr_str}"
+            f"Mean: {np.nanmean(path_sharpes):.4f} | DSR: {dsr_str} | PSR mean: {psr_mean_str}"
         )
     else:
         logger.warning("No complete backtest paths were evaluated.")
@@ -133,7 +139,9 @@ def _evaluate_paths_f1(
 
             score = f1_score(y_true, y_pred, average="weighted", zero_division="warn")
             path_scores.append(float(score))
-            logger.info(f"Path {i + 1}/{len(path_results)} F1 Score (weighted): {score:.4f}")
+            logger.info(
+                f"Path {i + 1}/{len(path_results)} F1 Score (weighted): {score:.4f}"
+            )
 
             report: Union[Dict[str, Any], str] = classification_report(
                 y_true, y_pred, output_dict=True, zero_division="warn"
@@ -144,7 +152,9 @@ def _evaluate_paths_f1(
                     clean_label = class_label.replace(" ", "_")
                     if isinstance(metrics, dict):
                         for metric_name, value in metrics.items():
-                            flat_report[f"{clean_label}_{metric_name.replace('-', '_')}"] = float(value)
+                            flat_report[
+                                f"{clean_label}_{metric_name.replace('-', '_')}"
+                            ] = float(value)
                     else:
                         flat_report[clean_label] = float(metrics)
                 mlflow.log_metrics(flat_report)
@@ -154,7 +164,12 @@ def _evaluate_paths_f1(
         logger.info(f"Individual Path F1 Scores: {[f'{s:.4f}' for s in path_scores]}")
         logger.info(f"Mean Path F1 Score: {np.mean(path_scores):.4f}")
         logger.info(f"Std Dev of Path F1 Scores: {np.std(path_scores):.4f}")
-        mlflow_logger.log_metrics({"f1_mean": float(np.mean(path_scores)), "f1_std": float(np.std(path_scores))})
+        mlflow_logger.log_metrics(
+            {
+                "f1_mean": float(np.mean(path_scores)),
+                "f1_std": float(np.std(path_scores)),
+            }
+        )
     else:
         logger.warning("No complete backtest paths were evaluated.")
 
@@ -188,7 +203,11 @@ def run_cpcv_for_strategy(
         )
         mlflow_logger.log_params(strategy_params)
 
-        path_indices = time_based_partition(pd.to_datetime(data.index), n_groups)
+        index = pd.to_datetime(data.index)
+        years = (index[-1] - index[0]).total_seconds() / (365.25 * 24 * 3600)
+        periods_per_year = int(len(data) / years)
+
+        path_indices = time_based_partition(index, n_groups)
         logger.info(f"Data partitioned into {n_groups} groups.")
 
         splits = generate_combinatorial_splits(n_groups, k_test_groups)
@@ -230,7 +249,7 @@ def run_cpcv_for_strategy(
         logging.info(f"Constructed {len(paths)} backtest paths.")
 
         _save_paths_artifact(paths)
-        _evaluate_paths_returns(paths, mlflow_logger)
+        _evaluate_paths_returns(paths, mlflow_logger, periods_per_year)
 
     finally:
         mlflow_logger.end_run()
@@ -334,7 +353,9 @@ def run_cpcv_for_ml_pipeline(
             )
 
         logger.info("--- Constructing and Evaluating Backtest Paths ---")
-        path_results = construct_backtest_paths(split_predictions, n_groups, k_test_groups)
+        path_results = construct_backtest_paths(
+            split_predictions, n_groups, k_test_groups
+        )
         path_scores = _evaluate_paths_f1(path_results, mlflow_logger)
         mean_f1 = float(np.mean(path_scores)) if path_scores else 0.0
 
@@ -381,7 +402,9 @@ def run_cpcv_for_metalabeling_pipeline(
         mlflow_logger.log_params(model_params, prefix="model_params")
 
         # Run on full data once to get consistent t1 and features for CPCV partitioning
-        logger.info("Performing initial pipeline run on full raw data for CPCV partitioning...")
+        logger.info(
+            "Performing initial pipeline run on full raw data for CPCV partitioning..."
+        )
         initial_pipeline = pipeline_cls(pipeline_config)
 
         logger.info(f"Raw data shape before structuring: {raw_data.shape}")
@@ -411,11 +434,9 @@ def run_cpcv_for_metalabeling_pipeline(
             f"{initial_labels.shape}, {initial_sample_weights.shape}, {initial_t1.shape}"
         )
 
-        common_initial_index = (
-            initial_features.index
-            .intersection(initial_labels.index)
-            .intersection(initial_t1.index)
-        )
+        common_initial_index = initial_features.index.intersection(
+            initial_labels.index
+        ).intersection(initial_t1.index)
         X_cpcv = initial_features.loc[common_initial_index]
         y_cpcv = initial_labels.loc[common_initial_index]
         t1_cpcv = initial_t1.loc[common_initial_index]
@@ -451,7 +472,12 @@ def run_cpcv_for_metalabeling_pipeline(
             )
 
             train_indices_pos, test_indices_pos = purge_and_embargo_split(
-                X_cpcv, t1_cpcv, path_indices, train_group_idxs, test_group_idxs, pct_embargo
+                X_cpcv,
+                t1_cpcv,
+                path_indices,
+                train_group_idxs,
+                test_group_idxs,
+                pct_embargo,
             )
             logger.debug(f"Train after purge: {len(X_cpcv.iloc[train_indices_pos])}")
 
@@ -495,7 +521,9 @@ def run_cpcv_for_metalabeling_pipeline(
                 )
                 continue
 
-            y_test_fold, _, _ = fold_pipeline.step_3_labeling_and_weighting(test_bars_fold)
+            y_test_fold, _, _ = fold_pipeline.step_3_labeling_and_weighting(
+                test_bars_fold
+            )
 
             common_test_fold_index = X_test_fold.index.intersection(y_test_fold.index)
             X_test_fold = X_test_fold.loc[common_test_fold_index]
@@ -508,7 +536,9 @@ def run_cpcv_for_metalabeling_pipeline(
                 continue
 
             primary_preds = fold_pipeline.primary_model_.predict(X_test_fold)
-            primary_probs = fold_pipeline.primary_model_.predict_proba(X_test_fold)[:, 1]
+            primary_probs = fold_pipeline.primary_model_.predict_proba(X_test_fold)[
+                :, 1
+            ]
 
             X_meta_test = X_test_fold.copy()
             X_meta_test["primary_prob"] = primary_probs
@@ -526,7 +556,9 @@ def run_cpcv_for_metalabeling_pipeline(
             )
 
         logger.info("--- Constructing and Evaluating Backtest Paths ---")
-        path_results = construct_backtest_paths(split_predictions, n_groups, k_test_groups)
+        path_results = construct_backtest_paths(
+            split_predictions, n_groups, k_test_groups
+        )
         path_scores = _evaluate_paths_f1(path_results, mlflow_logger)
 
     finally:

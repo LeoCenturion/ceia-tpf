@@ -16,6 +16,7 @@ from sklearn.metrics import f1_score
 
 from backtesting import Backtest, Strategy
 from backtesting.backtesting import _Broker as Broker  # type: ignore
+from backtesting.backtesting import _Data, _indicator_warmup_nbars, _strategy_indicators  # type: ignore
 from src.data_analysis import (
     adjust_data_to_ubtc,
     fetch_historical_data,
@@ -41,19 +42,29 @@ class TrialStrategy(Strategy):
         Generates batch predictions for a given dataset.
         This method will be used by CPCV.
         """
-        self._data = data  # type: ignore
-        # 1. Use the strategy's init() to set up indicators on the provided data.
-        self.I(lambda x: x, data.Close, name="Close")
-        self.init()
+        wrapped = _Data(data.copy(deep=False))
+        # Temporarily swap the strategy's internal data reference so that
+        # self.I() and indicator access point at the wrapped _Data object.
+        original_data = self._data
+        object.__setattr__(self, "_data", wrapped)
 
-        # 2. Create an array to hold the signals
+        self.init()
+        wrapped._update()
+
+        indicator_attrs = _strategy_indicators(self)
+        start = 1 + _indicator_warmup_nbars(self)
         signals = np.zeros(len(data), dtype=int)
 
-        # 3. Loop through the data to generate signals using the logic from next()
-        for i in range(len(data)):
-            self._index = i
-            self.next()
-            signals[i] = self.signal
+        with np.errstate(invalid="ignore"):
+            for i in range(start, len(data)):
+                wrapped._set_length(i + 1)
+                for attr, indicator in indicator_attrs:
+                    setattr(self, attr, indicator[..., : i + 1])
+                self.next()
+                signals[i] = self.signal
+
+        wrapped._set_length(len(data))
+        object.__setattr__(self, "_data", original_data)
 
         return pd.Series(signals, index=data.index)
 

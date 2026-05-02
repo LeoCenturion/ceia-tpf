@@ -55,11 +55,13 @@ def calmar_ratio(
     return annualized_return / max_dd
 
 
-def path_to_returns(path: Dict[str, np.ndarray]) -> pd.Series:
+def path_to_returns(path: Dict[str, np.ndarray], commission: float = 0.001) -> pd.Series:
     """Convert a CPCV path dict (y_true prices, y_pred signals) to a return series."""
     prices = pd.Series(path["y_true"], dtype=float)
     signals = pd.Series(path["y_pred"], dtype=float)
-    returns = prices.pct_change() * signals
+    signals = signals.shift(1)
+    trade_costs = signals.diff().abs() * commission
+    returns = prices.pct_change() * signals - trade_costs
     return returns.dropna()
 
 
