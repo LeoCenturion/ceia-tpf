@@ -5,7 +5,6 @@ from sklearn.base import clone
 from sklearn.decomposition import PCA
 from sklearn.metrics import f1_score
 from sklearn.preprocessing import StandardScaler
-
 from src.data_analysis.data_analysis import timer
 from src.modeling import PurgedKFold
 
@@ -16,7 +15,7 @@ class AbstractMLPipeline(ABC):
     Consolidates the structure: Data Structuring -> Feature Engineering -> Labeling -> Purged CV.
     """
 
-    def __init__(self, config):
+    def __init__(self, config: dict):
         self.config = config
         self.problem_type = "classification"  # Default to classification
 

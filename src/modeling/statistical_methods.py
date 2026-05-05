@@ -33,7 +33,7 @@ class MachineLearningPipeline(AbstractMLPipeline):
     @timer
     def step_1_data_structuring(self, raw_tick_data):
         """
-        Generate information-driven bars (Dollar Bars).
+        Gepnerate information-driven bars (Dollar Bars).
         """
         bars = create_dollar_bars(raw_tick_data, self.config["dollar_threshold"])
         return bars
