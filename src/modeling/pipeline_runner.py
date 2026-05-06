@@ -17,6 +17,8 @@ def run_pipeline(
     experiment_name,
     data_path=None,
     test_size=0.3,
+    nested=False,
+    run_name=None,
 ):
     """
     Generic function to run an ML pipeline, including:
@@ -28,7 +30,7 @@ def run_pipeline(
 
     # 1. Setup MLflow
     logger = MLflowLogger(experiment_name=experiment_name)
-    logger.start_run()
+    logger.start_run(run_name=run_name, nested=nested)
 
     try:
         # Log Data Info
@@ -78,11 +80,10 @@ def run_pipeline(
 
             # Log CV Metrics
             avg_score = np.mean(scores)
-            metric_name = (
-                "avg_cv_f1"
-                if pipeline.problem_type == "classification"
-                else "avg_cv_mase"
-            )
+            metric_name = {
+                "classification": "avg_cv_f1",
+                "trading": "avg_cv_sharpe",
+            }.get(pipeline.problem_type, "avg_cv_score")
             logging.debug(f"\nAverage CV Score: {avg_score:.4f}")
             logger.log_metrics({metric_name: avg_score})
 

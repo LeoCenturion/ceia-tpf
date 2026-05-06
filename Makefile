@@ -27,5 +27,5 @@ format:
 .PHONY: format
 
 analyze:
-	poerty run pyright ./src ./tests
+	poetry run pyright ./src ./tests
 .PHONY: analyze

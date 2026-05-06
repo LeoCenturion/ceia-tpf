@@ -9,6 +9,7 @@ fully-logged run.
 Financial metrics (Sharpe, Calmar, PSR) are replicated here so src.modeling
 stays import-independent of src.backtesting.
 """
+
 from __future__ import annotations
 
 import logging
@@ -153,9 +154,10 @@ def macd_signals(
 ) -> pd.Series:
     """Latching crossover between MACD line and signal line."""
     close = data["Close"]
-    macd = close.ewm(span=fast_span, adjust=False).mean() - close.ewm(
-        span=slow_span, adjust=False
-    ).mean()
+    macd = (
+        close.ewm(span=fast_span, adjust=False).mean()
+        - close.ewm(span=slow_span, adjust=False).mean()
+    )
     return _crossover_latch(macd, macd.ewm(span=signal_span, adjust=False).mean())
 
 
@@ -271,7 +273,11 @@ class MaCrossoverClassifier(BaseEstimator, ClassifierMixin):
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         full = pd.concat([self.X_train_, X])
-        return ma_crossover_signals(full, self.short_window, self.long_window).loc[X.index].values
+        return (
+            ma_crossover_signals(full, self.short_window, self.long_window)
+            .loc[X.index]
+            .values
+        )
 
     @classmethod
     def get_optuna_params(cls, trial: optuna.Trial) -> dict:
@@ -294,7 +300,11 @@ class BollingerBandsClassifier(BaseEstimator, ClassifierMixin):
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         full = pd.concat([self.X_train_, X])
-        return bollinger_bands_signals(full, self.bb_window, self.bb_std).loc[X.index].values
+        return (
+            bollinger_bands_signals(full, self.bb_window, self.bb_std)
+            .loc[X.index]
+            .values
+        )
 
     @classmethod
     def get_optuna_params(cls, trial: optuna.Trial) -> dict:
@@ -319,14 +329,22 @@ class MACDClassifier(BaseEstimator, ClassifierMixin):
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         full = pd.concat([self.X_train_, X])
-        return macd_signals(full, self.fast_span, self.slow_span, self.signal_span).loc[X.index].values
+        return (
+            macd_signals(full, self.fast_span, self.slow_span, self.signal_span)
+            .loc[X.index]
+            .values
+        )
 
     @classmethod
     def get_optuna_params(cls, trial: optuna.Trial) -> dict:
         fast_span = trial.suggest_int("fast_span", 5, 30)
         slow_span = trial.suggest_int("slow_span", fast_span + 1, 60)
         signal_span = trial.suggest_int("signal_span", 3, 20)
-        return {"fast_span": fast_span, "slow_span": slow_span, "signal_span": signal_span}
+        return {
+            "fast_span": fast_span,
+            "slow_span": slow_span,
+            "signal_span": signal_span,
+        }
 
 
 class RSIDivergenceClassifier(BaseEstimator, ClassifierMixin):
@@ -343,7 +361,11 @@ class RSIDivergenceClassifier(BaseEstimator, ClassifierMixin):
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         full = pd.concat([self.X_train_, X])
-        return rsi_divergence_signals(full, self.rsi_window, self.divergence_period).loc[X.index].values
+        return (
+            rsi_divergence_signals(full, self.rsi_window, self.divergence_period)
+            .loc[X.index]
+            .values
+        )
 
     @classmethod
     def get_optuna_params(cls, trial: optuna.Trial) -> dict:
@@ -375,9 +397,17 @@ class MultiIndicatorClassifier(BaseEstimator, ClassifierMixin):
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         full = pd.concat([self.X_train_, X])
-        return multi_indicator_signals(
-            full, self.bb_window, self.bb_std, self.fast_sma_window, self.slow_sma_window
-        ).loc[X.index].values
+        return (
+            multi_indicator_signals(
+                full,
+                self.bb_window,
+                self.bb_std,
+                self.fast_sma_window,
+                self.slow_sma_window,
+            )
+            .loc[X.index]
+            .values
+        )
 
     @classmethod
     def get_optuna_params(cls, trial: optuna.Trial) -> dict:
@@ -488,7 +518,9 @@ class TradingStrategyPipeline(AbstractMLPipeline):
             true_labels = (next_ret[mask] > 0).astype(int).values
             fold_signals = signals[mask].values
 
-            fold_f1 = f1_score(true_labels, fold_signals, average="weighted", zero_division=0)
+            fold_f1 = f1_score(
+                true_labels, fold_signals, average="weighted", zero_division=0
+            )
             scores.append(fold_f1)
             print(f"  Fold {i + 1} Weighted F1: {fold_f1:.4f}")
 
@@ -614,9 +646,11 @@ def main():
         "data/binance/python/data/spot/daily/klines/BTCUSDT/1m/"
         "BTCUSDT_consolidated_klines.csv"
     )
-    raw_data = fetch_historical_data(symbol="BTC/USDT", timeframe="1m", data_path=data_path)
+    raw_data = fetch_historical_data(
+        symbol="BTC/USDT", timeframe="1m", data_path=data_path
+    )
 
-    N_TRIALS = 30
+    N_TRIALS = 10
     pipeline_config = {
         "n_splits": 5,
         "pct_embargo": 0.01,
@@ -626,11 +660,11 @@ def main():
     }
 
     strategies: dict[str, Type[BaseEstimator]] = {
-        "SmaCrossClassifier": SmaCrossClassifier,
-        "MaCrossoverClassifier": MaCrossoverClassifier,
-        "BollingerBandsClassifier": BollingerBandsClassifier,
-        "MACDClassifier": MACDClassifier,
-        "RSIDivergenceClassifier": RSIDivergenceClassifier,
+        # "SmaCrossClassifier": SmaCrossClassifier,
+        # "MaCrossoverClassifier": MaCrossoverClassifier,
+        # "BollingerBandsClassifier": BollingerBandsClassifier,
+        # "MACDClassifier": MACDClassifier,
+        # "RSIDivergenceClassifier": RSIDivergenceClassifier,
         "MultiIndicatorClassifier": MultiIndicatorClassifier,
     }
 
@@ -645,6 +679,7 @@ def main():
                 raw_data=raw_data,
                 pipeline_config=pipeline_config,
                 n_trials=N_TRIALS,
+                n_jobs=10,
                 experiment_name="Trading_Strategy_Optimization",
             )
             results[name] = {"best_params": best_params, "best_f1": best_sharpe}

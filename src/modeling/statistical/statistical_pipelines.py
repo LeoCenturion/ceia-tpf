@@ -17,7 +17,7 @@ import pandas as pd
 import statsmodels.api as sm
 from pykalman import KalmanFilter
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
-from sklearn.metrics import f1_score
+from sklearn.metrics import classification_report, f1_score
 
 from src.data_analysis.data_analysis import fetch_historical_data, timer
 from src.modeling import PurgedKFold
@@ -541,7 +541,10 @@ class NeuralProphetClassifier(BaseEstimator, ClassifierMixin):
             "num_hidden_layers": self.num_hidden_layers,
             "learning_rate": self.learning_rate,
             "epochs": self.epochs,
-            "trainer_config": {"enable_progress_bar": False, "enable_model_summary": False},
+            "trainer_config": {
+                "enable_progress_bar": False,
+                "enable_model_summary": False,
+            },
         }
         if self.num_hidden_layers > 0:
             model_kwargs["d_hidden"] = self.d_hidden
@@ -561,9 +564,13 @@ class NeuralProphetClassifier(BaseEstimator, ClassifierMixin):
         full_df = pd.DataFrame({"ds": combined_close.index, "y": combined_close.values})
 
         try:
-            future = self.model_.make_future_dataframe(full_df, n_historic_predictions=True)
+            future = self.model_.make_future_dataframe(
+                full_df, n_historic_predictions=True
+            )
             forecast = self.model_.predict(future)
-            forecast = forecast[["ds", "yhat1"]].set_index("ds").reindex(combined_close.index)
+            forecast = (
+                forecast[["ds", "yhat1"]].set_index("ds").reindex(combined_close.index)
+            )
 
             # yhat1[t] = predicted close[t]; shift(-1) places predicted_close[t+1] at row t
             # direction[t] = sign(predicted_close[t+1] - actual_close[t]) ≡ label[t]
@@ -571,7 +578,8 @@ class NeuralProphetClassifier(BaseEstimator, ClassifierMixin):
             pred_return = (yhat_next - combined_close) / combined_close.clip(min=1e-10)
 
             direction = np.where(
-                pred_return > self.threshold, 1,
+                pred_return > self.threshold,
+                1,
                 np.where(pred_return < -self.threshold, -1, 0),
             )
             return (
@@ -667,6 +675,8 @@ class StatisticalModelPipeline(AbstractMLPipeline):
         )
 
         scores = []
+        all_y_test: list = []
+        all_y_pred: list = []
         print(f"Starting statistical CV ({self.config['n_splits']} folds)…")
         for i, (train_idx, test_idx) in enumerate(cv.split(X_raw, y)):
             X_train = X_raw.iloc[train_idx]
@@ -683,6 +693,8 @@ class StatisticalModelPipeline(AbstractMLPipeline):
             y_pred = fold_model.predict(X_test)
             score = f1_score(y_test, y_pred, average="weighted", zero_division=0)
             scores.append(score)
+            all_y_test.append(y_test.values)
+            all_y_pred.append(y_pred)
             print(f"  Fold {i + 1} F1: {score:.4f}")
 
         trained_model = clone(model)
@@ -719,8 +731,7 @@ def run_statistical_optimization(
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(experiment_name)
 
-    with mlflow.start_run(run_name=f"{model_class.__name__}_optuna") as parent_run:
-        parent_run_id = parent_run.info.run_id
+    with mlflow.start_run(run_name=f"{model_class.__name__}_optuna"):
         mlflow.log_param("model_class", model_class.__name__)
         mlflow.log_param("n_trials", n_trials)
         for k, v in pipeline_config.items():
@@ -728,24 +739,21 @@ def run_statistical_optimization(
 
         def objective(trial: optuna.Trial) -> float:
             params = model_class.get_optuna_params(trial)
-            model = model_class(**params)
-            pipeline = StatisticalModelPipeline(pipeline_config)
             try:
-                _, scores, _, _, _, _, _ = pipeline.run_cv(raw_data, model)
+                _, scores, _, _ = run_pipeline(
+                    pipeline=StatisticalModelPipeline(pipeline_config),
+                    model_cls=model_class,
+                    raw_data=raw_data,
+                    model_params=params,
+                    experiment_name=experiment_name,
+                    data_path=pipeline_config.get("data_path"),
+                    nested=True,
+                    run_name=f"trial_{trial.number}",
+                )
                 avg_f1 = float(np.mean(scores)) if scores else 0.0
             except Exception as exc:
                 logger.warning("Trial %d failed: %s", trial.number, exc)
                 avg_f1 = 0.0
-
-            tags = {"mlflow.parentRunId": parent_run_id}
-            with mlflow.start_run(
-                nested=True,
-                run_name=f"trial_{trial.number}",
-                tags=tags,
-            ):
-                mlflow.log_params(params)
-                mlflow.log_metric("avg_cv_f1", avg_f1)
-
             return avg_f1
 
         study_name = f"{experiment_name}_{model_class.__name__}"
