@@ -53,7 +53,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.base import clone
 
 from src.data_analysis.data_analysis import fetch_historical_data
-from src.modeling.statistical_methods import (
+from src.modeling.statistical.statistical_methods import (
     MachineLearningPipeline,
     feature_importance_mdi,
     feature_importance_mda,
@@ -62,7 +62,7 @@ from src.modeling.statistical_methods import (
     weighted_kendalls_tau
 )
 from src.modeling import PurgedKFold
-from src.modeling.chronos_feature_pipeline import ChronosFeaturePipeline
+from src.modeling.transformers.chronos_feature_pipeline import ChronosFeaturePipeline
 from src.constants import VOLUME_COL, CLOSE_COL
 
 sns.set_theme(style="whitegrid")

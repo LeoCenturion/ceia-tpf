@@ -14,7 +14,7 @@ from sklearn.metrics import (
 from src.data_analysis.data_analysis import fetch_historical_data
 from src.modeling import PurgedKFold
 from src.modeling.autogluon_adapter import AutoGluonAdapter
-from src.modeling.chronos_feature_pipeline import ChronosFeaturePipeline
+from src.modeling.transformers.chronos_feature_pipeline import ChronosFeaturePipeline
 from src.modeling.mlflow_utils import MLflowLogger
 from src.modeling.pipeline_runner import run_pipeline
 

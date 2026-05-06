@@ -14,7 +14,6 @@ predict() can collect without a broker.
   signal = 0  → flat / exit
 """
 
-from typing import Optional
 
 import numpy as np
 from backtesting.lib import crossover

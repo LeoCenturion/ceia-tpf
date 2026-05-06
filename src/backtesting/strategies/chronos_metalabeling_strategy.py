@@ -1,5 +1,5 @@
 from src.backtesting.backtesting import TrialStrategy
-from src.modeling.chronos_metalabeling_pipeline import ChronosMetaLabelingPipeline
+from src.modeling.transformers.chronos_metalabeling_pipeline import ChronosMetaLabelingPipeline
 
 
 class ChronosMetaLabelingCPCVStrategy(TrialStrategy):

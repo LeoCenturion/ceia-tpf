@@ -12,7 +12,7 @@ from src.data_analysis.data_analysis import fetch_historical_data
 from src.modeling.autogluon_adapter import AutoGluonAdapter
 from src.modeling.pipeline import timer
 from src.modeling.pipeline_runner import run_pipeline
-from src.modeling.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
+from src.modeling.machine_learning.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
 
 logger = logging.getLogger(__name__)
 

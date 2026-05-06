@@ -13,11 +13,11 @@ from src.constants import (
 from src.data_analysis.data_analysis import fetch_historical_data, timer
 from src.modeling.pipeline import AbstractMLPipeline
 from src.modeling.pipeline_runner import run_pipeline
-from src.modeling.xgboost_price_reversal_palazzo import (
+from src.modeling.machine_learning.xgboost_price_reversal_palazzo import (
     _create_reversal_features,
     aggregate_to_volume_bars,
 )
-from src.modeling.xgboost_price_reversal_palazzo import (
+from src.modeling.machine_learning.xgboost_price_reversal_palazzo import (
     create_labels as palazzo_create_labels,
 )
 

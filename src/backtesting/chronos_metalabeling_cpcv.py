@@ -3,7 +3,7 @@ import logging
 from src.backtesting.cpcv_runner import run_cpcv_for_metalabeling_pipeline
 from src.data_analysis.data_analysis import fetch_historical_data
 from src.modeling.autogluon_adapter import AutoGluonAdapter
-from src.modeling.chronos_metalabeling_pipeline import ChronosMetaLabelingPipeline
+from src.modeling.transformers.chronos_metalabeling_pipeline import ChronosMetaLabelingPipeline
 from src.utils.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)

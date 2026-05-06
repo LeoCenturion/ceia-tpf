@@ -15,7 +15,7 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from src.modeling.chronos_feature_pipeline import ChronosFeaturePipeline
+from src.modeling.transformers.chronos_feature_pipeline import ChronosFeaturePipeline
 
 
 def _make_volume_bars(n: int) -> pd.DataFrame:

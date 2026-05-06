@@ -4,7 +4,7 @@ from typing import Literal, Any, Optional
 import numpy as np
 import pandas as pd
 
-from src.modeling.chronos_pipeline_palazzo import (
+from src.modeling.transformers.chronos_pipeline_palazzo import (
     PalazzoChronosBinaryClassificationPipeline,
 )
 from src.app.strategy import Strategy

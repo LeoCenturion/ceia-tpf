@@ -58,7 +58,7 @@ def _make_mock_bolt_pipeline(embed_dim: int = _EMBED_DIM) -> MagicMock:
 class TestChronosBoltFeaturePipeline(unittest.TestCase):
 
     def setUp(self):
-        from src.modeling.chronos_bolt_feature_pipeline import ChronosBoltFeaturePipeline
+        from src.modeling.transformers.chronos_bolt_feature_pipeline import ChronosBoltFeaturePipeline
         self.config = {
             "volume_threshold": 50000,
             "tau": 0.7,
@@ -95,7 +95,7 @@ class TestChronosBoltFeaturePipeline(unittest.TestCase):
         self.pipeline.bolt_pipeline = mock_bolt
         window_size = self.config["chronos_window_size"]
 
-        from src.modeling.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
+        from src.modeling.machine_learning.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
         tabular = PalazzoXGBoostPipeline(self.config).step_2_feature_engineering(
             self.bars.copy()
         )

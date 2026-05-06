@@ -8,7 +8,7 @@ import pandas as pd
 from src.backtesting.cpcv_runner import run_cpcv_for_ml_pipeline
 from src.data_analysis.data_analysis import fetch_historical_data
 from src.modeling.autogluon_adapter import AutoGluonAdapter
-from src.modeling.chronos_feature_pipeline import ChronosFeaturePipeline
+from src.modeling.transformers.chronos_feature_pipeline import ChronosFeaturePipeline
 from src.utils.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)

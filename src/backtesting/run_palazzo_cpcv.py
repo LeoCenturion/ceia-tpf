@@ -8,7 +8,7 @@ import xgboost as xgb
 from src.backtesting.cpcv_runner import run_cpcv_for_ml_pipeline
 from src.data_analysis.data_analysis import fetch_historical_data
 from src.modeling.autogluon_adapter import AutoGluonAdapter
-from src.modeling.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
+from src.modeling.machine_learning.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
 from src.utils.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
