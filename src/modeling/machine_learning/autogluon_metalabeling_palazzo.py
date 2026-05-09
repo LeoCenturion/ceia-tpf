@@ -95,12 +95,13 @@ class PalazzoMetaLabelingPipeline(PalazzoXGBoostPipeline):
             oof_preds.loc[fold_indices] = val_pred
             oof_probs.loc[fold_indices] = val_prob
 
-        print(f"Average OOF CV F1 Score: {np.mean(fold_f1_scores):.4f}")
+        avg_oof_f1 = np.mean(fold_f1_scores)
+        print(f"Average OOF CV F1 Score: {avg_oof_f1:.4f}")
 
         return pd.DataFrame(
             {"true_label": y, "primary_pred": oof_preds, "primary_prob": oof_probs},
             index=X.index,
-        )
+        ), avg_oof_f1
 
     def log_results(
         self,
@@ -226,7 +227,7 @@ class PalazzoMetaLabelingPipeline(PalazzoXGBoostPipeline):
         print(f"Data Split: Train={len(X_train)}, Test={len(X_test)}")
 
         # 3. Generate OOF Predictions on Train_CV
-        oof_df = self.generate_oof_predictions(
+        oof_df, avg_oof_f1 = self.generate_oof_predictions(
             X_train, y_train, t1_train, sw_train, primary_model
         )
 
@@ -295,6 +296,7 @@ class PalazzoMetaLabelingPipeline(PalazzoXGBoostPipeline):
 
         # 1. Baseline: Primary Model Alone
         print("\n[Baseline] Primary Model Performance:")
+        primary_report = classification_report(y_test, primary_test_pred, output_dict=True)
         print(classification_report(y_test, primary_test_pred))
 
         # 2. Meta-Labeling Strategy:
@@ -324,11 +326,13 @@ class PalazzoMetaLabelingPipeline(PalazzoXGBoostPipeline):
         print(f"Precision Improvement: {prec_baseline:.4f} -> {prec_meta:.4f}")
 
         metrics = {
+            "avg_cv_f1": avg_oof_f1,
+            "test_accuracy": primary_report["accuracy"],
+            "test_macro_f1": primary_report["macro avg"]["f1-score"],
+            "test_weighted_f1": primary_report["weighted avg"]["f1-score"],
             "baseline_precision": prec_baseline,
             "metalabeling_precision": prec_meta,
-            "baseline_f1_weighted": f1_score(
-                y_test, primary_test_pred, average="weighted"
-            ),
+            "baseline_f1_weighted": primary_report["weighted avg"]["f1-score"],
             "metalabeling_f1_weighted": f1_score(
                 y_test, final_decision, average="weighted"
             ),

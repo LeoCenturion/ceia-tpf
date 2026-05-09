@@ -791,7 +791,6 @@ def main():
         raw_data = fetch_historical_data(
             symbol="BTC/USDT", timeframe="1m", data_path=minute_data_path
         )
-        raw_data.rename(columns={VOLUME_COL: "volume", CLOSE_COL: "close"}, inplace=True)
 
         config = {
             "volume_threshold": 50000,
