@@ -60,6 +60,7 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
 from src.data_analysis.bar_aggregation import create_volume_bars, create_dollar_bars, create_price_change_bars, create_tick_imbalance_bars
+from src.data_analysis import fetch_historical_data
 from scipy import stats
 from statsmodels.stats.diagnostic import acorr_ljungbox
 
@@ -486,7 +487,7 @@ df_for_bars = fetch_historical_data(
         data_path=DATA_PATH,
     )
 # Create the bars
-volume_bars = create_volume_bars(df_for_bars, volume_threshold=avg_hourly_btc_volume)
+volume_bars = create_volume_bars(df_for_bars, volume_threshold=50000)
 dollar_bars = create_dollar_bars(df_for_bars, dollar_threshold=avg_hourly_usdt_volume)
 
 logging.debug(f"\nNumber of original 1-hour bars: {len(df)}")
@@ -544,18 +545,96 @@ plt.show()
 # ### 7.2. Comparison of Close Prices
 
 # %%
+df['Volume BTC']
+
+# %%
+from datetime import datetime
 logging.debug("Plotting comparison of close prices across bar types...")
 plt.figure(figsize=(15, 8))
-
 # Plot the close prices for each bar type
-plt.plot(df.index, df['close'], label='Time Bars (1-Hour)', alpha=0.6, linewidth=1)
-plt.plot(volume_bars.index, volume_bars['close'], label=f'Volume Bars', alpha=0.8, linestyle='--', marker='.', markersize=2, linewidth=0.5)
-plt.plot(dollar_bars.index, dollar_bars['close'], label=f'Dollar Bars', alpha=0.8, linestyle=':', marker='x', markersize=2, linewidth=0.5)
+start = '2024-01-01'
+end =  '2024-01-03'
+df_slice = df[(df.index >= start) & (df.index <= end)]
+volume_bars_slice = volume_bars[(volume_bars.index >= start) & (volume_bars.index <= end)]
+plt.plot(df_slice.index, df_slice['close'], label='Time Bars (1-Hour)', alpha=0.6, linewidth=1)
+plt.plot(volume_bars_slice.index, volume_bars_slice['Close'], label=f'Volume Bars', alpha=1, linestyle='--', marker='x', markersize=5, linewidth=0.5)
+# plt.plot(dollar_bars.index, dollar_bars['Close'], label=f'Dollar Bars', alpha=0.8, linestyle=':', marker='x', markersize=2, linewidth=0.5)
 
 plt.title('Comparison of Close Prices: Time vs. Volume vs. Dollar Bars')
 plt.xlabel('Date')
 plt.ylabel('Price (USDT)')
 plt.legend()
+plt.show()
+
+# %%
+start = '2024-01-02'
+end = '2024-02-02'
+
+# Slice data
+df_slice = df.loc[start:end]
+volume_bars_slice = volume_bars.loc[start:end]
+
+fig, ax1 = plt.subplots(figsize=(15, 8))
+
+# --- Plot Prices on ax1 ---
+ax1.plot(df_slice.index, df_slice['close'], label='Time Bars (1-Hour)', color='tab:blue', alpha=0.6)
+ax1.plot(volume_bars_slice.index, volume_bars_slice['Close'], label='Volume Bars', color='tab:red', linestyle='', alpha=1, marker='X')
+ax1.set_ylabel('Price (USDT)')
+ax1.legend(loc='upper left')
+
+# --- Create a second Y-axis for Volume ---
+ax2 = ax1.twinx()  
+ax2.bar(df_slice.index, df_slice['Volume BTC'], color='red', alpha=0.5, width=0.03, label='Volume')
+ax2.set_ylabel('Volume BTC', color='gray')
+
+# --- Adjusting the Volume Scale ---
+# This keeps the volume bars at the bottom 20% of the chart
+ax2.set_ylim(0, df_slice['Volume BTC'].max() * 5) 
+
+plt.title(f'Price and Volume Overlay ({start} to {end})')
+plt.show()
+
+# %%
+import matplotlib.pyplot as plt
+import numpy as np
+
+start = '2024-01-01'
+end = '2024-01-03'
+
+# Slice the data
+# Note: df is 1m frequency as requested
+df_1m_slice = df
+v_bars_slice = volume_bars
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8))
+
+# --- LEFT PLOT: Sequential Volume Bars (Equally Spaced) ---
+x_seq = np.arange(len(v_bars_slice))
+ax1.plot(x_seq, v_bars_slice['Close'], 
+         label='Volume Bars', color='tab:orange', linewidth=0.8)
+
+# Formatting the sequential x-axis with date labels
+tick_freq_v = max(1, len(x_seq) // 8)
+ax1.set_xticks(x_seq[::tick_freq_v])
+ax1.set_xticklabels(v_bars_slice.index[::tick_freq_v].strftime('%m-%d %H:%M'), rotation=30)
+
+ax1.set_title('Volume Bars')
+ax1.set_ylabel('Price (USDT)')
+ax1.legend()
+
+# --- RIGHT PLOT: 1m Time Bars (Linear Time) ---
+ax2.plot(df_1m_slice.index, df_1m_slice['close'], 
+         label='1m Time Bars', color='tab:blue', linewidth=0.8)
+
+# Formatting the linear time x-axis
+# Matplotlib handles DatetimeIndex automatically here
+ax2.tick_params(axis='x', rotation=30)
+
+ax2.set_title('1m Close Price')
+ax2.set_ylabel('Price (USDT)')
+ax2.legend()
+
+plt.tight_layout()
 plt.show()
 
 # %% [markdown]

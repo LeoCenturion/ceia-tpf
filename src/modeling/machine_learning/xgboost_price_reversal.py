@@ -8,7 +8,7 @@ import optuna
 import pandas as pd
 import seaborn as sns
 import xgboost as xgb
-from scipy.stats import pearsonr
+from scipy.stats import t as t_dist
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.class_weight import compute_class_weight
@@ -28,16 +28,18 @@ def select_features(
     Note: The correlation threshold of 0.7 is extremely high and might result in
     very few or no features being selected. The paper's methodology is followed here.
     """
-    selected_features = []
-    for col in X.columns:
-        # Drop rows with NaN in either column for correlation calculation
-        temp_df = pd.concat([X[col], y], axis=1).dropna()
-        if len(temp_df) < 2:
-            continue
+    valid = X.join(y.rename("__y__")).dropna()
+    if len(valid) < 2:
+        return []
 
-        corr, p_value = pearsonr(temp_df.iloc[:, 0], temp_df.iloc[:, 1])
-        if abs(corr) >= corr_threshold and p_value < p_value_threshold:
-            selected_features.append(col)
+    r = valid.drop(columns="__y__").corrwith(valid["__y__"])
+    n = len(valid)
+    t_stat = r * np.sqrt(n - 2) / np.sqrt((1 - r**2).clip(1e-9))
+    p_values = 2 * t_dist.sf(t_stat.abs(), df=n - 2)
+
+    selected_features = r.index[
+        (r.abs() >= corr_threshold) & (p_values <= p_value_threshold)
+    ].tolist()
 
     print(
         f"Selected {len(selected_features)} features out of {len(X.columns)} based on correlation criteria."

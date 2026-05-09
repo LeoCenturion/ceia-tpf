@@ -54,9 +54,7 @@ class PalazzoXGBoostPipeline(AbstractMLPipeline):
 
         # Replicate feature post-processing from palazzo's create_features
         # but maintaining the index for PurgedKFold compatibility
-        final_features = pd.DataFrame(index=bars.index)
-        for col in features.columns:
-            final_features[f"feature_{col}"] = features[col]
+        final_features = features.add_prefix("feature_")
 
         final_features["feature_return_lag_1"] = bars["bar_return"].shift(1)
         final_features["feature_volatility_lag_1"] = bars["intra_bar_std"].shift(1)

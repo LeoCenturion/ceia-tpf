@@ -19,6 +19,8 @@ def run_pipeline(
     test_size=0.3,
     nested=False,
     run_name=None,
+    parent_run_id=None,
+    tracking_uri=None,
 ):
     """
     Generic function to run an ML pipeline, including:
@@ -29,8 +31,8 @@ def run_pipeline(
     """
 
     # 1. Setup MLflow
-    logger = MLflowLogger(experiment_name=experiment_name)
-    logger.start_run(run_name=run_name, nested=nested)
+    logger = MLflowLogger(experiment_name=experiment_name, tracking_uri=tracking_uri)
+    logger.start_run(run_name=run_name, nested=nested, parent_run_id=parent_run_id)
 
     try:
         # Log Data Info

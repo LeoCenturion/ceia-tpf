@@ -116,7 +116,10 @@ class AbstractMLPipeline(ABC):
                     y.iloc[test_idx],
                 )
             )
-            sw_train = sw.loc[X_train_raw.index]
+            # reindex handles synthetic samples (e.g. from SMOTE) that have no
+            # entry in sw; fill_value=1.0 gives them neutral weight since the
+            # oversampling already corrects the imbalance for those rows.
+            sw_train = sw.reindex(X_train_raw.index, fill_value=1.0)
             if X_train_raw.empty or X_test_raw.empty:
                 print(
                     f"Skipping fold {i + 1} due to empty features after engineering/alignment."
@@ -146,7 +149,7 @@ class AbstractMLPipeline(ABC):
 
             # 5. Predict and Score
             y_pred = fold_model.predict(X_test_transformed)
-            scores.append(f1_score(y_test, y_pred, average="weighted"))
+            scores.append(f1_score(y_test, y_pred, average="macro"))
             print(f"Fold {i + 1} F1: {scores[-1]:.4f}")
 
         # --- Final Fit on Full Dataset ---

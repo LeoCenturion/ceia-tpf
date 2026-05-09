@@ -25,11 +25,20 @@ class MLflowLogger:
         mlflow.set_experiment(experiment_name)
         self.run = None
 
-    def start_run(self, run_name=None, nested=False):
+    def start_run(self, run_name=None, nested=False, parent_run_id=None):
         """Start a new MLflow run."""
         if run_name is None:
             run_name = f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        self.run = mlflow.start_run(run_name=run_name, nested=nested)
+        tags = {"mlflow.parentRunId": parent_run_id} if parent_run_id else None
+        active = mlflow.active_run()
+        if parent_run_id and active and active.info.run_id != parent_run_id:
+            # Stale run from a previous trial in this thread — clean it up
+            mlflow.end_run()
+            active = None
+        # When parent is explicit, nest only if the active run IS that parent
+        # (main-thread case). Worker threads with empty stacks use nested=False.
+        use_nested = (active is not None) if parent_run_id else nested
+        self.run = mlflow.start_run(run_name=run_name, nested=use_nested, tags=tags)
         return self.run
 
     def log_params(self, params, prefix=None):

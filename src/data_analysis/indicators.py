@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+from numba import njit
 from scipy.signal import find_peaks
 
 from src.constants import (
@@ -172,13 +173,39 @@ def adx(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14) -> pd.Da
     )
 
 
+@njit(cache=True)
+def _aroon_core(
+    high: np.ndarray, low: np.ndarray, n: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Rolling argmax/argmin periods-since kernel for Aroon."""
+    length = len(high)
+    psh = np.full(length, np.nan)
+    psl = np.full(length, np.nan)
+    for i in range(n - 1, length):
+        psh[i] = n - 1 - np.argmax(high[i - n + 1 : i + 1])
+        psl[i] = n - 1 - np.argmin(low[i - n + 1 : i + 1])
+    return psh, psl
+
+
+@njit(cache=True)
+def _rolling_mad(values: np.ndarray, n: int) -> np.ndarray:
+    """Rolling Mean Absolute Deviation."""
+    result = np.full(len(values), np.nan)
+    for i in range(n - 1, len(values)):
+        window = values[i - n + 1 : i + 1]
+        mean = np.mean(window)
+        result[i] = np.mean(np.abs(window - mean))
+    return result
+
+
 def aroon(high: pd.Series, low: pd.Series, n: int = 14) -> pd.DataFrame:
     """Calculate the Aroon Indicator."""
-    periods_since_high = high.rolling(n).apply(lambda x: n - 1 - np.argmax(x), raw=True)
-    periods_since_low = low.rolling(n).apply(lambda x: n - 1 - np.argmin(x), raw=True)
-    aroon_up = 100 * (n - periods_since_high) / n
-    aroon_down = 100 * (n - periods_since_low) / n
-    return pd.DataFrame({f"AROONU_{n}": aroon_up, f"AROOND_{n}": aroon_down})
+    psh, psl = _aroon_core(high.values.astype(float), low.values.astype(float), n)
+    aroon_up = 100 * (n - psh) / n
+    aroon_down = 100 * (n - psl) / n
+    return pd.DataFrame(
+        {f"AROONU_{n}": aroon_up, f"AROOND_{n}": aroon_down}, index=high.index
+    )
 
 
 def cci(
@@ -186,7 +213,7 @@ def cci(
 ) -> pd.Series:
     tp = (high + low + close) / 3
     tp_sma = sma(tp, n)
-    mad = tp.rolling(n).apply(lambda x: np.abs(x - x.mean()).mean(), raw=True)
+    mad = pd.Series(_rolling_mad(tp.values.astype(float), n), index=tp.index)
     cci_series = (tp - tp_sma) / (c * mad).replace(0, 1e-9)
     return cci_series
 
@@ -307,35 +334,28 @@ def volume_oscillator(
     return 100 * (short_ma - long_ma) / long_ma.replace(0, 1e-9)
 
 
-def kama(close: pd.Series, n: int = 10, pow1: int = 2, pow2: int = 30) -> pd.Series:
-    """Calculates Kaufman's Adaptive Moving Average (KAMA)."""
-    # Efficiency Ratio
-    change = abs(close - close.shift(n))
-    volatility = abs(close - close.shift(1)).rolling(n).sum()
-    er = change / volatility.replace(0, 1e-9)
-
-    # Smoothing Constant
-    sc = (er * (2.0 / (pow1 + 1) - 2.0 / (pow2 + 1)) + 2.0 / (pow2 + 1)) ** 2
-
-    # KAMA calculation
-    kama_values = pd.Series(np.nan, index=close.index)
-    kama_values.iloc[n - 1] = close.iloc[n - 1]  # Initialize with the first valid price
-
-    # We need to iterate because KAMA depends on its previous value
-    # Using numpy for speed
-    close_values = close.values
-    sc_values = sc.values
-    kama_arr = np.full(len(close), np.nan)
+@njit(cache=True)
+def _kama_core(close_values: np.ndarray, sc_values: np.ndarray, n: int) -> np.ndarray:
+    """Recurrence kernel for KAMA — previous value dependency prevents vectorization."""
+    kama_arr = np.full(len(close_values), np.nan)
     kama_arr[n - 1] = close_values[n - 1]
-
-    for i in range(n, len(close)):
+    for i in range(n, len(close_values)):
         if np.isnan(sc_values[i]):
-            kama_arr[i] = kama_arr[i - 1]  # Carry forward if SC is NaN
+            kama_arr[i] = kama_arr[i - 1]
         else:
             kama_arr[i] = kama_arr[i - 1] + sc_values[i] * (
                 close_values[i] - kama_arr[i - 1]
             )
+    return kama_arr
 
+
+def kama(close: pd.Series, n: int = 10, pow1: int = 2, pow2: int = 30) -> pd.Series:
+    """Calculates Kaufman's Adaptive Moving Average (KAMA)."""
+    change = abs(close - close.shift(n))
+    volatility = abs(close - close.shift(1)).rolling(n).sum()
+    er = change / volatility.replace(0, 1e-9)
+    sc = (er * (2.0 / (pow1 + 1) - 2.0 / (pow2 + 1)) + 2.0 / (pow2 + 1)) ** 2
+    kama_arr = _kama_core(close.values.astype(float), sc.values.astype(float), n)
     return pd.Series(kama_arr, index=close.index)
 
 

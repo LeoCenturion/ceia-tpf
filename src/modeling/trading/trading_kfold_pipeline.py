@@ -19,6 +19,7 @@ import mlflow
 import numpy as np
 import optuna
 import pandas as pd
+from numba import njit
 from scipy import stats
 from scipy.special import ndtr
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
@@ -93,19 +94,12 @@ def _probabilistic_sharpe_ratio(returns, benchmark_sr: float = 0.0) -> float:
 
 def _crossover_latch(fast: pd.Series, slow: pd.Series) -> pd.Series:
     """Latching signal: 1 when fast crosses above slow, 0 on the reverse."""
-    signals = pd.Series(0, index=fast.index)
-    sig = 0
-    prev_f = prev_s = float("nan")
-    for i in range(len(fast)):
-        f, s = fast.iloc[i], slow.iloc[i]
-        if not any(np.isnan(v) for v in (f, s, prev_f, prev_s)):
-            if prev_f <= prev_s and f > s:
-                sig = 1
-            elif prev_f >= prev_s and f < s:
-                sig = 0
-        signals.iloc[i] = sig
-        prev_f, prev_s = f, s
-    return signals
+    cross_up   = (fast > slow) & (fast.shift(1) <= slow.shift(1))
+    cross_down = (fast < slow) & (fast.shift(1) >= slow.shift(1))
+    sig = pd.Series(np.nan, index=fast.index)
+    sig[cross_up]   = 1
+    sig[cross_down] = 0
+    return sig.ffill().fillna(0).astype(int)
 
 
 def smacross_signals(data: pd.DataFrame, n1: int, n2: int) -> pd.Series:
@@ -129,24 +123,14 @@ def bollinger_bands_signals(
 ) -> pd.Series:
     """1 when price dips below lower band; 0 when it rises above upper band."""
     close = data["Close"]
-    ma = close.rolling(bb_window).mean()
+    ma    = close.rolling(bb_window).mean()
     std_dev = close.rolling(bb_window).std()
     upper = ma + bb_std * std_dev
     lower = ma - bb_std * std_dev
-
-    signals = pd.Series(0, index=data.index)
-    sig = 0
-    for i in range(len(close)):
-        if pd.isna(lower.iloc[i]):
-            signals.iloc[i] = sig
-            continue
-        p = close.iloc[i]
-        if p < lower.iloc[i]:
-            sig = 1
-        elif p > upper.iloc[i]:
-            sig = 0
-        signals.iloc[i] = sig
-    return signals
+    sig = pd.Series(np.nan, index=data.index)
+    sig[close < lower] = 1
+    sig[close > upper] = 0
+    return sig.ffill().fillna(0).astype(int)
 
 
 def macd_signals(
@@ -161,40 +145,43 @@ def macd_signals(
     return _crossover_latch(macd, macd.ewm(span=signal_span, adjust=False).mean())
 
 
+@njit
+def _rsi_divergence_core(
+    low: np.ndarray, high: np.ndarray, rsi: np.ndarray, divergence_period: int
+) -> np.ndarray:
+    n = len(low)
+    signals = np.zeros(n, dtype=np.int64)
+    sig = 0
+    for i in range(divergence_period + 1, n):
+        if np.isnan(rsi[i]):
+            signals[i] = sig
+            continue
+        w_low  = low[i - divergence_period:i]
+        w_high = high[i - divergence_period:i]
+        w_rsi  = rsi[i - divergence_period:i]
+        p_low  = np.argmin(w_low)
+        p_high = np.argmax(w_high)
+        if low[i] < w_low[p_low] and rsi[i] > w_rsi[p_low]:
+            sig = 1
+        elif high[i] > w_high[p_high] and rsi[i] < w_rsi[p_high]:
+            sig = 0
+        signals[i] = sig
+    return signals
+
+
 def rsi_divergence_signals(
     data: pd.DataFrame, rsi_window: int, divergence_period: int
 ) -> pd.Series:
     """Bullish RSI divergence → 1; bearish → 0 (latching)."""
     close = data["Close"]
     delta = close.diff()
-    gain = delta.clip(lower=0).rolling(rsi_window).mean()
-    loss = (-delta.clip(upper=0)).rolling(rsi_window).mean()
-    rsi = 100 - 100 / (1 + gain / loss.replace(0, np.nan))
-
-    signals = pd.Series(0, index=data.index)
-    sig = 0
-    for i in range(divergence_period + 1, len(data)):
-        if pd.isna(rsi.iloc[i]):
-            signals.iloc[i] = sig
-            continue
-        s = slice(i - divergence_period, i)
-        low_sl = data["Low"].iloc[s]
-        high_sl = data["High"].iloc[s]
-        rsi_sl = rsi.iloc[s]
-        prev_low_pos = int(low_sl.values.argmin())
-        prev_high_pos = int(high_sl.values.argmax())
-        if (
-            data["Low"].iloc[i] < low_sl.iloc[prev_low_pos]
-            and rsi.iloc[i] > rsi_sl.iloc[prev_low_pos]
-        ):
-            sig = 1
-        elif (
-            data["High"].iloc[i] > high_sl.iloc[prev_high_pos]
-            and rsi.iloc[i] < rsi_sl.iloc[prev_high_pos]
-        ):
-            sig = 0
-        signals.iloc[i] = sig
-    return signals
+    gain  = delta.clip(lower=0).rolling(rsi_window).mean()
+    loss  = (-delta.clip(upper=0)).rolling(rsi_window).mean()
+    rsi   = 100 - 100 / (1 + gain / loss.replace(0, np.nan))
+    signals = _rsi_divergence_core(
+        data["Low"].values, data["High"].values, rsi.values, divergence_period
+    )
+    return pd.Series(signals, index=data.index)
 
 
 def multi_indicator_signals(
@@ -205,30 +192,17 @@ def multi_indicator_signals(
     slow_sma_window: int,
 ) -> pd.Series:
     """Bollinger Band breakout confirmed by dual-SMA trend filter."""
-    close = data["Close"]
-    ma = close.rolling(bb_window).mean()
-    std_dev = close.rolling(bb_window).std()
-    upper = ma + bb_std * std_dev
-    lower = ma - bb_std * std_dev
+    close    = data["Close"]
+    ma       = close.rolling(bb_window).mean()
+    std_dev  = close.rolling(bb_window).std()
+    upper    = ma + bb_std * std_dev
+    lower    = ma - bb_std * std_dev
     sma_fast = close.rolling(fast_sma_window).mean()
     sma_slow = close.rolling(slow_sma_window).mean()
-
-    signals = pd.Series(0, index=data.index)
-    sig = 0
-    for i in range(len(close)):
-        if any(
-            pd.isna(v)
-            for v in (upper.iloc[i], lower.iloc[i], sma_fast.iloc[i], sma_slow.iloc[i])
-        ):
-            signals.iloc[i] = sig
-            continue
-        p = close.iloc[i]
-        if p > upper.iloc[i] and sma_fast.iloc[i] > sma_slow.iloc[i]:
-            sig = 1
-        elif p < lower.iloc[i] and sma_fast.iloc[i] < sma_slow.iloc[i]:
-            sig = 0
-        signals.iloc[i] = sig
-    return signals
+    sig = pd.Series(np.nan, index=data.index)
+    sig[(close > upper) & (sma_fast > sma_slow)] = 1
+    sig[(close < lower) & (sma_fast < sma_slow)] = 0
+    return sig.ffill().fillna(0).astype(int)
 
 
 # ---------------------------------------------------------------------------
@@ -570,11 +544,12 @@ def run_trading_optimization(
     best_params : dict
     best_avg_cv_weighted_f1 : float
     """
-    tracking_uri = pipeline_config.get("tracking_uri", "sqlite:///mlflow.db")
+    tracking_uri = pipeline_config.get("tracking_uri", "sqlite:///mlflow.db?timeout=60")
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(experiment_name)
 
-    with mlflow.start_run(run_name=f"{model_class.__name__}_optuna"):
+    with mlflow.start_run(run_name=f"{model_class.__name__}_optuna") as parent_run:
+        parent_run_id = parent_run.info.run_id
         mlflow.log_param("model_class", model_class.__name__)
         mlflow.log_param("n_trials", n_trials)
         for k, v in pipeline_config.items():
@@ -592,6 +567,8 @@ def run_trading_optimization(
                     data_path=pipeline_config.get("data_path"),
                     nested=True,
                     run_name=f"trial_{trial.number}",
+                    parent_run_id=parent_run_id,
+                    tracking_uri=tracking_uri,
                 )
                 avg_f1 = float(np.nanmean(scores)) if scores else 0.0
             except Exception as exc:
@@ -630,6 +607,7 @@ def run_trading_optimization(
         model_params=best_params,
         experiment_name=f"{experiment_name}_best",
         data_path=pipeline_config.get("data_path"),
+        tracking_uri=tracking_uri,
     )
 
     return best_params, best_value
@@ -650,12 +628,12 @@ def main():
         symbol="BTC/USDT", timeframe="1m", data_path=data_path
     )
 
-    N_TRIALS = 10
+    N_TRIALS = 30
     pipeline_config = {
         "n_splits": 5,
         "pct_embargo": 0.01,
         "commission": 0.001,
-        "tracking_uri": "sqlite:///mlflow.db",
+        "tracking_uri": "sqlite:///mlflow.db?timeout=60",
         "data_path": data_path,
     }
 
@@ -664,7 +642,7 @@ def main():
         # "MaCrossoverClassifier": MaCrossoverClassifier,
         # "BollingerBandsClassifier": BollingerBandsClassifier,
         # "MACDClassifier": MACDClassifier,
-        # "RSIDivergenceClassifier": RSIDivergenceClassifier,
+        "RSIDivergenceClassifier": RSIDivergenceClassifier,
         "MultiIndicatorClassifier": MultiIndicatorClassifier,
     }
 
@@ -679,7 +657,7 @@ def main():
                 raw_data=raw_data,
                 pipeline_config=pipeline_config,
                 n_trials=N_TRIALS,
-                n_jobs=10,
+                n_jobs=8,
                 experiment_name="Trading_Strategy_Optimization",
             )
             results[name] = {"best_params": best_params, "best_f1": best_sharpe}

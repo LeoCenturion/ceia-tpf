@@ -30,6 +30,7 @@ pykalman = "^0.10.2"
 arch = "^7.2.0"
 matplotlib = "^3.10.6"
 xgboost = "^3.0.5"
+numba = "^0.61"
 cupy = "^13.6.0"
 torch = "2.7.1"
 accelerator = "^2025.9.5"
@@ -45,6 +46,8 @@ pyyaml = "^6.0.3"
 flask = "^3.1.3"
 requests = "^2.33.1"
 pyright = "^1.1.409"
+memory-profiler = "^0.61.0"
+imbalanced-learn = "^0.14.1"
 
 
 [build-system]

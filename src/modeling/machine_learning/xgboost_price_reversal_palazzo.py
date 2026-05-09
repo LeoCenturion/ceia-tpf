@@ -2,6 +2,7 @@ from functools import partial
 
 import cupy as cp
 import numpy as np
+from numba import njit
 import optuna
 import pandas as pd
 import xgboost as xgb
@@ -18,7 +19,7 @@ from src.constants import (
     VOLUME_COL,
 )
 from src.data_analysis.data_analysis import ewm, fetch_historical_data, sma, std
-from src.data_analysis.indicators import rsi_indicator
+from src.data_analysis.indicators import aroon, cci, rsi_indicator
 
 # --- Part 1: Data Simulation and Volume Bar Creation ---
 # The paper uses high-frequency data to construct volume bars.
@@ -176,23 +177,6 @@ def adx(high: pd.Series, low: pd.Series, close: pd.Series, n: int = 14):
     )
 
 
-def aroon(high: pd.Series, low: pd.Series, n: int = 14) -> pd.DataFrame:
-    periods_since_high = high.rolling(n).apply(lambda x: n - 1 - np.argmax(x), raw=True)
-    periods_since_low = low.rolling(n).apply(lambda x: n - 1 - np.argmin(x), raw=True)
-    aroon_up = 100 * (n - periods_since_high) / n
-    aroon_down = 100 * (n - periods_since_low) / n
-    return pd.DataFrame({f"AROONU_{n}": aroon_up, f"AROOND_{n}": aroon_down})
-
-
-def cci(
-    high: pd.Series, low: pd.Series, close: pd.Series, n: int = 20, c: float = 0.015
-) -> pd.Series:
-    tp = (high + low + close) / 3
-    tp_sma = sma(tp, n)
-    mad = tp.rolling(n).apply(lambda x: np.abs(x - x.mean()).mean(), raw=True)
-    cci_series = (tp - tp_sma) / (c * mad).replace(0, 1e-9)
-    return cci_series
-
 
 def _stochastic_series(series: pd.Series, n: int) -> pd.Series:
     low_n = series.rolling(window=n).min()
@@ -275,68 +259,68 @@ def donchian_channels(high: pd.Series, low: pd.Series, n: int = 20):
     return pd.DataFrame({f"DCU_{n}_{n}": upper, f"DCL_{n}_{n}": lower})
 
 
-def aggregate_to_volume_bars(df, volume_threshold=50000):
+@njit(cache=True)
+def _assign_bar_ids(volumes: np.ndarray, threshold: float) -> np.ndarray:
+    """Assign a bar ID to each row using a resetting volume accumulator."""
+    bar_ids = np.empty(len(volumes), dtype=np.int64)
+    current_bar = 0
+    cum_vol = 0.0
+    for i in range(len(volumes)):
+        bar_ids[i] = current_bar
+        cum_vol += volumes[i]
+        if cum_vol >= threshold:
+            current_bar += 1
+            cum_vol = 0.0
+    return bar_ids
+
+
+def aggregate_to_volume_bars(df: pd.DataFrame, volume_threshold: float = 50000) -> pd.DataFrame:
     """
     Aggregates time-series data into volume bars based on a volume threshold.
     This follows the core concept of the dissertation (Section 3.3).
     """
-    # print(f"Step 2: Aggregating data into volume bars of {volume_threshold} units...")
-    bars = []
-    current_bar_data = []
-    cumulative_volume = 0
+    bar_ids = _assign_bar_ids(df[VOLUME_COL].values.astype(float), float(volume_threshold))
 
-    for index, row in df.iterrows():
-        current_bar_data.append(row)
-        cumulative_volume += row[VOLUME_COL]
-        if cumulative_volume >= volume_threshold:
-            bar_df = pd.DataFrame(current_bar_data)
+    # All OHLCV aggregations in a single vectorized groupby pass
+    grp = df.groupby(bar_ids)
+    idx = df.index.to_series()
+    volume_bars_df = pd.DataFrame(
+        {
+            "open_time": idx.groupby(bar_ids).first(),
+            "close_time": idx.groupby(bar_ids).last(),
+            "open_price": grp[OPEN_COL].first(),
+            HIGH_COL: grp[HIGH_COL].max(),
+            LOW_COL: grp[LOW_COL].min(),
+            "close_price": grp[CLOSE_COL].last(),
+            "total_volume": grp[VOLUME_COL].sum(),
+        }
+    )
 
-            # Bar characteristics
-            open_time = bar_df.index[0]
-            close_time = bar_df.index[-1]
-            open_price = bar_df[OPEN_COL].iloc[0]
-            high_price = bar_df[HIGH_COL].max()
-            low_price = bar_df[LOW_COL].min()
-            close_price = bar_df[CLOSE_COL].iloc[-1]
+    # intra-bar log-return std — null out the first row of each bar so
+    # we don't bleed the previous bar's close into the current bar's std
+    log_ret = np.log(df[CLOSE_COL] / df[CLOSE_COL].shift(1))
+    bar_id_series = pd.Series(bar_ids, index=df.index)
+    bar_starts = bar_id_series != bar_id_series.shift(1)
+    log_ret[bar_starts] = np.nan
+    intra_std = log_ret.groupby(bar_ids).std().fillna(0)
+    # fillna(0) matches the original `if len(bar_log_returns) > 1 else 0` guard
 
-            # Calculate intra-bar volatility for labeling (σv)
-            # The paper uses log-returns for some calculations.
-            bar_log_returns = np.log(
-                bar_df[CLOSE_COL] / bar_df[CLOSE_COL].shift(1)
-            ).dropna()
-            intra_bar_std = bar_log_returns.std()
+    volume_bars_df["intra_bar_std"] = intra_std.values
+    volume_bars_df.reset_index(drop=True, inplace=True)
 
-            bars.append(
-                {
-                    "open_time": open_time,
-                    "close_time": close_time,
-                    "open_price": open_price,
-                    HIGH_COL: high_price,
-                    LOW_COL: low_price,
-                    "close_price": close_price,
-                    "total_volume": cumulative_volume,
-                    "intra_bar_std": intra_bar_std if len(bar_log_returns) > 1 else 0,
-                }
-            )
-
-            # Reset for the next bar
-            current_bar_data = []
-            cumulative_volume = 0
-
-    volume_bars_df = pd.DataFrame(bars)
+    # Drop trailing incomplete bar (rows that never accumulated enough volume)
+    if not volume_bars_df.empty:
+        volume_bars_df = volume_bars_df[
+            volume_bars_df["total_volume"] >= volume_threshold
+        ]
 
     if volume_bars_df.empty:
-        # print(
-        #     "Warning: No volume bars created. Threshold might be too high for the dataset."
-        # )
         return volume_bars_df
 
-    # Calculate bar returns (rv), which will be used for labeling
     volume_bars_df["bar_return"] = (
         volume_bars_df["close_price"] / volume_bars_df["open_price"]
     ) - 1
 
-    # print(f"Aggregation complete. {len(volume_bars_df)} volume bars created.\n")
     return volume_bars_df
 
 
