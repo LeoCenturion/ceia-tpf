@@ -24,6 +24,19 @@ This project uses mlflow for logging results. The db is located in `mlflow.db`
 This project uses optuna for hyperparameter search. The db is located in `optuna-study.db`
 
 This project uses python. Try to document main functions. Try to use type hints whenever possible.
+
+## Performance
+
+Signal generators in `src/modeling/trading/` operate on datasets of 3M+ rows (1-minute BTCUSDT bars). **Vectorized pandas/numpy operations must be prioritized over Python loops.** The ffill pattern handles latching state machines without loops:
+
+```python
+sig = pd.Series(np.nan, index=index)
+sig[buy_condition]  = 1
+sig[sell_condition] = 0
+sig.ffill().fillna(0).astype(int)
+```
+
+Python loops over large time series (even "simple" ones) have caused single trials to take 1.8 hours. Any new signal generator must be vectorized by default.
 This project uses poetry. Dependencies are defined in pyproject.toml. To run python you should ALWAYS use poetry e.g. 'poetry run python -m src.modeling.my_model'
 
 Utility scripts are in scripts/

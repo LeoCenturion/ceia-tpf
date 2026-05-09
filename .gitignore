@@ -16,3 +16,4 @@
 /AutogluonModels/
 /**/__pycache__/
 *.log
+/data_analysis/.ipynb_checkpoints/*.ipynb
