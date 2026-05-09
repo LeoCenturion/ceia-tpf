@@ -1,12 +1,23 @@
 import logging
 
+import mlflow
 import numpy as np
+import optuna
 from sklearn.base import clone
 from sklearn.metrics import (
     classification_report,
 )
 
 from src.modeling.mlflow_utils import MLflowLogger
+
+
+class _ReplayTrial:
+    """Replays Optuna best_params so get_optuna_params can reconstruct the pipeline/model split."""
+    def __init__(self, params: dict):
+        self._params = params
+    def suggest_int(self, name, *a, **kw): return self._params[name]
+    def suggest_float(self, name, *a, **kw): return self._params[name]
+    def suggest_categorical(self, name, *a, **kw): return self._params[name]
 
 
 def run_pipeline(
@@ -130,3 +141,113 @@ def run_pipeline(
         raise
     finally:
         logger.end_run()
+
+
+def run_optuna_optimization(
+    pipeline_cls,
+    model_cls,
+    raw_data,
+    pipeline_config: dict,
+    experiment_name: str,
+    n_trials: int = 30,
+    n_jobs: int = 1,
+    run_name_prefix: str = None,
+    optuna_storage: str = "sqlite:///optuna-study.db",
+    tracking_uri: str = "sqlite:///mlflow.db",
+    best_metric_name: str = "best_avg_cv_f1",
+    data_path: str = None,
+) -> tuple[dict, dict, float]:
+    """
+    Generic Optuna optimization loop shared across all pipeline types.
+
+    Each trial merges pipeline_config with pipeline_cls.get_optuna_params(trial), then
+    runs run_pipeline nested under a parent MLflow run.  After the study, _ReplayTrial
+    reconstructs the pipeline/model param split from best_params and executes a final
+    canonical run logged to {experiment_name}_best.
+
+    Returns (best_pipeline_overrides, best_model_params, best_value).
+    """
+    prefix = run_name_prefix or pipeline_cls.__name__
+    mlflow.set_tracking_uri(tracking_uri)
+
+    client = mlflow.tracking.MlflowClient(tracking_uri=tracking_uri)
+    exp = client.get_experiment_by_name(experiment_name)
+    if exp is not None and exp.lifecycle_stage == "deleted":
+        client.restore_experiment(exp.experiment_id)
+
+    mlflow.set_experiment(experiment_name)
+
+    with mlflow.start_run(run_name=f"{prefix}_optuna") as parent_run:
+        parent_run_id = parent_run.info.run_id
+        mlflow.log_param("pipeline_class", pipeline_cls.__name__)
+        mlflow.log_param("model_class", model_cls.__name__)
+        mlflow.log_param("n_trials", n_trials)
+        for k, v in pipeline_config.items():
+            try:
+                mlflow.log_param(f"pipeline.{k}", v)
+            except Exception:
+                pass
+
+        def objective(trial):
+            pipeline_trial_params = pipeline_cls.get_optuna_params(trial)
+            model_params = model_cls.get_optuna_params(trial)
+            merged_config = {**pipeline_config, **pipeline_trial_params}
+            try:
+                _, scores, _, _ = run_pipeline(
+                    pipeline=pipeline_cls(merged_config),
+                    model_cls=model_cls,
+                    raw_data=raw_data,
+                    model_params=model_params,
+                    experiment_name=experiment_name,
+                    data_path=data_path,
+                    nested=True,
+                    run_name=f"trial_{trial.number}",
+                    parent_run_id=parent_run_id,
+                    tracking_uri=tracking_uri,
+                )
+                return float(np.nanmean(scores)) if scores else 0.0
+            except Exception as exc:
+                logging.warning("Trial %d failed: %s", trial.number, exc)
+                return 0.0
+
+        study_name = f"{experiment_name}_{pipeline_cls.__name__}"
+        study = optuna.create_study(
+            direction="maximize",
+            study_name=study_name,
+            storage=optuna_storage,
+            load_if_exists=True,
+        )
+        study.optimize(objective, n_trials=n_trials, n_jobs=n_jobs, show_progress_bar=True)
+
+        try:
+            best_params = study.best_params
+            best_value = study.best_value
+        except ValueError:
+            logging.warning("No successful trials for %s.", pipeline_cls.__name__)
+            return {}, {}, 0.0
+
+        # _ReplayTrial re-runs get_optuna_params with fixed best values so the
+        # conditional branching in each method follows the same path as the best trial.
+        replay = _ReplayTrial(best_params)
+        best_pipeline_overrides = pipeline_cls.get_optuna_params(replay)
+        best_model_params = model_cls.get_optuna_params(replay)
+
+        mlflow.log_params({f"best.{k}": v for k, v in best_params.items()})
+        mlflow.log_metric(best_metric_name, best_value)
+
+    logging.debug(
+        "%s + %s — best %s: %.4f",
+        pipeline_cls.__name__, model_cls.__name__, best_metric_name, best_value,
+    )
+
+    run_pipeline(
+        pipeline=pipeline_cls({**pipeline_config, **best_pipeline_overrides}),
+        model_cls=model_cls,
+        raw_data=raw_data,
+        model_params=best_model_params,
+        experiment_name=f"{experiment_name}_best",
+        data_path=data_path,
+        tracking_uri=tracking_uri,
+    )
+
+    return best_pipeline_overrides, best_model_params, best_value

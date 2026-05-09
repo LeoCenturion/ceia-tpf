@@ -1,11 +1,8 @@
 import argparse
-from functools import partial
 from typing import cast
 
-import mlflow
 import mplfinance as mpf
 import numpy as np
-import optuna
 import pandas as pd
 from scipy.signal import find_peaks
 from scipy.stats import pearsonr
@@ -26,7 +23,7 @@ from src.modeling.machine_learning.xgboost_price_reversal_palazzo import (
     aggregate_to_volume_bars,
 )
 from src.modeling.pipeline import AbstractMLPipeline
-from src.modeling.pipeline_runner import run_pipeline
+from src.modeling.pipeline_runner import run_optuna_optimization, run_pipeline
 
 
 def awesome_oscillator(
@@ -541,6 +538,26 @@ class RFPriceReversalPipeline(AbstractMLPipeline):
         t1 = pd.Series(bars.index + horizon, index=bars.index, name="t1")
         return y, sample_weights, t1
 
+    @classmethod
+    def get_optuna_params(cls, trial) -> dict:
+        peak_method = trial.suggest_categorical(
+            "peak_method", ["ao_on_price", "ao_on_pct_change", "pct_change_on_ao"]
+        )
+        peak_distance = trial.suggest_int("peak_distance", 1, 24 * 7)
+        if peak_method == "ao_on_price":
+            peak_threshold = trial.suggest_float("peak_threshold", 0.0, 100.0)
+        elif peak_method == "pct_change_on_ao":
+            peak_threshold = trial.suggest_float("peak_threshold", 0.0, 5.0)
+        else:
+            peak_threshold = trial.suggest_float("peak_threshold", 0.0, 0.005)
+        corr_threshold = trial.suggest_float("corr_threshold", 0.1, 0.7)
+        return {
+            "peak_method": peak_method,
+            "peak_distance": peak_distance,
+            "peak_threshold": peak_threshold,
+            "corr_threshold": corr_threshold,
+        }
+
     def cross_validation_feature_engineering(self, train, test, y_train, y_test):
         from imblearn.over_sampling import SMOTE
 
@@ -573,6 +590,15 @@ class RFTripleBarrierPipeline(RFPriceReversalPipeline):
     t1 is exactly 1 bar ahead, so PurgedKFold purging is precise with no
     approximation needed.
     """
+
+    @classmethod
+    def get_optuna_params(cls, trial) -> dict:
+        return {
+            "tau": trial.suggest_float("tau", 0.3, 2.0),
+            "use_ao": trial.suggest_categorical("use_ao", [True, False]),
+            "vol_window": trial.suggest_int("vol_window", 5, 30),
+            "corr_threshold": trial.suggest_float("corr_threshold", 0.1, 0.7),
+        }
 
     def step_3_labeling_and_weighting(
         self, bars: pd.DataFrame
@@ -625,6 +651,12 @@ class RFTripleBarrierVolumePipeline(RFTripleBarrierPipeline):
         features["feature_rolling_std_return_5"] = bars["bar_return"].shift(1).rolling(5).std()
         return features.dropna()
 
+    @classmethod
+    def get_optuna_params(cls, trial) -> dict:
+        params = super().get_optuna_params(trial)
+        params["volume_threshold"] = trial.suggest_int("volume_threshold", 25000, 100000)
+        return params
+
     def step_3_labeling_and_weighting(self, bars):
         # Volume bars use close_price; remap to CLOSE_COL so the parent can find it.
         # HIGH_COL / LOW_COL are already the correct column names from aggregate_to_volume_bars.
@@ -633,221 +665,56 @@ class RFTripleBarrierVolumePipeline(RFTripleBarrierPipeline):
         return super().step_3_labeling_and_weighting(std_bars)
 
 
+class RFClassifier(RandomForestClassifier):
+    """RandomForestClassifier with Optuna search space declared as a classmethod."""
+
+    @classmethod
+    def get_optuna_params(cls, trial) -> dict:
+        return {
+            "n_estimators": trial.suggest_int("n_estimators", 50, 300),
+            "max_depth": trial.suggest_int("max_depth", 5, 50, log=True),
+            "min_samples_split": trial.suggest_int("min_samples_split", 2, 20),
+            "min_samples_leaf": trial.suggest_int("min_samples_leaf", 1, 20),
+            "random_state": 42,
+            "n_jobs": 3,
+            "class_weight": "balanced",
+        }
+
+
 # --- Optimization ---
 
 
-def _run_optuna_study(
-    objective_fn, study_name: str, n_trials: int, run_name_prefix: str
-):
-    mlflow.set_tracking_uri("sqlite:///mlflow.db")
-    mlflow.set_experiment(study_name)
-
-    study = optuna.create_study(
-        direction="maximize",
-        study_name=study_name,
-        storage="sqlite:///optuna-study.db",
-        load_if_exists=True,
-    )
-
-    with mlflow.start_run(run_name=f"{run_name_prefix}_study") as parent_run:
-        parent_run_id = parent_run.info.run_id
-
-        def wrapped(trial):
-            return objective_fn(trial, parent_run_id=parent_run_id, experiment_name=study_name)
-
-        study.optimize(wrapped, n_trials=n_trials, n_jobs=1)
-
-    print(f"\n--- {study_name} Best Results ---")
-    try:
-        best_trial = study.best_trial
-        print(f"Best trial value (F1 Score): {best_trial.value:.4f}")
-        print("Best parameters found:")
-        for key, value in best_trial.params.items():
-            print(f"  {key}: {value}")
-    except ValueError:
-        print("No successful trials were completed.")
-
-
-def objective_rf(trial: optuna.Trial, pipeline_config: dict, raw_data: pd.DataFrame, parent_run_id=None, experiment_name="rf_price_reversal_optimization") -> float:
-    peak_method = trial.suggest_categorical(
-        "peak_method", ["ao_on_price", "ao_on_pct_change", "pct_change_on_ao"]
-    )
-    if peak_method == "pct_change_std":
-        std_fraction = trial.suggest_float("std_fraction", 0.5, 3.0)
-        peak_distance = 1
-        peak_threshold = 0.0
-    else:
-        peak_distance = trial.suggest_int("peak_distance", 1, 24 * 7)
-        std_fraction = 1.0
-        if peak_method == "ao_on_price":
-            peak_threshold = trial.suggest_float("peak_threshold", 0.0, 100.0)
-        elif peak_method == "pct_change_on_ao":
-            peak_threshold = trial.suggest_float("peak_threshold", 0.0, 5.0)
-        else:
-            peak_threshold = trial.suggest_float("peak_threshold", 0.0, 0.005)
-
-    corr_threshold = trial.suggest_float("corr_threshold", 0.1, 0.7)
-    n_estimators = trial.suggest_int("n_estimators", 50, 300)
-    max_depth = trial.suggest_int("max_depth", 5, 50, log=True)
-    min_samples_split = trial.suggest_int("min_samples_split", 2, 20)
-    min_samples_leaf = trial.suggest_int("min_samples_leaf", 1, 20)
-
-    config = {
-        **pipeline_config,
-        "peak_method": peak_method,
-        "peak_distance": peak_distance,
-        "peak_threshold": peak_threshold,
-        "std_fraction": std_fraction,
-        "corr_threshold": corr_threshold,
-    }
-
-    model_params = {
-        "n_estimators": n_estimators,
-        "max_depth": max_depth,
-        "min_samples_split": min_samples_split,
-        "min_samples_leaf": min_samples_leaf,
-        "random_state": 42,
-        "n_jobs": 10,
-        "class_weight": "balanced",
-    }
-
-    try:
-        _, scores, _, _ = run_pipeline(
-            pipeline=RFPriceReversalPipeline(config),
-            model_cls=RandomForestClassifier,
-            raw_data=raw_data,
-            model_params=model_params,
-            experiment_name=experiment_name,
-            nested=True,
-            run_name=f"trial_{trial.number}",
-            parent_run_id=parent_run_id,
-        )
-        return float(np.mean(scores)) if scores else 0.0
-    except Exception as e:
-        print(f"Trial {trial.number} failed: {e}")
-        return 0.0
-
-
 def run_optimization(config: dict, raw_data: pd.DataFrame, n_trials: int = 20):
-    _run_optuna_study(
-        partial(objective_rf, pipeline_config=config, raw_data=raw_data),
-        study_name="rf_price_reversal_optimization",
+    run_optuna_optimization(
+        pipeline_cls=RFPriceReversalPipeline,
+        model_cls=RFClassifier,
+        raw_data=raw_data,
+        pipeline_config=config,
+        experiment_name="rf_price_reversal_optimization",
         n_trials=n_trials,
         run_name_prefix="rf_reversal",
     )
 
 
-def objective_triple_barrier(
-    trial: optuna.Trial, pipeline_config: dict, raw_data: pd.DataFrame, parent_run_id=None, experiment_name="rf_triple_barrier_optimization"
-) -> float:
-    tau = trial.suggest_float("tau", 0.3, 2.0)
-    use_ao = trial.suggest_categorical("use_ao", [True, False])
-    vol_window = trial.suggest_int("vol_window", 5, 30)
-    corr_threshold = trial.suggest_float("corr_threshold", 0.1, 0.7)
-    n_estimators = trial.suggest_int("n_estimators", 50, 300)
-    max_depth = trial.suggest_int("max_depth", 5, 50, log=True)
-    min_samples_split = trial.suggest_int("min_samples_split", 2, 20)
-    min_samples_leaf = trial.suggest_int("min_samples_leaf", 1, 20)
-
-    config = {
-        **pipeline_config,
-        "tau": tau,
-        "use_ao": use_ao,
-        "vol_window": vol_window,
-        "corr_threshold": corr_threshold,
-    }
-    model_params = {
-        "n_estimators": n_estimators,
-        "max_depth": max_depth,
-        "min_samples_split": min_samples_split,
-        "min_samples_leaf": min_samples_leaf,
-        "random_state": 42,
-        "n_jobs": 3,
-        "class_weight": "balanced",
-    }
-
-    try:
-        _, scores, _, _ = run_pipeline(
-            pipeline=RFTripleBarrierPipeline(config),
-            model_cls=RandomForestClassifier,
-            raw_data=raw_data,
-            model_params=model_params,
-            experiment_name=experiment_name,
-            nested=True,
-            run_name=f"trial_{trial.number}",
-            parent_run_id=parent_run_id,
-        )
-        return float(np.mean(scores)) if scores else 0.0
-    except Exception as e:
-        print(f"Trial {trial.number} failed: {e}")
-        return 0.0
-
-
-def run_optimization_triple_barrier(
-    config: dict, raw_data: pd.DataFrame, n_trials: int = 20
-):
-    _run_optuna_study(
-        partial(objective_triple_barrier, pipeline_config=config, raw_data=raw_data),
-        study_name="rf_triple_barrier_optimization",
+def run_optimization_triple_barrier(config: dict, raw_data: pd.DataFrame, n_trials: int = 20):
+    run_optuna_optimization(
+        pipeline_cls=RFTripleBarrierPipeline,
+        model_cls=RFClassifier,
+        raw_data=raw_data,
+        pipeline_config=config,
+        experiment_name="rf_triple_barrier_optimization",
         n_trials=n_trials,
         run_name_prefix="rf_triple_barrier",
     )
 
 
-def objective_volume_bars(
-    trial: optuna.Trial, pipeline_config: dict, raw_data: pd.DataFrame, parent_run_id=None, experiment_name="rf_volume_bars_optimization"
-) -> float:
-    volume_threshold = trial.suggest_int("volume_threshold", 25000, 100000)
-    tau = trial.suggest_float("tau", 0.3, 2.0)
-    use_ao = trial.suggest_categorical("use_ao", [True, False])
-    vol_window = trial.suggest_int("vol_window", 5, 30)
-    corr_threshold = trial.suggest_float("corr_threshold", 0.1, 0.7)
-    n_estimators = trial.suggest_int("n_estimators", 50, 300)
-    max_depth = trial.suggest_int("max_depth", 5, 50, log=True)
-    min_samples_split = trial.suggest_int("min_samples_split", 2, 20)
-    min_samples_leaf = trial.suggest_int("min_samples_leaf", 1, 20)
-
-    config = {
-        **pipeline_config,
-        "volume_threshold": volume_threshold,
-        "tau": tau,
-        "use_ao": use_ao,
-        "vol_window": vol_window,
-        "corr_threshold": corr_threshold,
-    }
-    model_params = {
-        "n_estimators": n_estimators,
-        "max_depth": max_depth,
-        "min_samples_split": min_samples_split,
-        "min_samples_leaf": min_samples_leaf,
-        "random_state": 42,
-        "n_jobs": 3,
-        "class_weight": "balanced",
-    }
-
-    try:
-        _, scores, _, _ = run_pipeline(
-            pipeline=RFTripleBarrierVolumePipeline(config),
-            model_cls=RandomForestClassifier,
-            raw_data=raw_data,
-            model_params=model_params,
-            experiment_name=experiment_name,
-            nested=True,
-            run_name=f"trial_{trial.number}",
-            parent_run_id=parent_run_id,
-        )
-        return float(np.mean(scores)) if scores else 0.0
-    except Exception as e:
-        print(f"Trial {trial.number} failed: {e}")
-        return 0.0
-
-
-def run_optimization_volume_bars(
-    config: dict, raw_data: pd.DataFrame, n_trials: int = 20
-):
-    _run_optuna_study(
-        partial(objective_volume_bars, pipeline_config=config, raw_data=raw_data),
-        study_name="rf_volume_bars_optimization",
+def run_optimization_volume_bars(config: dict, raw_data: pd.DataFrame, n_trials: int = 20):
+    run_optuna_optimization(
+        pipeline_cls=RFTripleBarrierVolumePipeline,
+        model_cls=RFClassifier,
+        raw_data=raw_data,
+        pipeline_config=config,
+        experiment_name="rf_volume_bars_optimization",
         n_trials=n_trials,
         run_name_prefix="rf_volume_bars",
     )

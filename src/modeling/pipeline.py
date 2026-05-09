@@ -56,6 +56,11 @@ class AbstractMLPipeline(ABC):
         """
         pass
 
+    @classmethod
+    def get_optuna_params(cls, trial) -> dict:
+        """Pipeline-level config overrides suggested per Optuna trial. Override in subclasses."""
+        return {}
+
     def cross_validation_feature_engineering(
         self, train, test, y_train, y_test
     ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:

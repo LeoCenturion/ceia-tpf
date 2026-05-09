@@ -28,7 +28,7 @@ from sklearn.metrics import classification_report, f1_score
 from src.data_analysis.data_analysis import adjust_data_to_ubtc, fetch_historical_data
 from src.modeling import PurgedKFold
 from src.modeling.pipeline import AbstractMLPipeline
-from src.modeling.pipeline_runner import run_pipeline
+from src.modeling.pipeline_runner import run_optuna_optimization, run_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -532,85 +532,22 @@ def run_trading_optimization(
     n_jobs: int = 1,
     optuna_storage: str = "sqlite:///optuna-study.db",
 ) -> tuple[dict, float]:
-    """
-    Optimize a trading strategy classifier with Optuna and log to MLflow.
-
-    Each Optuna trial is a nested MLflow run.  After the study finishes the
-    best parameters are re-evaluated via run_pipeline for a canonical, fully-
-    logged final run.
-
-    Returns
-    -------
-    best_params : dict
-    best_avg_cv_weighted_f1 : float
-    """
     tracking_uri = pipeline_config.get("tracking_uri", "sqlite:///mlflow.db?timeout=60")
-    mlflow.set_tracking_uri(tracking_uri)
-    mlflow.set_experiment(experiment_name)
-
-    with mlflow.start_run(run_name=f"{model_class.__name__}_optuna") as parent_run:
-        parent_run_id = parent_run.info.run_id
-        mlflow.log_param("model_class", model_class.__name__)
-        mlflow.log_param("n_trials", n_trials)
-        for k, v in pipeline_config.items():
-            mlflow.log_param(f"pipeline.{k}", v)
-
-        def objective(trial: optuna.Trial) -> float:
-            params = model_class.get_optuna_params(trial)
-            try:
-                _, scores, _, _ = run_pipeline(
-                    pipeline=TradingStrategyPipeline(pipeline_config),
-                    model_cls=model_class,
-                    raw_data=raw_data,
-                    model_params=params,
-                    experiment_name=experiment_name,
-                    data_path=pipeline_config.get("data_path"),
-                    nested=True,
-                    run_name=f"trial_{trial.number}",
-                    parent_run_id=parent_run_id,
-                    tracking_uri=tracking_uri,
-                )
-                avg_f1 = float(np.nanmean(scores)) if scores else 0.0
-            except Exception as exc:
-                logger.warning("Trial %d failed: %s", trial.number, exc)
-                avg_f1 = 0.0
-            return avg_f1
-
-        study_name = f"{experiment_name}_{model_class.__name__}"
-        study = optuna.create_study(
-            direction="maximize",
-            study_name=study_name,
-            storage=optuna_storage,
-            load_if_exists=True,
-        )
-        study.optimize(
-            objective, n_trials=n_trials, n_jobs=n_jobs, show_progress_bar=True
-        )
-
-        try:
-            best_params = study.best_params
-            best_value = study.best_value
-        except ValueError:
-            logger.warning("No successful trial found for %s.", model_class.__name__)
-            return {}, 0.0
-
-        mlflow.log_params({f"best.{k}": v for k, v in best_params.items()})
-        mlflow.log_metric("best_avg_cv_weighted_f1", best_value)
-
-    print(f"\n{model_class.__name__} — best params: {best_params}")
-    print(f"  best avg CV Weighted F1: {best_value:.4f}")
-
-    run_pipeline(
-        pipeline=TradingStrategyPipeline(pipeline_config),
+    _, best_model_params, best_value = run_optuna_optimization(
+        pipeline_cls=TradingStrategyPipeline,
         model_cls=model_class,
         raw_data=raw_data,
-        model_params=best_params,
-        experiment_name=f"{experiment_name}_best",
-        data_path=pipeline_config.get("data_path"),
+        pipeline_config=pipeline_config,
+        experiment_name=experiment_name,
+        n_trials=n_trials,
+        n_jobs=n_jobs,
+        run_name_prefix=model_class.__name__,
+        optuna_storage=optuna_storage,
         tracking_uri=tracking_uri,
+        best_metric_name="best_avg_cv_weighted_f1",
+        data_path=pipeline_config.get("data_path"),
     )
-
-    return best_params, best_value
+    return best_model_params, best_value
 
 
 # ---------------------------------------------------------------------------
