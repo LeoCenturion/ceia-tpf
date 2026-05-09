@@ -1,10 +1,7 @@
-from functools import partial
-
 import cupy as cp
 import matplotlib.pyplot as plt
 import mplfinance as mpf
 import numpy as np
-import optuna
 import pandas as pd
 import seaborn as sns
 import xgboost as xgb
@@ -18,6 +15,8 @@ from src.data_analysis.indicators import (
     create_ao_target,
     create_features,
 )
+from src.modeling.pipeline import AbstractMLPipeline
+from src.modeling.pipeline_runner import run_optuna_optimization
 
 
 def select_features(
@@ -198,154 +197,109 @@ def plot_reversals_on_candlestick(
     )
 
 
-def objective(trial: optuna.Trial, data: pd.DataFrame) -> float:
+class XGBoostPriceReversalPipeline(AbstractMLPipeline):
     """
-    Optuna objective function to tune hyperparameters for the XGBoost price reversal model.
-    """
-    # === 1. Define Hyperparameter Search Space ===
-    # Peak detection hyperparameters
-    peak_method = trial.suggest_categorical("peak_method", ["pct_change_on_ao"])
+    Pipeline for 3-class price reversal detection (top/neutral/bottom) using XGBoost.
 
-    std_fraction = 1.0
-    if peak_method == "pct_change_std":
-        std_fraction = trial.suggest_float("std_fraction", 0.5, 2.0)
-        # These are not used for 'pct_change_std' but need to be defined
-        peak_distance = 1
-        peak_threshold = 0
-    else:
+    Labels are remapped from {-1, 0, 1} to {0, 1, 2} so XGBoost multi:softmax works
+    with the standard AbstractMLPipeline.run_cv path.
+    """
+
+    def step_1_data_structuring(self, raw_tick_data) -> pd.DataFrame:
+        return raw_tick_data
+
+    def step_2_feature_engineering(self, bars) -> pd.DataFrame:
+        return create_features(bars).dropna()
+
+    def step_3_labeling_and_weighting(self, bars):
+        df = create_ao_target(
+            bars.copy(),
+            method=self.config.get("peak_method", "pct_change_on_ao"),
+            peak_distance=self.config.get("peak_distance", 4),
+            peak_threshold=self.config.get("peak_threshold", 0.5),
+            std_fraction=self.config.get("std_fraction", 1.0),
+        )
+        # Remap {-1, 0, 1} -> {0, 1, 2} for XGBoost multi:softmax
+        y = df["target"].map({-1: 0, 0: 1, 1: 2})
+        classes = np.unique(y)
+        weights = compute_class_weight("balanced", classes=classes, y=y)
+        sample_weights = y.map(dict(zip(classes, weights)))
+        horizon = pd.Timedelta(hours=self.config.get("peak_distance", 4))
+        t1 = pd.Series(bars.index + horizon, index=bars.index, name="t1")
+        return y, sample_weights, t1
+
+    @classmethod
+    def get_optuna_params(cls, trial) -> dict:
+        peak_method = trial.suggest_categorical(
+            "peak_method", ["pct_change_on_ao"]
+        )
         peak_distance = trial.suggest_int("peak_distance", 1, 5)
         if peak_method == "ao_on_price":
-            # Threshold is a difference, so values can be smaller than absolute price
             peak_threshold = trial.suggest_float("peak_threshold", 0.0, 100.0)
         elif peak_method == "pct_change_on_ao":
-            peak_threshold = trial.suggest_float("peak_threshold", 0.0, 5)
-        else:  # For pct_change based methods, the scale is much smaller
+            peak_threshold = trial.suggest_float("peak_threshold", 0.0, 5.0)
+        else:
             peak_threshold = trial.suggest_float("peak_threshold", 0.0, 0.005)
+        corr_threshold = trial.suggest_float("corr_threshold", 0.1, 0.7)
+        return {
+            "peak_method": peak_method,
+            "peak_distance": peak_distance,
+            "peak_threshold": peak_threshold,
+            "corr_threshold": corr_threshold,
+        }
 
-    # Feature selection hyperparameter
-    corr_threshold = trial.suggest_float("corr_threshold", 0.1, 0.7)
+    def cross_validation_feature_engineering(self, train, test, y_train, y_test):
+        corr_threshold = self.config.get("corr_threshold", 0.3)
+        selected = select_features(train, y_train, corr_threshold=corr_threshold)
+        if selected:
+            train, test = train[selected], test[selected]
+        return train, test, y_train, y_test
 
-    # Model hyperparameters for XGBoost
-    params = {
-        "objective": "multi:softmax",
-        "num_class": 3,
-        "eval_metric": "mlogloss",
-        "tree_method": "hist",
-        "device": "cuda",  # Use GPU
-        "n_estimators": trial.suggest_int("n_estimators", 50, 400),
-        "learning_rate": trial.suggest_float("learning_rate", 1e-3, 0.3, log=True),
-        "max_depth": trial.suggest_int("max_depth", 3, 10),
-        "subsample": trial.suggest_float("subsample", 0.5, 1.0),
-        "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
-        "gamma": trial.suggest_float("gamma", 1e-8, 1.0, log=True),
-        "min_child_weight": trial.suggest_int("min_child_weight", 1, 10),
-        "random_state": 42,
-        "n_jobs": -1,
-    }
-    refit_every = 24 * 7
 
-    # === 2. Run the ML Pipeline ===
-    print(f"\n--- Starting Trial {trial.number} ---")
-    print(f"Params: {trial.params}")
-
-    # Create Target Variable
-    reversal_data = create_ao_target(
-        data.copy(),
-        method=peak_method,
-        peak_distance=peak_distance,
-        peak_threshold=peak_threshold,
-        std_fraction=std_fraction,
-    )
-
-    # Prune trial if not enough reversal points are found
-    if (
-        reversal_data["target"].nunique() < 3
-        or reversal_data["target"].value_counts().get(1, 0) < 5
-        or reversal_data["target"].value_counts().get(-1, 0) < 5
-    ):
-        print("Not enough reversal points found with these parameters. Pruning trial.")
-        raise optuna.exceptions.TrialPruned()
-
-    y = reversal_data["target"]
-
-    # Prune trial if initial training set is not representative
-    split_index = int(
-        len(reversal_data) * (1 - 0.3)
-    )  # Corresponds to test_size in manual_backtest
-    if y.iloc[:split_index].nunique() < 3:
-        print("Initial training set does not contain all 3 classes. Pruning trial.")
-        raise optuna.exceptions.TrialPruned()
-
-    # Remap labels for XGBoost, which requires labels in [0, num_class-1]
-    y_mapped = y.map({-1: 0, 0: 1, 1: 2})
-
-    # Create Features
-    features_df = create_features(data)
-    X = features_df.loc[reversal_data.index]
-    X = X.loc[:, (X != X.iloc[0]).any()]  # Drop constant columns
-
-    # Feature Selection (use original y for correlation)
-    selected_cols = select_features(X, y, corr_threshold=corr_threshold)
-    if selected_cols:
-        X = X[selected_cols]
-    # Run Backtest
-    model = xgb.XGBClassifier(**params)
-    _, _, report = manual_backtest(
-        X, y_mapped, model, test_size=0.3, refit_every=refit_every
-    )
-
-    # === 3. Calculate and Return the Objective Metric ===
-    f1_top = report.get("Top (1)", {}).get("f1-score", 0.0)
-    f1_bottom = report.get("Bottom (-1)", {}).get("f1-score", 0.0)
-
-    # We want to maximize the average F1 score for identifying tops and bottoms
-    objective_value = (f1_top + f1_bottom) / 2
-    print(f"Trial {trial.number} finished. Avg F1 (Top/Bottom): {objective_value:.4f}")
-
-    return objective_value
+class XGBClassifierMulticlass(xgb.XGBClassifier):
+    @classmethod
+    def get_optuna_params(cls, trial) -> dict:
+        return {
+            "objective": "multi:softmax",
+            "num_class": 3,
+            "eval_metric": "mlogloss",
+            "tree_method": "hist",
+            "device": "cuda",
+            "n_estimators": trial.suggest_int("n_estimators", 50, 400),
+            "learning_rate": trial.suggest_float("learning_rate", 1e-3, 0.3, log=True),
+            "max_depth": trial.suggest_int("max_depth", 3, 10),
+            "subsample": trial.suggest_float("subsample", 0.5, 1.0),
+            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
+            "gamma": trial.suggest_float("gamma", 1e-8, 1.0, log=True),
+            "min_child_weight": trial.suggest_int("min_child_weight", 1, 10),
+            "random_state": 42,
+            "n_jobs": -1,
+        }
 
 
 def main():
-    """
-    Main function to run the Optuna hyperparameter optimization study.
-    """
-    N_TRIALS = 50
-
-    # 1. Load Data
-    print("Loading historical data...")
-    data = fetch_historical_data(
-        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv",
+    data_path = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/BTCUSDT_1h.csv"
+    raw_data = fetch_historical_data(
+        data_path=data_path,
         start_date="2022-01-01T00:00:00Z",
     )
 
-    # 2. Setup and Run Optuna Study
-    db_file_name = "optuna-study"
-    study_name_in_db = "xgboost price std reversal v2"
-    storage_name = f"sqlite:///{db_file_name}.db"
+    config = {
+        "n_splits": 3,
+        "pct_embargo": 0.01,
+        "use_pca": False,
+        "corr_threshold": 0.3,
+    }
 
-    print(f"Starting Optuna study: '{study_name_in_db}'. Storage: {storage_name}")
-
-    # Use a partial function to pass the loaded data to the objective function
-    objective_with_data = partial(objective, data=data)
-
-    study = optuna.create_study(
-        direction="maximize",
-        study_name=study_name_in_db,
-        storage=storage_name,
-        load_if_exists=True,
+    run_optuna_optimization(
+        pipeline_cls=XGBoostPriceReversalPipeline,
+        model_cls=XGBClassifierMulticlass,
+        raw_data=raw_data,
+        pipeline_config=config,
+        experiment_name="XGBoost_PriceReversal_Optimization",
+        n_trials=50,
+        data_path=data_path,
     )
-
-    study.optimize(objective_with_data, n_trials=N_TRIALS, n_jobs=-1)
-    # 3. Print Study Results
-    print("\n--- Optuna Study Best Results ---")
-    try:
-        best_trial = study.best_trial
-        print(f"Best trial value (Average F1 Score): {best_trial.value}")
-        print("Best parameters found:")
-        for key, value in best_trial.params.items():
-            print(f"  {key}: {value}")
-    except ValueError:
-        print("No successful trials were completed.")
 
 
 def plot_feature_selection_by_threshold(X: pd.DataFrame, y: pd.Series):

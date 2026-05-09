@@ -1,9 +1,6 @@
-from functools import partial
-
 import cupy as cp
 import numpy as np
 from numba import njit
-import optuna
 import pandas as pd
 import xgboost as xgb
 from scipy.stats import pearsonr
@@ -645,142 +642,37 @@ def manual_backtest(
     return y_pred, y_test, report_dict
 
 
-def objective(trial: optuna.Trial, minute_data: pd.DataFrame) -> float:
-    """
-    Optuna objective function to tune hyperparameters for the Palazzo price reversal model.
-    """
-    # === 1. Define Hyperparameter Search Space ===
-    # Data aggregation and labeling hyperparameters
-    volume_threshold = trial.suggest_int("volume_threshold", 25000, 75000)
-    tau = trial.suggest_float("tau", 0.7, 1.3)
-
-    # Feature selection hyperparameter
-    trial.suggest_float("corr_threshold", 0.01, 0.5)
-    trial.suggest_float("p_value_threshold", 0.01, 0.2)
-
-    # Model hyperparameters for XGBoost
-    params = {
-        "objective": "binary:logistic",
-        "eval_metric": "auc",
-        "tree_method": "hist",
-        "device": "cuda",
-        "n_estimators": trial.suggest_int("n_estimators", 50, 400),
-        "learning_rate": trial.suggest_float("learning_rate", 1e-3, 0.3, log=True),
-        "max_depth": trial.suggest_int("max_depth", 3, 20),
-        "subsample": trial.suggest_float("subsample", 0.5, 1.0),
-        "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
-        "gamma": trial.suggest_float("gamma", 1e-8, 1.0, log=True),
-        "min_child_weight": trial.suggest_int("min_child_weight", 1, 10),
-        "seed": 42,
-    }
-    refit_every = 24
-
-    # === 2. Run the ML Pipeline ===
-    print(f"\n--- Starting Trial {trial.number} ---")
-    print(f"Params: {trial.params}")
-
-    # Aggregate into volume bars
-    volume_bars = aggregate_to_volume_bars(
-        minute_data, volume_threshold=volume_threshold
-    )
-
-    if volume_bars.empty:
-        print("No volume bars created. Pruning trial.")
-        raise optuna.exceptions.TrialPruned()
-
-    # Create target labels
-    labeled_bars = create_labels(volume_bars.copy(), tau=tau)
-
-    # Engineer features
-    final_df = create_features(labeled_bars)
-
-    if final_df.empty:
-        print("No data after feature engineering. Pruning trial.")
-        raise optuna.exceptions.TrialPruned()
-
-    y = final_df["label"]
-    features = [col for col in final_df.columns if "feature_" in col]
-    X = final_df[features]
-
-    # Prune trial if not enough positive samples are found
-    if y.sum() < 10:
-        print("Not enough positive samples found with these parameters. Pruning trial.")
-        raise optuna.exceptions.TrialPruned()
-
-    # Prune trial if initial training set is not representative
-    split_index = int(len(X) * (1 - 0.3))  # Corresponds to test_size in manual_backtest
-    if y.iloc[:split_index].nunique() < 2:
-        print("Initial training set does not contain both classes. Pruning trial.")
-        raise optuna.exceptions.TrialPruned()
-
-    # Feature Selection
-    # selected_cols = select_features(X, y, corr_threshold=corr_threshold, p_value_threshold=p_value_threshold)
-    # if not selected_cols:
-    #     print("No features selected. Pruning trial.")
-    #     raise optuna.exceptions.TrialPruned()
-
-    # X = X[selected_cols]
-
-    # Run Backtest
-    model = xgb.XGBClassifier(**params)
-    _, _, report = manual_backtest(
-        X, y, model, test_size=0.3, refit_every=refit_every, train_window_size=4500
-    )
-
-    # === 3. Calculate and Return the Objective Metric ===
-    f1_top = report.get("top (1)", {}).get("f1-score", 0.0)
-
-    print(f"Trial {trial.number} finished. F1 (Top): {f1_top:.4f}")
-
-    return f1_top
-
-
 def main():
-    """
-    Main function to run the Optuna hyperparameter optimization study.
-    """
-    N_TRIALS = 30
+    from src.modeling.machine_learning.xgboost_pipeline_palazzo import (
+        PalazzoXGBoostPipeline,
+        XGBClassifierPalazzo,
+    )
+    from src.modeling.pipeline_runner import run_optuna_optimization
 
-    # 1. Load high-frequency data
-    print("Loading 1-minute historical data...")
-    minute_data = fetch_historical_data(
+    data_path = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv"
+    raw_data = fetch_historical_data(
         symbol="BTC/USDT",
         timeframe="1m",
-        # start_date="2025-09-01T00:00:00Z",
-        data_path="/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv",
+        data_path=data_path,
     )
-    # The aggregate_to_volume_bars function expects 'close' and 'volume' columns.
-    # fetch_historical_data returns 'Close' and 'Volume', so we rename them.
-    minute_data.rename(columns={CLOSE_COL: "close", VOLUME_COL: "volume"}, inplace=True)
-    # print(minute_data)
-    # 2. Setup and Run Optuna Study
-    db_file_name = "optuna-study"
-    study_name_in_db = "xgboost_price_reversal_palazzo_v2"
-    storage_name = f"sqlite:///{db_file_name}.db"
+    raw_data.rename(columns={CLOSE_COL: "close", VOLUME_COL: "volume"}, inplace=True)
 
-    print(f"Starting Optuna study: '{study_name_in_db}'. Storage: {storage_name}")
+    config = {
+        "n_splits": 3,
+        "pct_embargo": 0.01,
+        "use_pca": True,
+        "pca_components": 0.95,
+    }
 
-    # Use a partial function to pass the loaded data to the objective function
-    objective_with_data = partial(objective, minute_data=minute_data)
-    study = optuna.create_study(
-        direction="maximize",
-        study_name=study_name_in_db,
-        storage=storage_name,
-        load_if_exists=True,
+    run_optuna_optimization(
+        pipeline_cls=PalazzoXGBoostPipeline,
+        model_cls=XGBClassifierPalazzo,
+        raw_data=raw_data,
+        pipeline_config=config,
+        experiment_name="Palazzo_XGBoost_PR_Optimization",
+        n_trials=30,
+        data_path=data_path,
     )
-
-    study.optimize(objective_with_data, n_trials=N_TRIALS, n_jobs=-1)
-
-    # 3. Print Study Results
-    print("\n--- Optuna Study Best Results ---")
-    try:
-        best_trial = study.best_trial
-        print(f"Best trial value (F1 Score): {best_trial.value}")
-        print("Best parameters found:")
-        for key, value in best_trial.params.items():
-            print(f"  {key}: {value}")
-    except ValueError:
-        print("No successful trials were completed.")
 
 
 if __name__ == "__main__":

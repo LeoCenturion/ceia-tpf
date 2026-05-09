@@ -140,6 +140,19 @@ class AutoGluonAdapter(BaseEstimator, ClassifierMixin):
         except ImportError:
             return False
 
+    @classmethod
+    def get_optuna_params(cls, trial) -> dict:
+        return {
+            "label": "label",
+            "eval_metric": "f1_weighted",
+            "presets": trial.suggest_categorical(
+                "presets", ["medium_quality", "high_quality", "best_quality"]
+            ),
+            "time_limit": 600,
+            "verbosity": 0,
+            "path": f"AutogluonModels/palazzo_optuna/trial_{trial.number}",
+        }
+
     def leaderboard(self, data=None, silent=False):
         """
         Output the leaderboard of trained models.

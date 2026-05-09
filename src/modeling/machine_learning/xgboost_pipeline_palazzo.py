@@ -12,7 +12,7 @@ from src.constants import (
 )
 from src.data_analysis.data_analysis import fetch_historical_data, timer
 from src.modeling.pipeline import AbstractMLPipeline
-from src.modeling.pipeline_runner import run_pipeline
+from src.modeling.pipeline_runner import run_optuna_optimization, run_pipeline
 from src.modeling.machine_learning.xgboost_price_reversal_palazzo import (
     _create_reversal_features,
     aggregate_to_volume_bars,
@@ -67,6 +67,13 @@ class PalazzoXGBoostPipeline(AbstractMLPipeline):
 
         return final_features.dropna()
 
+    @classmethod
+    def get_optuna_params(cls, trial) -> dict:
+        return {
+            "volume_threshold": trial.suggest_int("volume_threshold", 25000, 75000),
+            "tau": trial.suggest_float("tau", 0.7, 1.3),
+        }
+
     @timer
     def step_3_labeling_and_weighting(
         self, bars
@@ -87,6 +94,25 @@ class PalazzoXGBoostPipeline(AbstractMLPipeline):
         return y, sample_weights, t1
 
 
+class XGBClassifierPalazzo(xgb.XGBClassifier):
+    @classmethod
+    def get_optuna_params(cls, trial) -> dict:
+        return {
+            "objective": "binary:logistic",
+            "eval_metric": "auc",
+            "tree_method": "hist",
+            "device": "cuda",
+            "n_estimators": trial.suggest_int("n_estimators", 50, 400),
+            "learning_rate": trial.suggest_float("learning_rate", 1e-3, 0.3, log=True),
+            "max_depth": trial.suggest_int("max_depth", 3, 20),
+            "subsample": trial.suggest_float("subsample", 0.5, 1.0),
+            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
+            "gamma": trial.suggest_float("gamma", 1e-8, 1.0, log=True),
+            "min_child_weight": trial.suggest_int("min_child_weight", 1, 10),
+            "seed": 42,
+        }
+
+
 def main():
     data_path = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv"
     raw_data = fetch_historical_data(
@@ -97,32 +123,20 @@ def main():
     raw_data.rename(columns={VOLUME_COL: "volume", CLOSE_COL: "close"}, inplace=True)
 
     config = {
-        "volume_threshold": 50000,
-        "tau": 0.7,
         "n_splits": 3,
         "pct_embargo": 0.01,
         "use_pca": True,
         "pca_components": 0.95,
     }
 
-    model_params = {
-        "objective": "binary:logistic",
-        "eval_metric": "auc",
-        "tree_method": "hist",
-        "device": "cuda",
-        "n_estimators": 100,
-        "learning_rate": 0.1,
-        "max_depth": 6,
-    }
-
-    pipeline = PalazzoXGBoostPipeline(config)
-
-    run_pipeline(
-        pipeline=pipeline,
-        model_cls=xgb.XGBClassifier,
+    run_optuna_optimization(
+        pipeline_cls=PalazzoXGBoostPipeline,
+        model_cls=XGBClassifierPalazzo,
         raw_data=raw_data,
-        model_params=model_params,
-        experiment_name="Palazzo_XGBoost_Pipeline",
+        pipeline_config=config,
+        experiment_name="Palazzo_XGBoost_Optimization",
+        n_trials=30,
+        run_name_prefix="palazzo_xgb",
         data_path=data_path,
     )
 
