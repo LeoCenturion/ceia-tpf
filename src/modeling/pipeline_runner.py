@@ -1,8 +1,11 @@
 import logging
+import os
+import tempfile
 
 import mlflow
 import numpy as np
 import optuna
+import pandas as pd
 from sklearn.base import clone
 from sklearn.metrics import (
     classification_report,
@@ -11,8 +14,23 @@ from sklearn.metrics import (
 from src.modeling.mlflow_utils import MLflowLogger
 
 
+def _log_oos_predictions(oos_df: pd.DataFrame) -> None:
+    """Serialize OOS predictions DataFrame to CSV and log under predictions/ artifact path."""
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".csv", delete=False, prefix="oos_predictions_"
+    ) as f:
+        oos_df.to_csv(f, index=True)
+        tmp = f.name
+    try:
+        mlflow.log_artifact(tmp, artifact_path="predictions")
+    finally:
+        os.remove(tmp)
+
+
 class _ReplayTrial:
     """Replays Optuna best_params so get_optuna_params can reconstruct the pipeline/model split."""
+    number = -1  # sentinel so callers that use trial.number get a safe value
+
     def __init__(self, params: dict):
         self._params = params
     def suggest_int(self, name, *a, **kw): return self._params[name]
@@ -89,7 +107,10 @@ def run_pipeline(
             return trained_primary_model, trained_meta_model, metrics
         else:
             model = model_cls(**model_params) if model_cls else None
-            trained_model, scores, X, y, sw, t1, pca = pipeline.run_cv(raw_data, model)
+            trained_model, scores, X, y, sw, t1, pca, oos_df = pipeline.run_cv(raw_data, model)
+
+            if oos_df is not None and not oos_df.empty:
+                _log_oos_predictions(oos_df)
 
             # Log CV Metrics
             avg_score = np.mean(scores)

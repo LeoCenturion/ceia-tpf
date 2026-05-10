@@ -101,8 +101,6 @@ def main():
     config = {
         "n_splits": 3,
         "pct_embargo": 0.01,
-        "use_pca": True,
-        "pca_components": 0.95,
     }
 
     if args.optimize:

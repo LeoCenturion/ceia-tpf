@@ -72,6 +72,8 @@ class PalazzoXGBoostPipeline(AbstractMLPipeline):
         return {
             "volume_threshold": trial.suggest_int("volume_threshold", 25000, 75000),
             "tau": trial.suggest_float("tau", 0.7, 1.3),
+            "use_pca": trial.suggest_categorical("use_pca", [True, False]),
+            "pca_components": trial.suggest_float("pca_components", 0.80, 0.99),
         }
 
     @timer
@@ -120,13 +122,10 @@ def main():
         timeframe="1m",
         data_path=data_path,
     )
-    raw_data.rename(columns={VOLUME_COL: "volume", CLOSE_COL: "close"}, inplace=True)
 
     config = {
         "n_splits": 3,
         "pct_embargo": 0.01,
-        "use_pca": True,
-        "pca_components": 0.95,
     }
 
     run_optuna_optimization(

@@ -677,6 +677,7 @@ class StatisticalModelPipeline(AbstractMLPipeline):
         scores = []
         all_y_test: list = []
         all_y_pred: list = []
+        oos_records: list = []
         print(f"Starting statistical CV ({self.config['n_splits']} folds)…")
         for i, (train_idx, test_idx) in enumerate(cv.split(X_raw, y)):
             X_train = X_raw.iloc[train_idx]
@@ -697,10 +698,16 @@ class StatisticalModelPipeline(AbstractMLPipeline):
             all_y_pred.append(y_pred)
             print(f"  Fold {i + 1} F1: {score:.4f}")
 
+            oos_records.append(pd.DataFrame(
+                {"y_true": y_test.values, "y_pred": y_pred},
+                index=y_test.index,
+            ))
+
         trained_model = clone(model)
         trained_model.fit(X_raw, y, sample_weight=sw.values)
 
-        return trained_model, scores, X_raw, y, sw, t1_series, None
+        oos_df = pd.concat(oos_records).sort_index() if oos_records else pd.DataFrame(columns=["y_true", "y_pred"])
+        return trained_model, scores, X_raw, y, sw, t1_series, None, oos_df
 
 
 # ── optimization ──────────────────────────────────────────────────────────────

@@ -109,6 +109,7 @@ class AbstractMLPipeline(ABC):
         )
 
         scores = []
+        oos_records = []
 
         print(f"Starting Purged Cross-Validation ({self.config['n_splits']} folds)...")
         for i, (train_idx, test_idx) in enumerate(cv.split(X_raw, y)):
@@ -157,6 +158,12 @@ class AbstractMLPipeline(ABC):
             scores.append(f1_score(y_test, y_pred, average="macro"))
             print(f"Fold {i + 1} F1: {scores[-1]:.4f}")
 
+            # 6. Collect OOS predictions (y_test retains original DatetimeIndex)
+            oos_records.append(pd.DataFrame(
+                {"y_true": y_test.values, "y_pred": y_pred},
+                index=y_test.index,
+            ))
+
         # --- Final Fit on Full Dataset ---
         scaler_final = StandardScaler()
         X_scaled_final = scaler_final.fit_transform(X_raw)
@@ -181,4 +188,5 @@ class AbstractMLPipeline(ABC):
         trained_model = clone(model)
         trained_model.fit(X_final, y, sample_weight=sw.values)
 
-        return trained_model, scores, X_final, y, sw, t1_series, pca_final
+        oos_df = pd.concat(oos_records).sort_index() if oos_records else pd.DataFrame(columns=["y_true", "y_pred"])
+        return trained_model, scores, X_final, y, sw, t1_series, pca_final, oos_df

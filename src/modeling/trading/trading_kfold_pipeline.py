@@ -466,6 +466,7 @@ class TradingStrategyPipeline(AbstractMLPipeline):
         scores = []
         all_true_labels: list = []
         all_signals: list = []
+        oos_records: list = []
         print(f"Starting trading CV ({self.config.get('n_splits', 5)} folds)…")
         for i, (train_idx, test_idx) in enumerate(cv.split(X, close)):
             X_train = X.iloc[train_idx]
@@ -501,6 +502,12 @@ class TradingStrategyPipeline(AbstractMLPipeline):
             all_true_labels.append(true_labels)
             all_signals.append(fold_signals)
 
+            # OOS predictions: y_true = close prices, y_pred = signals (for return computation)
+            oos_records.append(pd.DataFrame(
+                {"y_true": close_test.values, "y_pred": signals.values},
+                index=close_test.index,
+            ))
+
         if all_true_labels:
             report = classification_report(
                 np.concatenate(all_true_labels),
@@ -515,7 +522,8 @@ class TradingStrategyPipeline(AbstractMLPipeline):
         trained_model = clone(model)
         trained_model.fit(X, None, sample_weight=sw.values)
 
-        return trained_model, scores, X, close, sw, t1, None
+        oos_df = pd.concat(oos_records).sort_index() if oos_records else pd.DataFrame(columns=["y_true", "y_pred"])
+        return trained_model, scores, X, close, sw, t1, None, oos_df
 
 
 # ---------------------------------------------------------------------------

@@ -121,7 +121,7 @@ class XGBoostPriceReversalPalazzoStrategy(Strategy):  # pylint: disable=attribut
         # 1. Pre-process data to get volume bars and features.
         # This is computationally intensive and done once per backtest run.
         minute_data = self.data.df.copy()
-        minute_data.rename(columns={"Close": "close", "Volume": "volume"}, inplace=True)
+        # minute_data.rename(columns={"Close": "close", "Volume": "volume"}, inplace=True)
 
         volume_bars = aggregate_to_volume_bars(minute_data, self.volume_threshold)
         if volume_bars.empty:

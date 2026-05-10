@@ -655,7 +655,6 @@ def main():
         timeframe="1m",
         data_path=data_path,
     )
-    raw_data.rename(columns={CLOSE_COL: "close", VOLUME_COL: "volume"}, inplace=True)
 
     config = {
         "n_splits": 3,
