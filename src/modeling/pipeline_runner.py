@@ -180,7 +180,7 @@ def run_optuna_optimization(
     with mlflow.start_run(run_name=f"{prefix}_optuna") as parent_run:
         parent_run_id = parent_run.info.run_id
         mlflow.log_param("pipeline_class", pipeline_cls.__name__)
-        mlflow.log_param("model_class", model_cls.__name__)
+        mlflow.log_param("model_class", model_cls.__name__ if model_cls else "None")
         mlflow.log_param("n_trials", n_trials)
         for k, v in pipeline_config.items():
             try:
@@ -190,7 +190,7 @@ def run_optuna_optimization(
 
         def objective(trial):
             pipeline_trial_params = pipeline_cls.get_optuna_params(trial)
-            model_params = model_cls.get_optuna_params(trial)
+            model_params = model_cls.get_optuna_params(trial) if model_cls else {}
             merged_config = {**pipeline_config, **pipeline_trial_params}
             try:
                 _, scores, _, _ = run_pipeline(
@@ -230,14 +230,14 @@ def run_optuna_optimization(
         # conditional branching in each method follows the same path as the best trial.
         replay = _ReplayTrial(best_params)
         best_pipeline_overrides = pipeline_cls.get_optuna_params(replay)
-        best_model_params = model_cls.get_optuna_params(replay)
+        best_model_params = model_cls.get_optuna_params(replay) if model_cls else {}
 
         mlflow.log_params({f"best.{k}": v for k, v in best_params.items()})
         mlflow.log_metric(best_metric_name, best_value)
 
     logging.debug(
         "%s + %s — best %s: %.4f",
-        pipeline_cls.__name__, model_cls.__name__, best_metric_name, best_value,
+        pipeline_cls.__name__, model_cls.__name__ if model_cls else "None", best_metric_name, best_value,
     )
 
     run_pipeline(

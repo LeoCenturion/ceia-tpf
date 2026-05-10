@@ -1,10 +1,7 @@
 import argparse
 import os
-from functools import partial
 
-import mlflow
 import numpy as np
-import optuna
 import pandas as pd
 from autogluon.timeseries import TimeSeriesDataFrame, TimeSeriesPredictor
 from sklearn.metrics import accuracy_score, f1_score
@@ -14,7 +11,7 @@ from typing import Dict
 from src.constants import VOLUME_COL
 from src.data_analysis.data_analysis import fetch_historical_data, timer
 from src.modeling import PurgedKFold
-from src.modeling.pipeline_runner import run_pipeline
+from src.modeling.pipeline_runner import run_optuna_optimization, run_pipeline
 from src.modeling.machine_learning.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
 
 
@@ -587,6 +584,19 @@ class PalazzoChronosBinaryClassificationPipeline(PalazzoChronosPipeline):
 
         return int(pred_mean > 0)
 
+    @classmethod
+    def get_optuna_params(cls, trial) -> dict:
+        return {
+            "chronos_model": trial.suggest_categorical(
+                "chronos_model",
+                [
+                    "amazon/chronos-bolt-tiny",
+                    "amazon/chronos-bolt-small",
+                    "amazon/chronos-bolt-mini",
+                ],
+            ),
+        }
+
     def build_hyperparameters(self) -> Dict:
         model_path = self.config.get("chronos_model", "amazon/chronos-t5-small")
         hyperparameter_key = "Chronos2" if ("chronos2" in model_path.lower() or "chronos-2" in model_path.lower()) else "Chronos"
@@ -819,79 +829,6 @@ class PalazzoChronosBinaryClassificationPipeline(PalazzoChronosPipeline):
             )
 
 
-def objective(trial, raw_data):
-    """Optuna objective function for the Chronos Binary Classification pipeline."""
-    chronos_model = trial.suggest_categorical(
-        "chronos_model",
-        [
-            "amazon/chronos-bolt-tiny",
-            "amazon/chronos-bolt-small",
-            "amazon/chronos-bolt-mini",
-        ],
-    )
-    prediction_length = 2
-    n_splits = 3
-    pct_embargo = 0.05
-    volume_threshold = 50000
-    fine_tune_batch_size = 32
-    time_limit = 600
-
-    config = {
-        "volume_threshold": volume_threshold,
-        "prediction_length": prediction_length,
-        "chronos_model": chronos_model,
-        "n_splits": n_splits,
-        "pct_embargo": pct_embargo,
-        "fine_tune_batch_size": fine_tune_batch_size,
-        "time_limit": time_limit,
-    }
-
-    pipeline = PalazzoChronosBinaryClassificationPipeline(config)
-    try:
-        _, scores, _, _, _, _, _ = pipeline.run_cv(raw_data)
-        return float(np.mean(scores))
-    except Exception as e:
-        print(f"Trial {trial.number} failed: {e}")
-        return 0.0
-
-
-def run_optuna_study(raw_data, data_path, n_trials=10):
-    """Sets up and runs an Optuna study for the Chronos Binary Classification pipeline."""
-    study_name = "Chronos_Palazzo_FinetuneToClass"
-    storage_name = "sqlite:///optuna-study.db"
-
-    mlflow.set_tracking_uri("sqlite:///mlflow.db")
-    mlflow.set_experiment(study_name)
-
-    study = optuna.create_study(
-        direction="maximize",
-        study_name=study_name,
-        storage=storage_name,
-        load_if_exists=True,
-    )
-
-    def mlflow_callback(study, trial):
-        with mlflow.start_run(run_name=f"chronos_trial_{trial.number}"):
-            mlflow.log_params(trial.params)
-            mlflow.log_metric("avg_f1_score", trial.value)
-
-    study.optimize(
-        partial(objective, raw_data=raw_data),
-        n_trials=n_trials,
-        callbacks=[mlflow_callback],
-    )
-
-    print("--- Optuna Study Best Results ---")
-    try:
-        best = study.best_trial
-        print(f"Best trial value (F1 Score): {best.value:.4f}")
-        print("Best parameters found:")
-        for key, value in best.params.items():
-            print(f"  {key}: {value}")
-    except ValueError:
-        print("No successful trials were completed.")
-
-
 def main():
     parser = argparse.ArgumentParser(
         description="Run Chronos Palazzo Pipeline or Optuna study."
@@ -909,7 +846,24 @@ def main():
     )
 
     if args.optimize:
-        run_optuna_study(raw_data, data_path, n_trials=5)
+        config = {
+            "volume_threshold": 50000,
+            "prediction_length": 2,
+            "n_splits": 3,
+            "pct_embargo": 0.05,
+            "fine_tune_batch_size": 32,
+            "time_limit": 600,
+        }
+        run_optuna_optimization(
+            pipeline_cls=PalazzoChronosBinaryClassificationPipeline,
+            model_cls=None,
+            raw_data=raw_data,
+            pipeline_config=config,
+            experiment_name="Chronos_Palazzo_FinetuneToClass_Optimization",
+            n_trials=5,
+            run_name_prefix="chronos_palazzo",
+            data_path=data_path,
+        )
     else:
         config = {
             "volume_threshold": 50000,

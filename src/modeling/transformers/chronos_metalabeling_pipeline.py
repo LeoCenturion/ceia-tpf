@@ -85,12 +85,13 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
             oof_preds.loc[fold_indices] = val_pred
             oof_probs.loc[fold_indices] = val_prob
 
-        logger.debug(f"Average OOF CV F1 Score: {np.mean(fold_f1_scores):.4f}")
+        avg_oof_f1 = np.mean(fold_f1_scores)
+        logger.debug(f"Average OOF CV F1 Score: {avg_oof_f1:.4f}")
 
         return pd.DataFrame(
             {"true_label": y, "primary_pred": oof_preds, "primary_prob": oof_probs},
             index=X.index,
-        )
+        ), avg_oof_f1
 
     def log_results(
         self,
@@ -253,7 +254,7 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
             )
 
         # Generate OOF predictions
-        oof_df = self.generate_oof_predictions(
+        oof_df, avg_oof_f1 = self.generate_oof_predictions(
             X_train, y_train, t1_train, sw_train, primary_model_init
         )
         logger.debug(f"After generate_oof_predictions, oof_df shape: {oof_df.shape}")
@@ -274,7 +275,7 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
         self.primary_model_ = model_cls(**primary_model_params)
         self.primary_model_.fit(X_train, y_train, sample_weight=sw_train.values)
         self.t1_train_ = t1_train  # Store t1 for potential future use or debugging
-        return X_test, y_test, t1_test
+        return X_test, y_test, t1_test, avg_oof_f1
 
     def predict(self, data_window: pd.DataFrame) -> int:
         """
@@ -339,7 +340,7 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
             )
 
             # Fit the pipeline and get test data
-            X_test, y_test, t1_test = self.fit(raw_data, model_cls, model_params)
+            X_test, y_test, t1_test, avg_oof_f1 = self.fit(raw_data, model_cls, model_params)
             logger.debug(
                 f"After fit and split, X_test shape: {X_test.shape}, y_test shape: {y_test.shape}"
             )
@@ -359,6 +360,9 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
             final_decision = final_decision.astype(int)
 
             # --- Metrics ---
+            from sklearn.metrics import classification_report as _cr
+            primary_report = _cr(y_test, primary_test_pred, output_dict=True, zero_division=0)
+
             prec_baseline = precision_score(
                 y_test, primary_test_pred, pos_label=1, zero_division=0
             )
@@ -367,11 +371,13 @@ class ChronosMetaLabelingPipeline(ChronosFeaturePipeline):
             )
 
             metrics = {
+                "avg_cv_f1": avg_oof_f1,
+                "test_accuracy": primary_report["accuracy"],
+                "test_macro_f1": primary_report["macro avg"]["f1-score"],
+                "test_weighted_f1": primary_report["weighted avg"]["f1-score"],
                 "baseline_precision": prec_baseline,
                 "metalabeling_precision": prec_meta,
-                "baseline_f1_weighted": f1_score(
-                    y_test, primary_test_pred, average="weighted"
-                ),
+                "baseline_f1_weighted": primary_report["weighted avg"]["f1-score"],
                 "metalabeling_f1_weighted": f1_score(
                     y_test, final_decision, average="weighted"
                 ),

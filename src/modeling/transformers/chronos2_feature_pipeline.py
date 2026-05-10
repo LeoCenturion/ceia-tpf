@@ -1,17 +1,14 @@
 import argparse
 import logging
-from functools import partial
 
-import mlflow
 import numpy as np
-import optuna
 import pandas as pd
 import torch
 from chronos import Chronos2Pipeline
 
 from src.data_analysis.data_analysis import fetch_historical_data, timer
 from src.modeling.autogluon_adapter import AutoGluonAdapter
-from src.modeling.pipeline_runner import run_pipeline
+from src.modeling.pipeline_runner import run_optuna_optimization, run_pipeline
 from src.modeling.machine_learning.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
 
 logger = logging.getLogger(__name__)
@@ -88,85 +85,19 @@ class Chronos2FeaturePipeline(PalazzoXGBoostPipeline):
         logger.debug(f"Combined features shape: {features.shape}")
         return features
 
-
-def objective(trial, raw_data):
-    """Optuna objective function for Chronos-2 Feature pipeline."""
-    chronos_window_size = trial.suggest_int("chronos_window_size", 32, 256, step=64)
-    chronos_model_name = trial.suggest_categorical(
-        "chronos_model_name",
-        [
-            "autogluon/chronos-2-tiny",
-            "autogluon/chronos-2-mini",
-            "autogluon/chronos-2-small",
-        ],
-    )
-
-    pipeline_config = {
-        "volume_threshold": 50000,
-        "tau": 0.7,
-        "n_splits": 3,
-        "pct_embargo": 0.01,
-        "use_pca": False,
-        "chronos_model_name": chronos_model_name,
-        "chronos_window_size": chronos_window_size,
-        "chronos_stride": 1,
-    }
-
-    presets = trial.suggest_categorical("presets", ["medium_quality", "high_quality"])
-    time_limit = trial.suggest_int("time_limit", 300, 600, step=300)
-
-    model_params = {
-        "label": "label",
-        "eval_metric": "f1_weighted",
-        "presets": presets,
-        "time_limit": time_limit,
-        "verbosity": 0,
-        "path": f"AutogluonModels/chronos2_optuna/trial_{trial.number}",
-    }
-
-    pipeline = Chronos2FeaturePipeline(pipeline_config)
-
-    try:
-        model = AutoGluonAdapter(**model_params)
-        _, scores, _, _, _, _, _ = pipeline.run_cv(raw_data, model)
-        avg_f1 = np.mean(scores)
-        return avg_f1
-    except Exception as e:
-        logger.error(f"Trial {trial.number} failed: {e}")
-        return 0.0
-
-
-def run_optuna_study(raw_data, data_path, n_trials=10):
-    study_name = "chronos2_feature_pipeline_optimization"
-    storage_name = "sqlite:///optuna-study.db"
-    mlflow.set_tracking_uri("sqlite:///mlflow.db")
-    mlflow.set_experiment(study_name)
-
-    study = optuna.create_study(
-        direction="maximize",
-        study_name=study_name,
-        storage=storage_name,
-        load_if_exists=True,
-    )
-
-    objective_with_data = partial(objective, raw_data=raw_data)
-
-    def mlflow_callback(study, trial):
-        with mlflow.start_run(run_name=f"chronos2_trial_{trial.number}"):
-            mlflow.log_params(trial.params)
-            mlflow.log_metric("avg_f1_score", trial.value)
-
-    study.optimize(objective_with_data, n_trials=n_trials, callbacks=[mlflow_callback])
-
-    print("--- Optuna Study Best Results ---")
-    try:
-        best_trial = study.best_trial
-        print(f"Best trial value (F1 Score): {best_trial.value:.4f}")
-        print("Best parameters found:")
-        for key, value in best_trial.params.items():
-            print(f"  {key}: {value}")
-    except ValueError:
-        print("No successful trials were completed.")
+    @classmethod
+    def get_optuna_params(cls, trial) -> dict:
+        return {
+            "chronos_model_name": trial.suggest_categorical(
+                "chronos_model_name",
+                [
+                    "autogluon/chronos-2-tiny",
+                    "autogluon/chronos-2-mini",
+                    "autogluon/chronos-2-small",
+                ],
+            ),
+            "chronos_window_size": trial.suggest_int("chronos_window_size", 32, 256, step=64),
+        }
 
 
 def run_single_pipeline():
@@ -228,7 +159,24 @@ def main():
     )
 
     if args.optimize:
-        run_optuna_study(raw_data, data_path, n_trials=10)
+        config = {
+            "volume_threshold": 50000,
+            "tau": 0.7,
+            "n_splits": 3,
+            "pct_embargo": 0.01,
+            "use_pca": False,
+            "chronos_stride": 1,
+        }
+        run_optuna_optimization(
+            pipeline_cls=Chronos2FeaturePipeline,
+            model_cls=AutoGluonAdapter,
+            raw_data=raw_data,
+            pipeline_config=config,
+            experiment_name="Chronos2_Feature_AutoGluon_Optimization",
+            n_trials=10,
+            run_name_prefix="chronos2_feature",
+            data_path=data_path,
+        )
     else:
         run_single_pipeline()
 

@@ -1,6 +1,8 @@
+import argparse
 import logging
 import os
 import shutil
+
 import numpy as np
 import pandas as pd
 import torch
@@ -11,7 +13,7 @@ from tqdm import tqdm
 from src.data_analysis.data_analysis import fetch_historical_data
 from src.modeling.autogluon_adapter import AutoGluonAdapter
 from src.modeling.pipeline import timer
-from src.modeling.pipeline_runner import run_pipeline
+from src.modeling.pipeline_runner import run_optuna_optimization, run_pipeline
 from src.modeling.machine_learning.xgboost_pipeline_palazzo import PalazzoXGBoostPipeline
 
 logger = logging.getLogger(__name__)
@@ -189,6 +191,16 @@ class FinetunedChronosFeaturePipeline(PalazzoXGBoostPipeline):
 
         return X_train_final, X_test_final, y_train_final, y_test_final
 
+    @classmethod
+    def get_optuna_params(cls, trial) -> dict:
+        return {
+            "chronos_model_name": trial.suggest_categorical(
+                "chronos_model_name",
+                ["amazon/chronos-bolt-tiny", "amazon/chronos-t5-tiny"],
+            ),
+            "chronos_window_size": trial.suggest_int("chronos_window_size", 32, 256, step=64),
+        }
+
 
 def run_single_pipeline():
     """Defines and runs a single pipeline for demonstration or debugging."""
@@ -232,8 +244,44 @@ def run_single_pipeline():
 
 
 def main():
-    """Main entry point for the script."""
-    run_single_pipeline()
+    parser = argparse.ArgumentParser(
+        description="Run Finetuned Chronos Feature Pipeline or Optuna study."
+    )
+    parser.add_argument(
+        "--optimize",
+        action="store_true",
+        help="Run Optuna hyperparameter optimization study.",
+    )
+    args = parser.parse_args()
+
+    if args.optimize:
+        data_path = "/home/leocenturion/Documents/postgrados/ia/tp-final/Tp Final/data/binance/python/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT_consolidated_klines.csv"
+        raw_data = fetch_historical_data(
+            symbol="BTC/USDT",
+            timeframe="1m",
+            start_date="2023-01-01T00:00:00Z",
+            data_path=data_path,
+        )
+        config = {
+            "volume_threshold": 50000,
+            "tau": 0.7,
+            "n_splits": 3,
+            "pct_embargo": 0.01,
+            "finetune_time_limit": 300,
+            "fine_tune_batch_size": 16,
+        }
+        run_optuna_optimization(
+            pipeline_cls=FinetunedChronosFeaturePipeline,
+            model_cls=AutoGluonAdapter,
+            raw_data=raw_data,
+            pipeline_config=config,
+            experiment_name="Finetuned_Chronos_Feature_Optimization",
+            n_trials=10,
+            run_name_prefix="finetuned_chronos",
+            data_path=data_path,
+        )
+    else:
+        run_single_pipeline()
 
 
 if __name__ == "__main__":
